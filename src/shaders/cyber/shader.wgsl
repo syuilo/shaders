@@ -180,29 +180,12 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 
 	var border = 0.25;
 
-	// glsl
-	//vec2 modUv = vec2(mod(uv - 0.5, cellSize));
-	var modUv = vec2f(
-		(uv.x - 0.5) - cellSize.x * floor((uv.x - 0.5) / cellSize.x),
-		(uv.y - 0.5) - cellSize.y * floor((uv.y - 0.5) / cellSize.y)
-	);
-
-	// glsl
-	//vec2 cellSize2 = cellSize * 2.0;
-	//vec2 modUv2 = vec2(mod(uv - 0.5, cellSize2));
-	//vec2 cellSize4 = cellSize * 4.0;
-	//vec2 modUv4 = vec2(mod(uv - 0.5, cellSize4));
+	var modUv = (uv - 0.5) - cellSize * floor((uv - 0.5) / cellSize); // = mod(uv - 0.5, cellSize)
 
 	let cellSize2 = cellSize * 2.0;
-	let modUv2 = vec2f(
-		(uv.x - 0.5) - cellSize2.x * floor((uv.x - 0.5) / cellSize2.x),
-		(uv.y - 0.5) - cellSize2.y * floor((uv.y - 0.5) / cellSize2.y)
-	);
+	let modUv2 = (uv - 0.5) - cellSize2 * floor((uv - 0.5) / cellSize2); // = mod(uv - 0.5, cellSize2)
 	let cellSize4 = cellSize * 4.0;
-	let modUv4 = vec2f(
-		(uv.x - 0.5) - cellSize4.x * floor((uv.x - 0.5) / cellSize4.x),
-		(uv.y - 0.5) - cellSize4.y * floor((uv.y - 0.5) / cellSize4.y)
-	);
+	let modUv4 = (uv - 0.5) - cellSize4 * floor((uv - 0.5) / cellSize4); // = mod(uv - 0.5, cellSize4)
 
 	let cellUv2 = (cellSize2 * floor((uv - 0.5) / cellSize2))
 		+ cellSize2 / 2.0
