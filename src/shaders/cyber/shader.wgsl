@@ -165,6 +165,11 @@ struct Uniforms {
 @group(0) @binding(2) var symbolSampler: sampler;
 @group(0) @binding(3) var symbolTextures: texture_2d_array<f32>;
 
+// equivalent to GLSL's mod function
+fn modVec2f(a: vec2f, b: vec2f) -> vec2f {
+	return a - b * floor(a / b);
+}
+
 @fragment
 fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	let time = uniforms.time * uniforms.timeFactor;
@@ -180,12 +185,12 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 
 	var border = 0.25;
 
-	var modUv = (uv - 0.5) - cellSize * floor((uv - 0.5) / cellSize); // = mod(uv - 0.5, cellSize)
+	var modUv = modVec2f(uv - 0.5, cellSize);
 
 	let cellSize2 = cellSize * 2.0;
-	let modUv2 = (uv - 0.5) - cellSize2 * floor((uv - 0.5) / cellSize2); // = mod(uv - 0.5, cellSize2)
+	let modUv2 = modVec2f(uv - 0.5, cellSize2);
 	let cellSize4 = cellSize * 4.0;
-	let modUv4 = (uv - 0.5) - cellSize4 * floor((uv - 0.5) / cellSize4); // = mod(uv - 0.5, cellSize4)
+	let modUv4 = modVec2f(uv - 0.5, cellSize4);
 
 	let cellUv2 = (cellSize2 * floor((uv - 0.5) / cellSize2))
 		+ cellSize2 / 2.0
