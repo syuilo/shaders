@@ -21,14 +21,9 @@ export async function initWebGPU(canvas: HTMLCanvasElement, code: string, opts =
 	}
 	const context = _context as GPUCanvasContext;
 
-	let aspectRatioMin = [1.0, 1.0];
-	let aspectRatioMax = [1.0, 1.0];
-
 	function setCanvasSize(width: number, height: number) {
 		canvas.width = Math.max(1, Math.min(width, device.limits.maxTextureDimension2D));
 		canvas.height = Math.max(1, Math.min(height, device.limits.maxTextureDimension2D));
-		aspectRatioMin = [Math.min(width / height, 1.0), Math.min(height / width, 1.0)];
-		aspectRatioMax = [Math.max(width / height, 1.0), Math.max(height / width, 1.0)];
 	}
 
 	setCanvasSize(canvas.offsetWidth * pixelRatio, canvas.offsetHeight * pixelRatio);
@@ -81,6 +76,8 @@ export async function initWebGPU(canvas: HTMLCanvasElement, code: string, opts =
 		layout: 'auto',
 	});
 
+	let disposed = false;
+
 	function start(renderCb) {
 		// 誰が見ても同じレンダリング結果になるように、開いた時間を基準にする
 		// ただそのままUNIX時間を入れると、秒数が大きすぎて浮動小数点数の関係で精度が落ちるため、1日間隔でループ
@@ -96,6 +93,8 @@ export async function initWebGPU(canvas: HTMLCanvasElement, code: string, opts =
 		};
 
 		function render(timeStamp: number) {
+			if (disposed) return;
+
 			const time = initialTime + Math.floor(timeStamp);
 
 			renderPassDescriptor.colorAttachments[0].view = context.getCurrentTexture().createView();
@@ -105,23 +104,31 @@ export async function initWebGPU(canvas: HTMLCanvasElement, code: string, opts =
 			passEncoder.setPipeline(pipeline);
 			passEncoder.setVertexBuffer(0, vertexBuffer);
 
-			renderCb({ device, passEncoder, time, aspectRatioMin, aspectRatioMax });
+			renderCb({ device, passEncoder, time, width: canvas.width, height: canvas.height });
 
 			passEncoder.draw(6);
 			passEncoder.end();
 			device.queue.submit([commandEncoder.finish()]);
+		}
 
-			if (opts.fps == null) {
-				window.requestAnimationFrame(render);
-			}
+		function renderLoop(timeStamp: number) {
+			if (disposed) return;
+
+			render(timeStamp);
+
+			window.requestAnimationFrame(renderLoop);
 		}
 
 		if (opts.fps) {
-			window.setInterval(() => {
+			const intervalId = window.setInterval(() => {
+				if (disposed) {
+					window.clearInterval(intervalId);
+					return;
+				}
 				render(performance.now());
 			}, 1000 / opts.fps);
 		} else {
-			window.requestAnimationFrame(render);
+			window.requestAnimationFrame(renderLoop);
 		}
 
 		const observer = new ResizeObserver(entries => {
@@ -136,5 +143,11 @@ export async function initWebGPU(canvas: HTMLCanvasElement, code: string, opts =
 		observer.observe(canvas);
 	}
 
-	return { start, device, pipeline };
+	function dispose() {
+		disposed = true;
+		device.destroy();
+		context.unconfigure();
+	}
+
+	return { start, device, pipeline, dispose };
 }

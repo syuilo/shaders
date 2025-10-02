@@ -163,16 +163,38 @@ fn premultiplyAlpha(color: vec4f) -> vec4f {
 }
 
 struct Uniforms {
-	aspectRatio: vec2f,
+	aspectRatio: f32,
 	time: f32,
 	timeFactor: f32,
 	divisions: f32,
-	texturesCount: u32,
+	symbolTexturesCount: u32,
+	pointerPosition: vec2f,
+	useSource: u32,
+	sourceTextureAspectRatio: f32,
 };
 
 @group(0) @binding(1) var<uniform> uniforms: Uniforms;
 @group(0) @binding(2) var symbolSampler: sampler;
 @group(0) @binding(3) var symbolTextures: texture_2d_array<f32>;
+@group(0) @binding(4) var sourceTexture: texture_2d<f32>;
+
+fn getPointerForce(uv: vec2f) -> f32 {
+	if (uniforms.pointerPosition.x == -1.0 && uniforms.pointerPosition.y == -1.0) {
+		return 0.0;
+	}
+
+	var v = 0.0;
+	let thickness = 0.05;
+	let radius = 0.1;
+
+	let d = distance(uv, (uniforms.pointerPosition + vec2f(-0.5, 0.5)) / vec2f(1.0, uniforms.aspectRatio));
+	if (d < radius + thickness && d > radius - thickness) {
+		let gradate = abs(d - radius + thickness) / thickness;
+		v += ((1.0 - radius) * gradate);
+	}
+
+	return v;
+}
 
 @fragment
 fn fs(fragData: VertexOut) -> @location(0) vec4f {
@@ -180,10 +202,9 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	let u_seed = 1000.0;
 	let u_scale = 48.0;
 	let noiseScale = 32.0;
-
-	let uv = (fragData.uv - vec2(0.5, 0.5)) * uniforms.aspectRatio;
-
 	let scroll = vec2f(0.0, -time * 0.0001);
+
+	let uv = (fragData.uv - 0.5) / vec2f(1.0, uniforms.aspectRatio);
 
 	var cellSize = vec2f(1.0 / uniforms.divisions);
 
@@ -220,20 +241,29 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 		+ cellSize / 2.0
 		+ 0.5;
 
-	//float ripple = getRipple(cellUv);
-	//float pointerForce = getPointerForce(cellUv);
+	let sourceScale = select(1.0, uniforms.sourceTextureAspectRatio / uniforms.aspectRatio, uniforms.sourceTextureAspectRatio > uniforms.aspectRatio);
+	let sourceUv = cellUv * vec2f(1.0, uniforms.sourceTextureAspectRatio) / sourceScale;
 
-	let texSelector = snoise0to1(vec3f((cellUv * 3.0) + scroll, time * 0.00001));
+	let sourceColor = textureSample(sourceTexture, symbolSampler, sourceUv + 0.5);
+	//return sourceColor;
+
+	//float ripple = getRipple(cellUv);
+	let pointerForce = getPointerForce(cellUv);
+
+	var texSelector = select(
+		snoise0to1(vec3f((cellUv * 3.0) + scroll, time * 0.00001)),
+		(sourceColor.r + sourceColor.g + sourceColor.b) / 3.0,
+		uniforms.useSource == 1);
 
 	//if (ripple > 0.5) {
 	//	texSelector += 0.25;
 	//	//texSelector *= 1.5;
 	//	texSelector = min(texSelector, 1.0);
 	//}
-	//if (pointerForce > 0.0) {
-	//	texSelector += pointerForce * 0.25;
-	//	texSelector = min(texSelector, 1.0);
-	//}
+	if (pointerForce > 0.0) {
+		texSelector += pointerForce * 0.25;
+		texSelector = min(texSelector, 1.0);
+	}
 
 	let scaleNoise = snoise0to1(vec3f(cellUv * 0.7, time * 0.0000125));
 	var scale = select(0.4, 1.0, scaleNoise > 0.25);
@@ -244,18 +274,22 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 
 	let margin = (1.0 - (0.5 + (scale / 2.0))) * cellSize;
 	let transformedCoords = (modUv - margin) / (cellSize - (margin * 2.0));
-	var out_color = textureSample(symbolTextures, symbolSampler, transformedCoords, u32(texSelector * f32(uniforms.texturesCount)));
+	var out_color = textureSample(symbolTextures, symbolSampler, transformedCoords, u32(texSelector * f32(uniforms.symbolTexturesCount)));
 
 	let visibilityNoiseA = snoise0to1(vec3f(cellUv + scroll, time * 0.00000625));
 	let visibilityNoiseB = snoise0to1(vec3f(cellUv * 8.0, time * 0.00000625));
 	var threshold = 0.65;
 	//if (ripple > 0.5) threshold -= 0.1;
 	var visibility = select(0.0, 1.0, mix(visibilityNoiseA, visibilityNoiseB, 0.5) > threshold);
+	if (uniforms.useSource == 1) {
+		visibility = select(0.0, 1.0, (sourceColor.r + sourceColor.g + sourceColor.b) / 3.0 < threshold);
+	}
 
 	let colorNoise = snoise0to1(vec3f((cellUv * 8.0) + scroll, time * 0.000025));
 
 	// background dots and blocks
 	if (visibility == 0.0) {
+		//return sourceColor;
 		let n = mix(visibilityNoiseA, visibilityNoiseB, 0.2);
 		if (n > 0.75) {
 			return premultiplyAlpha(vec4f(1.0, 1.0, 1.0, 0.05));
@@ -277,23 +311,48 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 		return premultiplyAlpha(vec4f(vec3f(0.0), 0.0));
 	}
 
-	if (colorNoise > 0.9) {
-		out_color.g *= 0.4;
-		out_color.b = 0.0;
-	//} else if (colorNoise > 0.85) {
-	//	out_color.b = 0.0;
-	} else if (colorNoise > 0.7) {
-		out_color.r /= 1.25;
-		out_color.b = 0.0;
-	} else if (colorNoise > 0.35) {
-		out_color.r = 1.0;
-		out_color.g = 1.0;
-		out_color.b = 1.0;
+	if (uniforms.useSource == 1) {
+		if ((sourceColor.r + sourceColor.g + sourceColor.b) / 3.0 > 0.7) {
+			out_color.r = 1.0;
+			out_color.g = 1.0;
+			out_color.b = 1.0;
+		} else if (sourceColor.r > 0.75) {
+			out_color.g *= 0.4;
+			out_color.b = 0.0;
+		//} else if (colorNoise > 0.85) {
+		//	out_color.b = 0.0;
+		} else if (sourceColor.g > 0.4) {
+			out_color.r /= 1.25;
+			out_color.b = 0.0;
+		} else if ((sourceColor.r + sourceColor.g + sourceColor.b) / 3.0 < 0.2) {
+			out_color.r = 1.0;
+			out_color.g = 1.0;
+			out_color.b = 1.0;
+			out_color.a *= 0.7;
+		} else {
+			out_color.r = 1.0;
+			out_color.g = 1.0;
+			out_color.b = 1.0;
+		}
 	} else {
-		out_color.r = 1.0;
-		out_color.g = 1.0;
-		out_color.b = 1.0;
-		out_color.a *= 0.3;
+		if (colorNoise > 0.9) {
+			out_color.g *= 0.4;
+			out_color.b = 0.0;
+		//} else if (colorNoise > 0.85) {
+		//	out_color.b = 0.0;
+		} else if (colorNoise > 0.7) {
+			out_color.r /= 1.25;
+			out_color.b = 0.0;
+		} else if (colorNoise > 0.35) {
+			out_color.r = 1.0;
+			out_color.g = 1.0;
+			out_color.b = 1.0;
+		} else {
+			out_color.r = 1.0;
+			out_color.g = 1.0;
+			out_color.b = 1.0;
+			out_color.a *= 0.3;
+		}
 	}
 
 	if (visibility == 0.0) {
