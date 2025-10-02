@@ -4,15 +4,20 @@
 <div v-if="showMenu" id="menu">
 	<h1>WebGPU - CYBER SHADER by syuilo</h1>
 	<label>
-		<b>source image/video: </b>
+		<b>source image/video:</b>
 		<input type="file" accept="image/*,video/*" @change="onFileSelected"/>
 	</label>
 	<label>
-		<b>audio volume: </b>
+		<b>audio volume:</b>
 		<input type="range" min="0" max="1" step="0.01" v-model="videoAudioVolume" />
 	</label>
 	<label>
-		<b>divisions: </b>
+		<b>video control:</b>
+		<button @click="videoElement.play()">play</button>
+		<button @click="videoElement.pause()">pause</button>
+	</label>
+	<label>
+		<b>divisions:</b>
 		<input type="range" min="8" max="512" step="1" v-model="divisions" />
 	</label>
 </div>

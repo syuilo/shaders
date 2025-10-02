@@ -43,13 +43,20 @@ html, body {
 	color: #fff;
 }
 
-#menu h1 {
+#menu > h1 {
 	margin: 0;
 	font-size: 1.25em;
 	border-bottom: solid 1px #fff5;
 }
 
-#menu label {
+#menu > label {
 	display: block;
 	margin-top: 10px;
+}
+
+#menu > label > b {
+	display: inline-block;
+	min-width: 200px;
+	margin-right: 16px;
+	text-align: right;
 }
