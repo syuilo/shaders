@@ -42,3 +42,14 @@ html, body {
 	backdrop-filter: blur(8px);
 	color: #fff;
 }
+
+#menu h1 {
+	margin: 0;
+	font-size: 1.25em;
+	border-bottom: solid 1px #fff5;
+}
+
+#menu label {
+	display: block;
+	margin-top: 10px;
+}

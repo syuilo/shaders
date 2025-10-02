@@ -3,17 +3,23 @@
 <button id="menuButton" @click="showMenu = !showMenu">MENU</button>
 <div v-if="showMenu" id="menu">
 	<h1>WebGPU - CYBER SHADER by syuilo</h1>
-	<div>
-		<input type="file" accept="image/*,video/*" @change="onFileSelected"/> choose image/video
-	</div>
-	<div>
-		<input type="range" min="8" max="512" step="1" v-model="divisions" /> divisions
-	</div>
+	<label>
+		<b>source image/video: </b>
+		<input type="file" accept="image/*,video/*" @change="onFileSelected"/>
+	</label>
+	<label>
+		<b>audio volume: </b>
+		<input type="range" min="0" max="1" step="0.01" v-model="videoAudioVolume" />
+	</label>
+	<label>
+		<b>divisions: </b>
+		<input type="range" min="8" max="512" step="1" v-model="divisions" />
+	</label>
 </div>
 </template>
 
 <script lang="ts" setup>
-import { onMounted, ref, useTemplateRef } from 'vue';
+import { onMounted, ref, useTemplateRef, watch } from 'vue';
 import code from './shader.wgsl?raw';
 import { initWebGPU } from '@/webgpu.ts';
 import { getUrlParam } from '@/utils.ts';
@@ -61,11 +67,17 @@ const symbolTextureUrls = [
 	'./assets/symbols/fill.png',
 ];
 
+
 const imageElement = document.createElement('img');
 const videoElement = document.createElement('video');
 videoElement.loop = true;
 videoElement.preload = 'auto';
 let sorceType: 'image' | 'video' | null = null;
+
+const videoAudioVolume = ref(0.5);
+watch(videoAudioVolume, (v) => {
+	videoElement.volume = v;
+}, { immediate: true });
 
 const timeFactor = getUrlParam('timeFactor', 'float') ?? 1.0;
 
