@@ -15,6 +15,7 @@
 		<b>video control:</b>
 		<button @click="videoElement.play()">play</button>
 		<button @click="videoElement.pause()">pause</button>
+		<input type="range" min="0" :max="videoDuration" step="0.01" :value="videoCurrentTime" @input="seekVideoTo($event.target.value)" />
 	</label>
 	<label>
 		<b>divisions:</b>
@@ -72,7 +73,6 @@ const symbolTextureUrls = [
 	'./assets/symbols/fill.png',
 ];
 
-
 const imageElement = document.createElement('img');
 const videoElement = document.createElement('video');
 videoElement.loop = true;
@@ -83,6 +83,19 @@ const videoAudioVolume = ref(0.5);
 watch(videoAudioVolume, (v) => {
 	videoElement.volume = v;
 }, { immediate: true });
+
+const videoDuration = ref(0);
+const videoCurrentTime = ref(0);
+videoElement.addEventListener('loadedmetadata', () => {
+	videoDuration.value = videoElement.duration;
+});
+videoElement.addEventListener('timeupdate', () => {
+	videoCurrentTime.value = videoElement.currentTime;
+});
+
+function seekVideoTo(v: number) {
+	videoElement.currentTime = v;
+}
 
 const timeFactor = getUrlParam('timeFactor', 'float') ?? 1.0;
 
