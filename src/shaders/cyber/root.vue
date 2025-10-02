@@ -137,7 +137,7 @@ async function init() {
 	});
 
 	const sourceTexture = createTextureFromSource(device, sorceType === 'video' ? videoElement : sorceType === 'image' ? imageElement : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], {
-		mips: true,
+		mips: sorceType === 'video' ? false : true,
 		flipY: true,
 	});
 
@@ -185,7 +185,7 @@ async function init() {
 				{ texture: sourceTexture },
 				{ width: sourceTexture.width, height: sourceTexture.height },
 			);
-			}
+		}
 	});
 }
 
