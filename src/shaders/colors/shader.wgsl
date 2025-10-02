@@ -153,6 +153,15 @@ fn snoise0to1(v: vec3f) -> f32 {
 	return (snoise(v) + 1.0) / 2.0;
 }
 
+// equivalent to GLSL's mod function
+fn modVec2f(a: vec2f, b: vec2f) -> vec2f {
+	return a - b * floor(a / b);
+}
+
+fn premultiplyAlpha(color: vec4f) -> vec4f {
+	return vec4f(color.rgb * color.a, color.a);
+}
+
 struct Uniforms {
 	aspectRatio: vec2f,
 	time: f32,

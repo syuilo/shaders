@@ -13,6 +13,8 @@ const canvas = useTemplateRef('canvas');
 
 const textureUrls = [
 	'./assets/symbols/dot.png',
+	'./assets/symbols/dot.png',
+	'./assets/symbols/dot.png',
 	'./assets/symbols/dots.png',
 	'./assets/symbols/dots3.png',
 

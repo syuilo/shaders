@@ -153,6 +153,15 @@ fn snoise0to1(v: vec3f) -> f32 {
 	return (snoise(v) + 1.0) / 2.0;
 }
 
+// equivalent to GLSL's mod function
+fn modVec2f(a: vec2f, b: vec2f) -> vec2f {
+	return a - b * floor(a / b);
+}
+
+fn premultiplyAlpha(color: vec4f) -> vec4f {
+	return vec4f(color.rgb * color.a, color.a);
+}
+
 struct Uniforms {
 	aspectRatio: vec2f,
 	time: f32,
@@ -164,11 +173,6 @@ struct Uniforms {
 @group(0) @binding(1) var<uniform> uniforms: Uniforms;
 @group(0) @binding(2) var symbolSampler: sampler;
 @group(0) @binding(3) var symbolTextures: texture_2d_array<f32>;
-
-// equivalent to GLSL's mod function
-fn modVec2f(a: vec2f, b: vec2f) -> vec2f {
-	return a - b * floor(a / b);
-}
 
 @fragment
 fn fs(fragData: VertexOut) -> @location(0) vec4f {
@@ -240,7 +244,7 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 
 	let margin = (1.0 - (0.5 + (scale / 2.0))) * cellSize;
 	let transformedCoords = (modUv - margin) / (cellSize - (margin * 2.0));
-	var out_color = textureSample(symbolTextures, symbolSampler, transformedCoords, u32(texSelector * f32(uniforms.texturesCount - 1)));
+	var out_color = textureSample(symbolTextures, symbolSampler, transformedCoords, u32(texSelector * f32(uniforms.texturesCount)));
 
 	let visibilityNoiseA = snoise0to1(vec3f(cellUv + scroll, time * 0.00000625));
 	let visibilityNoiseB = snoise0to1(vec3f(cellUv * 8.0, time * 0.00000625));
@@ -254,14 +258,10 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	if (visibility == 0.0) {
 		let n = mix(visibilityNoiseA, visibilityNoiseB, 0.2);
 		if (n > 0.75) {
-			// iOSだとおかしい
-			//return vec4f(1.0, 1.0, 1.0, 0.05);
-			return vec4f(0.05, 0.05, 0.05, 1.0);
+			return premultiplyAlpha(vec4f(1.0, 1.0, 1.0, 0.05));
 		} else if (n > 0.5) {
 			if (distance(modUv / cellSize, vec2(0.5, 0.5)) < 0.05) {
-				// iOSだとおかしい
-				//return vec4f(1.0, 1.0, 1.0, 0.25);
-				return vec4f(0.25, 0.25, 0.25, 1.0);
+				return premultiplyAlpha(vec4f(1.0, 1.0, 1.0, 0.25));
 			}
 		}
 	}
@@ -274,9 +274,7 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	);
 
 	if (!isIn) {
-		// iOSだとおかしい
-		//return vec4f(vec3f(0.0), 0.0);
-		return vec4f(0.0, 0.0, 0.0, 1.0);
+		return premultiplyAlpha(vec4f(vec3f(0.0), 0.0));
 	}
 
 	if (colorNoise > 0.9) {
@@ -288,29 +286,19 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 		out_color.r /= 1.25;
 		out_color.b = 0.0;
 	} else if (colorNoise > 0.35) {
-		// iOSだとおかしい
-		//out_color.r = 1.0;
-		//out_color.g = 1.0;
-		//out_color.b = 1.0;
+		out_color.r = 1.0;
+		out_color.g = 1.0;
+		out_color.b = 1.0;
 	} else {
-		// iOSだとおかしい
-		//out_color.r = 1.0;
-		//out_color.g = 1.0;
-		//out_color.b = 1.0;
-		//out_color.a *= 0.25;
-
-		out_color.r *= 0.5;
-		out_color.g *= 0.5;
-		out_color.b *= 0.5;
+		out_color.r = 1.0;
+		out_color.g = 1.0;
+		out_color.b = 1.0;
+		out_color.a *= 0.3;
 	}
-
-	out_color.a *= visibility;
 
 	if (visibility == 0.0) {
-		// iOSだとおかしい
-		//out_color = vec4f(1.0, 1.0, 1.0, ripple * 0.0125);
-		out_color = vec4f(0.0, 0.0, 0.0, 1.0);
+		out_color = vec4f(1.0, 1.0, 1.0, 0.0);
 	}
 
-	return out_color;
+	return premultiplyAlpha(out_color);
 }

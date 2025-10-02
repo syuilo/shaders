@@ -1,16 +1,21 @@
 <template>
-<ShadersTest v-if="shader === 'test'" />
-<ShadersColors v-else-if="shader === 'colors'" />
-<ShadersCyber v-else-if="shader === 'cyber'" />
+<component :is="c" v-if="component" />
 </template>
 
 <script lang="ts" setup>
-import ShadersTest from './shaders/test/root.vue';
-import ShadersColors from './shaders/colors/root.vue';
-import ShadersCyber from './shaders/cyber/root.vue';
+import { defineAsyncComponent } from 'vue';
 import { getUrlParam } from './utils.ts';
 
 const shader = getUrlParam('shader', 'string');
+
+let component;
+switch (shader) {
+	case 'test': component = import('./shaders/test/root.vue'); break;
+	case 'colors': component = import('./shaders/colors/root.vue'); break;
+	case 'cyber': component = import('./shaders/cyber/root.vue'); break;
+}
+
+const c = defineAsyncComponent(() => component);
 </script>
 
 <style scoped>
