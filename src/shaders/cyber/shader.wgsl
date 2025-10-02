@@ -264,7 +264,7 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 		texSelector = min(texSelector, 1.0);
 	}
 
-	let scaleNoise = snoise0to1(vec3f(cellUv * 0.7, time * 0.0000125));
+	let scaleNoise = select(snoise0to1(vec3f(cellUv * 0.7, time * 0.0000125)), 1.0, useSource);
 	var scale = select(0.4, 1.0, scaleNoise > 0.25);
 	scale = min(scale, 1.0 - border);
 	//if (ripple > 0.5) {
@@ -281,7 +281,11 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	//if (ripple > 0.5) threshold -= 0.1;
 	var visibility = select(0.0, 1.0, mix(visibilityNoiseA, visibilityNoiseB, 0.5) > threshold);
 	if (useSource) {
-		visibility = select(0.0, 1.0, (sourceColor.r + sourceColor.g + sourceColor.b) / 3.0 < threshold);
+		let skipWhite = true;
+		visibility = select(0.0, 1.0, (sourceColor.r + sourceColor.g + sourceColor.b) / 3.0 > 0.1);
+		if (skipWhite && (sourceColor.r + sourceColor.g + sourceColor.b) / 3.0 > 0.7) {
+			visibility = 0.0;
+		}
 	}
 
 	let colorNoise = snoise0to1(vec3f((cellUv * 8.0) + scroll, time * 0.000025));
