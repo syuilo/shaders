@@ -18,8 +18,16 @@
 		<input type="range" min="0" :max="videoDuration" step="0.01" :value="videoCurrentTime" @input="seekVideoTo($event.target.value)" />
 	</label>
 	<label>
+		<b>time factor:</b>
+		<input type="range" min="0" max="16" step="0.01" v-model="timeFactor" />
+	</label>
+	<label>
 		<b>divisions:</b>
 		<input type="range" min="8" max="512" step="1" v-model="divisions" />
+	</label>
+	<label>
+		<b>with numbers:</b>
+		<input type="checkbox" v-model="withNumbers" />
 	</label>
 </div>
 </template>
@@ -35,51 +43,13 @@ const showMenu = ref(false);
 
 const canvas = useTemplateRef('canvas');
 
-const symbolTextureUrls = [
-	'./assets/symbols/dot.png',
-	'./assets/symbols/dot.png',
-	'./assets/symbols/dot.png',
-	'./assets/symbols/dots.png',
-	'./assets/symbols/dots3.png',
-
-	'./assets/symbols/o1.png',
-	'./assets/symbols/o2.png',
-	'./assets/symbols/o3.png',
-	'./assets/symbols/o4.png',
-	'./assets/symbols/x1.png',
-	'./assets/symbols/x2.png',
-	'./assets/symbols/cross1.png',
-	'./assets/symbols/cross2.png',
-	'./assets/symbols/slash1.png',
-	'./assets/symbols/slash2.png',
-	'./assets/symbols/corner.png',
-	'./assets/symbols/block.png',
-
-	...(getUrlParam('numbers', 'bool') ? [
-		'./assets/chars/0.png',
-		'./assets/chars/1.png',
-		'./assets/chars/2.png',
-		'./assets/chars/3.png',
-		'./assets/chars/4.png',
-		'./assets/chars/5.png',
-		'./assets/chars/6.png',
-		'./assets/chars/7.png',
-		'./assets/chars/8.png',
-		'./assets/chars/9.png',
-	] : []),
-
-	'./assets/symbols/square-slash.png',
-	'./assets/symbols/stripe.png',
-	'./assets/symbols/fill.png',
-];
-
 const imageElement = document.createElement('img');
 const videoElement = document.createElement('video');
 videoElement.loop = true;
 videoElement.preload = 'auto';
 let sorceType: 'image' | 'video' | null = null;
 
-const videoAudioVolume = ref(0.5);
+const videoAudioVolume = ref(0.3);
 watch(videoAudioVolume, (v) => {
 	videoElement.volume = v;
 }, { immediate: true });
@@ -97,9 +67,12 @@ function seekVideoTo(v: number) {
 	videoElement.currentTime = v;
 }
 
-const timeFactor = getUrlParam('timeFactor', 'float') ?? 1.0;
-
+const timeFactor = ref(getUrlParam('timeFactor', 'float') ?? 1.0);
 const divisions = ref(getUrlParam('divisions', 'int') ?? 64);
+const withNumbers = ref(getUrlParam('numbers', 'bool') ?? false);
+watch(withNumbers, () => {
+	init();
+});
 
 let _dispose: (() => void) | null = null;
 let pointerX = -1.0;
@@ -113,6 +86,44 @@ async function init() {
 		fps: sorceType === 'video' ? null : 30,
 	});
 	_dispose = dispose;
+
+	const symbolTextureUrls = [
+		'./assets/symbols/dot.png',
+		'./assets/symbols/dot.png',
+		'./assets/symbols/dot.png',
+		'./assets/symbols/dots.png',
+		'./assets/symbols/dots3.png',
+
+		'./assets/symbols/o1.png',
+		'./assets/symbols/o2.png',
+		'./assets/symbols/o3.png',
+		'./assets/symbols/o4.png',
+		'./assets/symbols/x1.png',
+		'./assets/symbols/x2.png',
+		'./assets/symbols/cross1.png',
+		'./assets/symbols/cross2.png',
+		'./assets/symbols/slash1.png',
+		'./assets/symbols/slash2.png',
+		'./assets/symbols/corner.png',
+		'./assets/symbols/block.png',
+
+		...(withNumbers.value ? [
+			'./assets/chars/0.png',
+			'./assets/chars/1.png',
+			'./assets/chars/2.png',
+			'./assets/chars/3.png',
+			'./assets/chars/4.png',
+			'./assets/chars/5.png',
+			'./assets/chars/6.png',
+			'./assets/chars/7.png',
+			'./assets/chars/8.png',
+			'./assets/chars/9.png',
+		] : []),
+
+		'./assets/symbols/square-slash.png',
+		'./assets/symbols/stripe.png',
+		'./assets/symbols/fill.png',
+	];
 
 	const sampler = device.createSampler({
 		magFilter: 'linear',
@@ -159,7 +170,7 @@ async function init() {
 			useSource: sorceType == null ? 0 : 1,
 			sourceTextureAspectRatio: sourceTexture.width / sourceTexture.height,
 			time: ctx.time,
-			timeFactor: timeFactor,
+			timeFactor: parseFloat(timeFactor.value),
 			divisions: parseInt(divisions.value),
 			symbolTexturesCount: symbolTextureUrls.length,
 			pointerPosition: [pointerX, -pointerY],

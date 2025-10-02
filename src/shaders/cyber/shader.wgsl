@@ -200,9 +200,8 @@ fn getPointerForce(uv: vec2f) -> f32 {
 fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	let time = uniforms.time * uniforms.timeFactor;
 	let u_seed = 1000.0;
-	let u_scale = 48.0;
-	let noiseScale = 32.0;
 	let scroll = vec2f(0.0, -time * 0.0001);
+	let useSource = uniforms.useSource == 1;
 
 	let uv = (fragData.uv - 0.5) / vec2f(1.0, uniforms.aspectRatio);
 
@@ -253,7 +252,7 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	var texSelector = select(
 		snoise0to1(vec3f((cellUv * 3.0) + scroll, time * 0.00001)),
 		(sourceColor.r + sourceColor.g + sourceColor.b) / 3.0,
-		uniforms.useSource == 1);
+		useSource);
 
 	//if (ripple > 0.5) {
 	//	texSelector += 0.25;
@@ -281,7 +280,7 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	var threshold = 0.65;
 	//if (ripple > 0.5) threshold -= 0.1;
 	var visibility = select(0.0, 1.0, mix(visibilityNoiseA, visibilityNoiseB, 0.5) > threshold);
-	if (uniforms.useSource == 1) {
+	if (useSource) {
 		visibility = select(0.0, 1.0, (sourceColor.r + sourceColor.g + sourceColor.b) / 3.0 < threshold);
 	}
 
@@ -311,7 +310,7 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 		return premultiplyAlpha(vec4f(vec3f(0.0), 0.0));
 	}
 
-	if (uniforms.useSource == 1) {
+	if (useSource) {
 		if ((sourceColor.r + sourceColor.g + sourceColor.b) / 3.0 > 0.7) {
 			out_color.r = 1.0;
 			out_color.g = 1.0;
