@@ -42,11 +42,11 @@
 		<input type="checkbox" v-model="withNumbers" />
 	</label>
 	<label>
-		<b>symbol textures range min:</b>
+		<b>symbol variations range min:</b>
 		<input type="range" min="0" max="1" step="0.01" v-model="symbolTexturesRangeMin" />
 	</label>
 	<label>
-		<b>symbol textures range max:</b>
+		<b>symbol variations range max:</b>
 		<input type="range" min="0" max="1" step="0.01" v-model="symbolTexturesRangeMax" />
 	</label>
 </div>
