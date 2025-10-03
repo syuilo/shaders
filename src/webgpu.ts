@@ -111,25 +111,24 @@ export async function initWebGPU(canvas: HTMLCanvasElement, code: string, opts =
 			device.queue.submit([commandEncoder.finish()]);
 		}
 
+		let then = 0;
+		const interval = 1000 / (opts.fps ?? 30);
+
 		function renderLoop(timeStamp: number) {
 			if (disposed) return;
 
+			window.requestAnimationFrame(renderLoop);
+
+			if (opts.fps != null) {
+				const delta = timeStamp - then;
+				if (delta <= interval) return;
+				then = timeStamp - (delta % interval);
+			}
+
 			render(timeStamp);
-
-			window.requestAnimationFrame(renderLoop);
 		}
 
-		if (opts.fps) {
-			const intervalId = window.setInterval(() => {
-				if (disposed) {
-					window.clearInterval(intervalId);
-					return;
-				}
-				render(performance.now());
-			}, 1000 / opts.fps);
-		} else {
-			window.requestAnimationFrame(renderLoop);
-		}
+		window.requestAnimationFrame(renderLoop);
 
 		const observer = new ResizeObserver(entries => {
 			for (const entry of entries) {

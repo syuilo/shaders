@@ -183,7 +183,7 @@ struct Uniforms {
 @group(0) @binding(4) var sourceTexture: texture_2d<f32>;
 
 // https://docs.arduino.cc/language-reference/en/functions/math/map/
-fn map(value: f32, inMin: f32, inMax: f32, outMin: f32, outMax: f32) -> f32 {
+fn remap(value: f32, inMin: f32, inMax: f32, outMin: f32, outMax: f32) -> f32 {
 	return (value - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
 }
 
@@ -313,7 +313,7 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 
 	var texSelector = select(
 		snoise0to1(vec3f((cellUv * 3.0) + scroll, time * 0.00001)),
-		select(sourceColorLuminance, map(sourceColorLuminance, 0.0, discardBrightPixelsThreshold, 0.0, 1.0), uniforms.discardBrightPixels == 1), // discardBrightPixelsでスキップした範囲の分だけ範囲を圧縮する
+		select(sourceColorLuminance, remap(sourceColorLuminance, 0.0, discardBrightPixelsThreshold, 0.0, 1.0), uniforms.discardBrightPixels == 1), // discardBrightPixelsでスキップした範囲の分だけ範囲を圧縮する
 		useSource);
 
 	//float ripple = getRipple(cellUv);
@@ -329,7 +329,7 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 		texSelector = min(texSelector, 1.0);
 	}
 
-	texSelector = map(texSelector, 0.0, 1.0, uniforms.symbolTexturesRangeMin, uniforms.symbolTexturesRangeMax);
+	texSelector = remap(texSelector, 0.0, 1.0, uniforms.symbolTexturesRangeMin, uniforms.symbolTexturesRangeMax);
 
 	let scaleNoise = select(snoise0to1(vec3f(cellUv * 0.7, time * 0.0000125)), 1.0, useSource);
 	var scale = select(0.4, 1.0, scaleNoise > 0.25);

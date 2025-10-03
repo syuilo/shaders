@@ -4,6 +4,10 @@
 <div v-if="showMenu" id="menu">
 	<h1>WebGPU - CYBER SHADER by syuilo</h1>
 	<label>
+		<b>limit fps to 30:</b>
+		<input type="checkbox" v-model="limitFpsTo30" />
+	</label>
+	<label>
 		<b>source image/video:</b>
 		<input type="file" accept="image/*,video/*" @change="onFileSelected"/>
 	</label>
@@ -83,6 +87,10 @@ function seekVideoTo(v: number) {
 	videoElement.currentTime = v;
 }
 
+const limitFpsTo30 = ref(getUrlParam('limitFpsTo30', 'bool') ?? true);
+watch(limitFpsTo30, () => {
+	init();
+});
 const timeFactor = ref(getUrlParam('timeFactor', 'float') ?? 1.0);
 const divisions = ref(getUrlParam('divisions', 'int') ?? 64);
 const discardBrightPixels = ref(getUrlParam('discardBrightPixels', 'bool') ?? true);
@@ -103,7 +111,7 @@ async function init() {
 	if (_dispose) _dispose();
 
 	const { start, device, pipeline, dispose } = await initWebGPU(canvas.value!, code, {
-		fps: sorceType === 'video' ? null : 30,
+		fps: limitFpsTo30.value ? 30 : null,
 	});
 	_dispose = dispose;
 
