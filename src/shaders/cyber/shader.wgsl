@@ -171,6 +171,8 @@ struct Uniforms {
 	pointerPosition: vec2f,
 	useSource: u32,
 	sourceTextureAspectRatio: f32,
+	discardBrightPixels: u32,
+	enableSampledCellJoining: u32,
 };
 
 @group(0) @binding(1) var<uniform> uniforms: Uniforms;
@@ -180,6 +182,12 @@ struct Uniforms {
 
 fn getPixelatedUv(uv: vec2f, cellSize: vec2f) -> vec2f {
 	return (cellSize * floor((uv - 0.5) / cellSize)) + (cellSize / 2.0);
+}
+
+fn getSourceColor(uv: vec2f) -> vec4f {
+	let sourceScale = select(1.0, uniforms.sourceTextureAspectRatio / uniforms.aspectRatio, uniforms.sourceTextureAspectRatio > uniforms.aspectRatio);
+	let sourceUv = uv * vec2f(1.0, uniforms.sourceTextureAspectRatio) / sourceScale;
+	return textureSample(sourceTexture, symbolSampler, sourceUv + 0.5);
 }
 
 fn getPointerForce(uv: vec2f) -> f32 {
@@ -218,24 +226,76 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	let cellUv2 = getPixelatedUv(uv, cellSize * 2.0) + 0.5;
 	let cellUv4 = getPixelatedUv(uv, cellSize * 4.0) + 0.5;
 
-	let cellMultiplier2Noise = snoise0to1(vec3f(cellUv2.x * 3.0, cellUv2.y * 3.0, time * 0.000025));
-	let cellMultiplier4Noise = snoise0to1(vec3f(cellUv4.x * 3.0, cellUv4.y * 3.0, time * 0.000025));
-	if (cellMultiplier4Noise > 0.9) {
-		modUv = modVec2f(uv - 0.5, cellSize * 4.0);
-		cellSize = cellSize * 4.0;
-		border /= 4.0;
-	} else if (cellMultiplier2Noise > 0.75) {
-		modUv = modVec2f(uv - 0.5, cellSize * 2.0);
-		cellSize = cellSize * 2.0;
-		border /= 2.0;
+	let a2 = cellUv2 + vec2f(-(cellUv2.x / 2.0 / 2.0), -(cellUv2.y / 2.0 / 2.0));
+	let b2 = cellUv2 + vec2f((cellUv2.x / 2.0 / 2.0), -(cellUv2.y / 2.0 / 2.0));
+	let c2 = cellUv2 + vec2f(-(cellUv2.x / 2.0 / 2.0), (cellUv2.y / 2.0 / 2.0));
+	let d2 = cellUv2 + vec2f((cellUv2.x / 2.0 / 2.0), (cellUv2.y / 2.0 / 2.0));
+	let sourceColorA2 = getSourceColor(a2);
+	let sourceColorB2 = getSourceColor(b2);
+	let sourceColorC2 = getSourceColor(c2);
+	let sourceColorD2 = getSourceColor(d2);
+	let sourceColorA2Lum = (sourceColorA2.r + sourceColorA2.g + sourceColorA2.b) / 3.0;
+	let sourceColorB2Lum = (sourceColorB2.r + sourceColorB2.g + sourceColorB2.b) / 3.0;
+	let sourceColorC2Lum = (sourceColorC2.r + sourceColorC2.g + sourceColorC2.b) / 3.0;
+	let sourceColorD2Lum = (sourceColorD2.r + sourceColorD2.g + sourceColorD2.b) / 3.0;
+
+	let a4 = cellUv4 + vec2f(-(cellUv4.x / 4.0 / 2.0), -(cellUv4.y / 4.0 / 2.0));
+	let b4 = cellUv4 + vec2f((cellUv4.x / 4.0 / 2.0), -(cellUv4.y / 4.0 / 2.0));
+	let c4 = cellUv4 + vec2f(-(cellUv4.x / 4.0 / 2.0), (cellUv4.y / 4.0 / 2.0));
+	let d4 = cellUv4 + vec2f((cellUv4.x / 4.0 / 2.0), (cellUv4.y / 4.0 / 2.0));
+	let sourceColorA4 = getSourceColor(a4);
+	let sourceColorB4 = getSourceColor(b4);
+	let sourceColorC4 = getSourceColor(c4);
+	let sourceColorD4 = getSourceColor(d4);
+	let sourceColorA4Lum = (sourceColorA4.r + sourceColorA4.g + sourceColorA4.b) / 3.0;
+	let sourceColorB4Lum = (sourceColorB4.r + sourceColorB4.g + sourceColorB4.b) / 3.0;
+	let sourceColorC4Lum = (sourceColorC4.r + sourceColorC4.g + sourceColorC4.b) / 3.0;
+	let sourceColorD4Lum = (sourceColorD4.r + sourceColorD4.g + sourceColorD4.b) / 3.0;
+
+	let similar2 = (
+		abs(sourceColorA2Lum - sourceColorB2Lum) < 0.1 &&
+		abs(sourceColorA2Lum - sourceColorC2Lum) < 0.1 &&
+		abs(sourceColorB2Lum - sourceColorC2Lum) < 0.1 &&
+		abs(sourceColorA2Lum - sourceColorD2Lum) < 0.1 &&
+		abs(sourceColorB2Lum - sourceColorD2Lum) < 0.1 &&
+		abs(sourceColorC2Lum - sourceColorD2Lum) < 0.1
+	);
+	let similar4 = (
+		abs(sourceColorA4Lum - sourceColorB4Lum) < 0.1 &&
+		abs(sourceColorA4Lum - sourceColorC4Lum) < 0.1 &&
+		abs(sourceColorB4Lum - sourceColorC4Lum) < 0.1 &&
+		abs(sourceColorA4Lum - sourceColorD4Lum) < 0.1 &&
+		abs(sourceColorB4Lum - sourceColorD4Lum) < 0.1 &&
+		abs(sourceColorC4Lum - sourceColorD4Lum) < 0.1
+	);
+
+	if (useSource && uniforms.enableSampledCellJoining == 1) {
+		if (similar4) {
+			modUv = modVec2f(uv - 0.5, cellSize * 4.0);
+			cellSize = cellSize * 4.0;
+			border /= 4.0;
+		} else if (similar2) {
+			modUv = modVec2f(uv - 0.5, cellSize * 2.0);
+			cellSize = cellSize * 2.0;
+			border /= 2.0;
+		}
+	} else {
+		let cellMultiplier2Noise = snoise0to1(vec3f(cellUv2.x * 3.0, cellUv2.y * 3.0, time * 0.000025));
+		let cellMultiplier4Noise = snoise0to1(vec3f(cellUv4.x * 3.0, cellUv4.y * 3.0, time * 0.000025));
+		if (cellMultiplier4Noise > 0.9) {
+			modUv = modVec2f(uv - 0.5, cellSize * 4.0);
+			cellSize = cellSize * 4.0;
+			border /= 4.0;
+		} else if (cellMultiplier2Noise > 0.75) {
+			modUv = modVec2f(uv - 0.5, cellSize * 2.0);
+			cellSize = cellSize * 2.0;
+			border /= 2.0;
+		}
 	}
 
 	var cellUv = getPixelatedUv(uv, cellSize) + 0.5;
 
-	let sourceScale = select(1.0, uniforms.sourceTextureAspectRatio / uniforms.aspectRatio, uniforms.sourceTextureAspectRatio > uniforms.aspectRatio);
-	let sourceUv = cellUv * vec2f(1.0, uniforms.sourceTextureAspectRatio) / sourceScale;
-
-	let sourceColor = textureSample(sourceTexture, symbolSampler, sourceUv + 0.5);
+	let sourceColor = getSourceColor(cellUv);
 	//return sourceColor;
 
 	//float ripple = getRipple(cellUv);
@@ -273,9 +333,8 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	//if (ripple > 0.5) threshold -= 0.1;
 	var visibility = select(0.0, 1.0, mix(visibilityNoiseA, visibilityNoiseB, 0.5) > threshold);
 	if (useSource) {
-		let skipWhite = true;
 		visibility = select(0.0, 1.0, (sourceColor.r + sourceColor.g + sourceColor.b) / 3.0 > 0.1);
-		if (skipWhite && (sourceColor.r + sourceColor.g + sourceColor.b) / 3.0 > 0.7) {
+		if (uniforms.discardBrightPixels == 1 && (sourceColor.r + sourceColor.g + sourceColor.b) / 3.0 > 0.7) {
 			visibility = 0.0;
 		}
 	}
