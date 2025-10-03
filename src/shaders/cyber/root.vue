@@ -170,7 +170,7 @@ async function init() {
 	});
 
 	start(ctx => {
-		if (lastPointerMovedAt + 100 < performance.now()) {
+		if (lastPointerMovedAt + 30 < performance.now()) {
 			pointerX = -1.0;
 			pointerY = -1.0;
 		}
@@ -224,6 +224,22 @@ onMounted(() => {
 		}
 		divisions.value = Math.min(512, Math.max(8, divisions.value));
 	}, { passive: false });
+
+	window.addEventListener('keydown', (ev: KeyboardEvent) => {
+		if (ev.key === 'Escape') {
+			showMenu.value = false;
+			ev.preventDefault();
+		} else if (ev.key === ' ') {
+			videoElement.paused ? videoElement.play() : videoElement.pause();
+			ev.preventDefault();
+		} else if (ev.key === 'ArrowLeft') {
+			videoElement.currentTime = Math.max(0, videoElement.currentTime - 0.01);
+			ev.preventDefault();
+		} else if (ev.key === 'ArrowRight') {
+			videoElement.currentTime = Math.min(videoElement.duration, videoElement.currentTime + 0.01);
+			ev.preventDefault();
+		}
+	});
 });
 
 async function onFileSelected(ev: Event) {

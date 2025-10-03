@@ -190,6 +190,14 @@ fn getSourceColor(uv: vec2f) -> vec4f {
 	return textureSample(sourceTexture, symbolSampler, sourceUv + 0.5);
 }
 
+fn isSimilar(a: vec4f, b: vec4f, c: vec4f, d: vec4f, threshold: f32) -> bool {
+	return (
+		abs(a.r - b.r) < threshold && abs(a.g - b.g) < threshold && abs(a.b - b.b) < threshold &&
+		abs(a.r - c.r) < threshold && abs(a.g - c.g) < threshold && abs(a.b - c.b) < threshold &&
+		abs(a.r - d.r) < threshold && abs(a.g - d.g) < threshold && abs(a.b - d.b) < threshold
+	);
+}
+
 fn getPointerForce(uv: vec2f) -> f32 {
 	if (uniforms.pointerPosition.x == -1.0 && uniforms.pointerPosition.y == -1.0) {
 		return 0.0;
@@ -234,10 +242,6 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	let sourceColorB2 = getSourceColor(b2);
 	let sourceColorC2 = getSourceColor(c2);
 	let sourceColorD2 = getSourceColor(d2);
-	let sourceColorA2Lum = (sourceColorA2.r + sourceColorA2.g + sourceColorA2.b) / 3.0;
-	let sourceColorB2Lum = (sourceColorB2.r + sourceColorB2.g + sourceColorB2.b) / 3.0;
-	let sourceColorC2Lum = (sourceColorC2.r + sourceColorC2.g + sourceColorC2.b) / 3.0;
-	let sourceColorD2Lum = (sourceColorD2.r + sourceColorD2.g + sourceColorD2.b) / 3.0;
 
 	let a4 = cellUv4 + vec2f(-(cellUv4.x / 4.0 / 2.0), -(cellUv4.y / 4.0 / 2.0));
 	let b4 = cellUv4 + vec2f((cellUv4.x / 4.0 / 2.0), -(cellUv4.y / 4.0 / 2.0));
@@ -247,27 +251,9 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	let sourceColorB4 = getSourceColor(b4);
 	let sourceColorC4 = getSourceColor(c4);
 	let sourceColorD4 = getSourceColor(d4);
-	let sourceColorA4Lum = (sourceColorA4.r + sourceColorA4.g + sourceColorA4.b) / 3.0;
-	let sourceColorB4Lum = (sourceColorB4.r + sourceColorB4.g + sourceColorB4.b) / 3.0;
-	let sourceColorC4Lum = (sourceColorC4.r + sourceColorC4.g + sourceColorC4.b) / 3.0;
-	let sourceColorD4Lum = (sourceColorD4.r + sourceColorD4.g + sourceColorD4.b) / 3.0;
 
-	let similar2 = (
-		abs(sourceColorA2Lum - sourceColorB2Lum) < 0.1 &&
-		abs(sourceColorA2Lum - sourceColorC2Lum) < 0.1 &&
-		abs(sourceColorB2Lum - sourceColorC2Lum) < 0.1 &&
-		abs(sourceColorA2Lum - sourceColorD2Lum) < 0.1 &&
-		abs(sourceColorB2Lum - sourceColorD2Lum) < 0.1 &&
-		abs(sourceColorC2Lum - sourceColorD2Lum) < 0.1
-	);
-	let similar4 = (
-		abs(sourceColorA4Lum - sourceColorB4Lum) < 0.1 &&
-		abs(sourceColorA4Lum - sourceColorC4Lum) < 0.1 &&
-		abs(sourceColorB4Lum - sourceColorC4Lum) < 0.1 &&
-		abs(sourceColorA4Lum - sourceColorD4Lum) < 0.1 &&
-		abs(sourceColorB4Lum - sourceColorD4Lum) < 0.1 &&
-		abs(sourceColorC4Lum - sourceColorD4Lum) < 0.1
-	);
+	let similar2 = isSimilar(sourceColorA2, sourceColorB2, sourceColorC2, sourceColorD2, 0.1);
+	let similar4 = isSimilar(sourceColorA4, sourceColorB4, sourceColorC4, sourceColorD4, 0.025);
 
 	if (useSource && uniforms.enableSampledCellJoining == 1) {
 		if (similar4) {
