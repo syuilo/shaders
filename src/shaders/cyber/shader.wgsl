@@ -190,6 +190,14 @@ fn getSourceColor(uv: vec2f) -> vec4f {
 	return textureSample(sourceTexture, symbolSampler, sourceUv + 0.5);
 }
 
+fn discardSourceColor(c: vec4f) -> bool {
+	var visible = select(false, true, (c.r + c.g + c.b) / 3.0 > 0.1);
+	if (uniforms.discardBrightPixels == 1 && (c.r + c.g + c.b) / 3.0 > 0.7) {
+		visible = false;
+	}
+	return !visible;
+}
+
 fn isSimilar(a: vec4f, b: vec4f, c: vec4f, d: vec4f, threshold: f32) -> bool {
 	return (
 		abs(a.r - b.r) < threshold && abs(a.g - b.g) < threshold && abs(a.b - b.b) < threshold &&
@@ -252,8 +260,8 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	let sourceColorC4 = getSourceColor(c4);
 	let sourceColorD4 = getSourceColor(d4);
 
-	let similar2 = isSimilar(sourceColorA2, sourceColorB2, sourceColorC2, sourceColorD2, 0.1);
-	let similar4 = isSimilar(sourceColorA4, sourceColorB4, sourceColorC4, sourceColorD4, 0.025);
+	let similar2 = !discardSourceColor(getSourceColor(cellUv2)) && isSimilar(sourceColorA2, sourceColorB2, sourceColorC2, sourceColorD2, 0.1);
+	let similar4 = !discardSourceColor(getSourceColor(cellUv4)) && isSimilar(sourceColorA4, sourceColorB4, sourceColorC4, sourceColorD4, 0.025);
 
 	if (useSource && uniforms.enableSampledCellJoining == 1) {
 		if (similar4) {
@@ -279,7 +287,7 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 		}
 	}
 
-	var cellUv = getPixelatedUv(uv, cellSize) + 0.5;
+	let cellUv = getPixelatedUv(uv, cellSize) + 0.5;
 
 	let sourceColor = getSourceColor(cellUv);
 	//return sourceColor;
@@ -319,10 +327,7 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	//if (ripple > 0.5) threshold -= 0.1;
 	var visibility = select(0.0, 1.0, mix(visibilityNoiseA, visibilityNoiseB, 0.5) > threshold);
 	if (useSource) {
-		visibility = select(0.0, 1.0, (sourceColor.r + sourceColor.g + sourceColor.b) / 3.0 > 0.1);
-		if (uniforms.discardBrightPixels == 1 && (sourceColor.r + sourceColor.g + sourceColor.b) / 3.0 > 0.7) {
-			visibility = 0.0;
-		}
+		visibility = select(0.0, 1.0, !discardSourceColor(sourceColor));
 	}
 
 	let colorNoise = snoise0to1(vec3f((cellUv * 8.0) + scroll, time * 0.000025));
