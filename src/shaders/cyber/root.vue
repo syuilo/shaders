@@ -37,6 +37,14 @@
 		<b>with numbers:</b>
 		<input type="checkbox" v-model="withNumbers" />
 	</label>
+	<label>
+		<b>symbol textures range min:</b>
+		<input type="range" min="0" max="1" step="0.01" v-model="symbolTexturesRangeMin" />
+	</label>
+	<label>
+		<b>symbol textures range max:</b>
+		<input type="range" min="0" max="1" step="0.01" v-model="symbolTexturesRangeMax" />
+	</label>
 </div>
 </template>
 
@@ -79,6 +87,8 @@ const timeFactor = ref(getUrlParam('timeFactor', 'float') ?? 1.0);
 const divisions = ref(getUrlParam('divisions', 'int') ?? 64);
 const discardBrightPixels = ref(getUrlParam('discardBrightPixels', 'bool') ?? true);
 const enableSampledCellJoining = ref(getUrlParam('enableSampledCellJoining', 'bool') ?? true);
+const symbolTexturesRangeMin = ref(getUrlParam('symbolTexturesRangeMin', 'float') ?? 0.0);
+const symbolTexturesRangeMax = ref(getUrlParam('symbolTexturesRangeMax', 'float') ?? 1.0);
 const withNumbers = ref(getUrlParam('numbers', 'bool') ?? false);
 watch(withNumbers, () => {
 	init();
@@ -115,7 +125,7 @@ async function init() {
 		'./assets/symbols/slash1.png',
 		'./assets/symbols/slash2.png',
 		'./assets/symbols/corner.png',
-		'./assets/symbols/block.png',
+		'./assets/symbols/square-slash.png',
 
 		...(withNumbers.value ? [
 			'./assets/chars/0.png',
@@ -130,9 +140,11 @@ async function init() {
 			'./assets/chars/9.png',
 		] : []),
 
-		'./assets/symbols/square-slash.png',
-		'./assets/symbols/stripe.png',
-		'./assets/symbols/fill.png',
+		'./assets/symbols/block.png',
+
+		//'./assets/symbols/square-slash.png',
+		//'./assets/symbols/stripe.png',
+		//'./assets/symbols/fill.png',
 	];
 
 	const sampler = device.createSampler({
@@ -185,6 +197,8 @@ async function init() {
 			timeFactor: parseFloat(timeFactor.value),
 			divisions: parseInt(divisions.value),
 			symbolTexturesCount: symbolTextureUrls.length,
+			symbolTexturesRangeMin: parseFloat(symbolTexturesRangeMin.value),
+			symbolTexturesRangeMax: parseFloat(symbolTexturesRangeMax.value),
 			pointerPosition: [pointerX, -pointerY],
 		});
 		ctx.device.queue.writeBuffer(uniformBuffer, 0, uniformValues.arrayBuffer);

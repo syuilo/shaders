@@ -168,6 +168,8 @@ struct Uniforms {
 	timeFactor: f32,
 	divisions: f32,
 	symbolTexturesCount: u32,
+	symbolTexturesRangeMin: f32,
+	symbolTexturesRangeMax: f32,
 	pointerPosition: vec2f,
 	useSource: u32,
 	sourceTextureAspectRatio: f32,
@@ -180,6 +182,11 @@ struct Uniforms {
 @group(0) @binding(3) var symbolTextures: texture_2d_array<f32>;
 @group(0) @binding(4) var sourceTexture: texture_2d<f32>;
 
+// https://docs.arduino.cc/language-reference/en/functions/math/map/
+fn map(value: f32, inMin: f32, inMax: f32, outMin: f32, outMax: f32) -> f32 {
+	return (value - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
+}
+
 fn getPixelatedUv(uv: vec2f, cellSize: vec2f) -> vec2f {
 	return (cellSize * floor((uv - 0.5) / cellSize)) + (cellSize / 2.0);
 }
@@ -190,9 +197,11 @@ fn getSourceColor(uv: vec2f) -> vec4f {
 	return textureSample(sourceTexture, symbolSampler, sourceUv + 0.5);
 }
 
+const discardBrightPixelsThreshold = 0.7;
+
 fn discardSourceColor(c: vec4f) -> bool {
 	var visible = select(false, true, (c.r + c.g + c.b) / 3.0 > 0.1);
-	if (uniforms.discardBrightPixels == 1 && (c.r + c.g + c.b) / 3.0 > 0.7) {
+	if (uniforms.discardBrightPixels == 1 && (c.r + c.g + c.b) / 3.0 > discardBrightPixelsThreshold) {
 		visible = false;
 	}
 	return !visible;
@@ -290,15 +299,25 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	let cellUv = getPixelatedUv(uv, cellSize) + 0.5;
 
 	let sourceColor = getSourceColor(cellUv);
+	let sourceColorLuminance = (sourceColor.r + sourceColor.g + sourceColor.b) / 3.0;
 	//return sourceColor;
 
-	//float ripple = getRipple(cellUv);
-	let pointerForce = getPointerForce(cellUv);
+	let visibilityNoiseA = snoise0to1(vec3f(cellUv + scroll, time * 0.00000625));
+	let visibilityNoiseB = snoise0to1(vec3f(cellUv * 8.0, time * 0.00000625));
+	var threshold = 0.65;
+	//if (ripple > 0.5) threshold -= 0.1;
+	var visibility = select(0.0, 1.0, mix(visibilityNoiseA, visibilityNoiseB, 0.5) > threshold);
+	if (useSource) {
+		visibility = select(0.0, 1.0, !discardSourceColor(sourceColor));
+	}
 
 	var texSelector = select(
 		snoise0to1(vec3f((cellUv * 3.0) + scroll, time * 0.00001)),
-		(sourceColor.r + sourceColor.g + sourceColor.b) / 3.0,
+		select(sourceColorLuminance, map(sourceColorLuminance, 0.0, discardBrightPixelsThreshold, 0.0, 1.0), uniforms.discardBrightPixels == 1), // discardBrightPixelsでスキップした範囲の分だけ範囲を圧縮する
 		useSource);
+
+	//float ripple = getRipple(cellUv);
+	let pointerForce = getPointerForce(cellUv);
 
 	//if (ripple > 0.5) {
 	//	texSelector += 0.25;
@@ -310,6 +329,8 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 		texSelector = min(texSelector, 1.0);
 	}
 
+	texSelector = map(texSelector, 0.0, 1.0, uniforms.symbolTexturesRangeMin, uniforms.symbolTexturesRangeMax);
+
 	let scaleNoise = select(snoise0to1(vec3f(cellUv * 0.7, time * 0.0000125)), 1.0, useSource);
 	var scale = select(0.4, 1.0, scaleNoise > 0.25);
 	scale = min(scale, 1.0 - border);
@@ -320,15 +341,6 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	let margin = (1.0 - (0.5 + (scale / 2.0))) * cellSize;
 	let transformedCoords = (modUv - margin) / (cellSize - (margin * 2.0));
 	var out_color = textureSample(symbolTextures, symbolSampler, transformedCoords, u32(texSelector * f32(uniforms.symbolTexturesCount)));
-
-	let visibilityNoiseA = snoise0to1(vec3f(cellUv + scroll, time * 0.00000625));
-	let visibilityNoiseB = snoise0to1(vec3f(cellUv * 8.0, time * 0.00000625));
-	var threshold = 0.65;
-	//if (ripple > 0.5) threshold -= 0.1;
-	var visibility = select(0.0, 1.0, mix(visibilityNoiseA, visibilityNoiseB, 0.5) > threshold);
-	if (useSource) {
-		visibility = select(0.0, 1.0, !discardSourceColor(sourceColor));
-	}
 
 	let colorNoise = snoise0to1(vec3f((cellUv * 8.0) + scroll, time * 0.000025));
 
