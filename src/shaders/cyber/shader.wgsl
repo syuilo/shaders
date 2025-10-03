@@ -178,6 +178,10 @@ struct Uniforms {
 @group(0) @binding(3) var symbolTextures: texture_2d_array<f32>;
 @group(0) @binding(4) var sourceTexture: texture_2d<f32>;
 
+fn getPixelatedUv(uv: vec2f, cellSize: vec2f) -> vec2f {
+	return (cellSize * floor((uv - 0.5) / cellSize)) + (cellSize / 2.0);
+}
+
 fn getPointerForce(uv: vec2f) -> f32 {
 	if (uniforms.pointerPosition.x == -1.0 && uniforms.pointerPosition.y == -1.0) {
 		return 0.0;
@@ -211,34 +215,22 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 
 	var modUv = modVec2f(uv - 0.5, cellSize);
 
-	let cellSize2 = cellSize * 2.0;
-	let modUv2 = modVec2f(uv - 0.5, cellSize2);
-	let cellSize4 = cellSize * 4.0;
-	let modUv4 = modVec2f(uv - 0.5, cellSize4);
-
-	let cellUv2 = (cellSize2 * floor((uv - 0.5) / cellSize2))
-		+ cellSize2 / 2.0
-		+ 0.5;
-
-	let cellUv4 = (cellSize4 * floor((uv - 0.5) / cellSize4))
-		+ cellSize4 / 2.0
-		+ 0.5;
+	let cellUv2 = getPixelatedUv(uv, cellSize * 2.0) + 0.5;
+	let cellUv4 = getPixelatedUv(uv, cellSize * 4.0) + 0.5;
 
 	let cellMultiplier2Noise = snoise0to1(vec3f(cellUv2.x * 3.0, cellUv2.y * 3.0, time * 0.000025));
 	let cellMultiplier4Noise = snoise0to1(vec3f(cellUv4.x * 3.0, cellUv4.y * 3.0, time * 0.000025));
 	if (cellMultiplier4Noise > 0.9) {
-		modUv = modUv4;
-		cellSize = cellSize4;
+		modUv = modVec2f(uv - 0.5, cellSize * 4.0);
+		cellSize = cellSize * 4.0;
 		border /= 4.0;
 	} else if (cellMultiplier2Noise > 0.75) {
-		modUv = modUv2;
-		cellSize = cellSize2;
+		modUv = modVec2f(uv - 0.5, cellSize * 2.0);
+		cellSize = cellSize * 2.0;
 		border /= 2.0;
 	}
 
-	let cellUv = (cellSize * floor((uv - 0.5) / cellSize))
-		+ cellSize / 2.0
-		+ 0.5;
+	var cellUv = getPixelatedUv(uv, cellSize) + 0.5;
 
 	let sourceScale = select(1.0, uniforms.sourceTextureAspectRatio / uniforms.aspectRatio, uniforms.sourceTextureAspectRatio > uniforms.aspectRatio);
 	let sourceUv = cellUv * vec2f(1.0, uniforms.sourceTextureAspectRatio) / sourceScale;
