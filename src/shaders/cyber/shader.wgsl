@@ -175,6 +175,7 @@ struct Uniforms {
 	sourceTextureAspectRatio: f32,
 	discardBrightPixels: u32,
 	enableSampledCellJoining: u32,
+	coverSource: u32,
 };
 
 @group(0) @binding(1) var<uniform> uniforms: Uniforms;
@@ -192,7 +193,10 @@ fn getPixelatedUv(uv: vec2f, cellSize: vec2f) -> vec2f {
 }
 
 fn getSourceColor(uv: vec2f) -> vec4f {
-	let sourceScale = select(1.0, uniforms.sourceTextureAspectRatio / uniforms.aspectRatio, uniforms.sourceTextureAspectRatio > uniforms.aspectRatio);
+	let sourceScale = select(
+		select(1.0, uniforms.sourceTextureAspectRatio / uniforms.aspectRatio, uniforms.sourceTextureAspectRatio < uniforms.aspectRatio),
+		select(1.0, uniforms.sourceTextureAspectRatio / uniforms.aspectRatio, uniforms.sourceTextureAspectRatio > uniforms.aspectRatio),
+		uniforms.coverSource == 1);
 	let sourceUv = uv * vec2f(1.0, uniforms.sourceTextureAspectRatio) / sourceScale;
 	return textureSample(sourceTexture, symbolSampler, sourceUv + 0.5);
 }
@@ -300,7 +304,6 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 
 	let sourceColor = getSourceColor(cellUv);
 	let sourceColorLuminance = (sourceColor.r + sourceColor.g + sourceColor.b) / 3.0;
-	//return sourceColor;
 
 	let visibilityNoiseA = snoise0to1(vec3f(cellUv + scroll, time * 0.00000625));
 	let visibilityNoiseB = snoise0to1(vec3f(cellUv * 8.0, time * 0.00000625));

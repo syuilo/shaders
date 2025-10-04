@@ -22,6 +22,10 @@
 		<input type="range" min="0" :max="videoDuration" step="0.01" :value="videoCurrentTime" @input="seekVideoTo($event.target.value)" />
 	</label>
 	<label>
+		<b>cover source:</b>
+		<input type="checkbox" v-model="coverSource" />
+	</label>
+	<label>
 		<b>discard bright pixels:</b>
 		<input type="checkbox" v-model="discardBrightPixels" />
 	</label>
@@ -95,6 +99,7 @@ const timeFactor = ref(getUrlParam('timeFactor', 'float') ?? 1.0);
 const divisions = ref(getUrlParam('divisions', 'int') ?? 64);
 const discardBrightPixels = ref(getUrlParam('discardBrightPixels', 'bool') ?? true);
 const enableSampledCellJoining = ref(getUrlParam('enableSampledCellJoining', 'bool') ?? true);
+const coverSource = ref(getUrlParam('coverSource', 'bool') ?? true);
 const symbolTexturesRangeMin = ref(getUrlParam('symbolTexturesRangeMin', 'float') ?? 0.0);
 const symbolTexturesRangeMax = ref(getUrlParam('symbolTexturesRangeMax', 'float') ?? 1.0);
 const withNumbers = ref(getUrlParam('numbers', 'bool') ?? false);
@@ -199,6 +204,7 @@ async function init() {
 			aspectRatio: ctx.width / ctx.height,
 			useSource: sorceType == null ? 0 : 1,
 			sourceTextureAspectRatio: sourceTexture.width / sourceTexture.height,
+			coverSource: coverSource.value ? 1 : 0,
 			discardBrightPixels: discardBrightPixels.value ? 1 : 0,
 			enableSampledCellJoining: enableSampledCellJoining.value ? 1 : 0,
 			time: ctx.time,
