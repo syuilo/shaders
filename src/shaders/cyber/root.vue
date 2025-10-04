@@ -9,7 +9,7 @@
 	</label>
 	<label>
 		<b>source image/video:</b>
-		<input type="file" accept="image/*,video/*" @change="onFileSelected"/>
+		<input type="file" accept="image/*,video/*" @change="onFileSelected"/> or <button @click="useWebcam">Use webcamera</button>
 	</label>
 	<label>
 		<b>audio volume:</b>
@@ -59,7 +59,7 @@
 <script lang="ts" setup>
 import { onMounted, ref, useTemplateRef, watch } from 'vue';
 import code from './shader.wgsl?raw';
-import { initWebGPU } from '@/webgpu.ts';
+import { initWebGPU, setupWebcam } from '@/webgpu.ts';
 import { getUrlParam } from '@/utils.ts';
 import { createTextureFromImages, createTextureFromSource, makeShaderDataDefinitions, makeStructuredView } from 'webgpu-utils';
 
@@ -283,6 +283,14 @@ async function onFileSelected(ev: Event) {
 		await videoElement.play();
 		sorceType = 'video';
 	}
+	init();
+}
+
+async function useWebcam() {
+	const camera = await setupWebcam();
+	videoElement.srcObject = camera;
+	await videoElement.play();
+	sorceType = 'video';
 	init();
 }
 </script>

@@ -150,3 +150,25 @@ export async function initWebGPU(canvas: HTMLCanvasElement, code: string, opts =
 
 	return { start, device, pipeline, dispose };
 }
+
+export function setupWebcam() {
+	return new Promise((resolve, reject) => {
+		navigator.mediaDevices.getUserMedia({
+			video: true,
+			audio: false
+		}).then(localMediaStream => {
+			resolve(localMediaStream);
+		}).catch(err => {
+			// 取得に失敗した原因を調査
+			if(err.name === 'PermissionDeniedError'){
+				// ユーザーによる利用の拒否
+				alert('denied permission');
+			}else{
+				// デバイスが見つからない場合など
+				alert('can not be used webcam');
+			}
+
+			reject(err);
+		});
+	});
+}
