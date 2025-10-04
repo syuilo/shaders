@@ -1,5 +1,5 @@
 <template>
-<canvas ref="canvas" style="display: block; width: 100%; height: 100%; touch-action: none;"></canvas>
+<canvas ref="canvas" style="display: block; width: 100%; height: 100%; touch-action: none;" @wheel="onWheel"></canvas>
 <button id="menuButton" @click="showMenu = !showMenu">MENU</button>
 <div v-if="showMenu" id="menu">
 	<h1>WebGPU - CYBER SHADER by syuilo</h1>
@@ -244,15 +244,6 @@ onMounted(() => {
 		lastPointerMovedAt = performance.now();
 	});
 
-	window.addEventListener('wheel', (ev: WheelEvent) => {
-		if (ev.deltaY > 0) {
-			divisions.value = Math.floor(divisions.value * 1.2);
-		} else if (ev.deltaY < 0) {
-			divisions.value = Math.floor(divisions.value / 1.2);
-		}
-		divisions.value = Math.min(512, Math.max(8, divisions.value));
-	}, { passive: false });
-
 	window.addEventListener('keydown', (ev: KeyboardEvent) => {
 		if (ev.key === 'Escape') {
 			showMenu.value = false;
@@ -269,6 +260,15 @@ onMounted(() => {
 		}
 	});
 });
+
+function onWheel(ev: WheelEvent) {
+	if (ev.deltaY > 0) {
+		divisions.value = Math.floor(divisions.value * 1.2);
+	} else if (ev.deltaY < 0) {
+		divisions.value = Math.floor(divisions.value / 1.2);
+	}
+	divisions.value = Math.min(512, Math.max(8, divisions.value));
+}
 
 async function onFileSelected(ev: Event) {
 	const input = ev.target as HTMLInputElement;
