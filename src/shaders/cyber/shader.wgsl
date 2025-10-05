@@ -167,6 +167,7 @@ struct Uniforms {
 	time: f32,
 	timeFactor: f32,
 	divisions: f32,
+	margin: f32,
 	symbolTexturesCount: u32,
 	symbolTexturesRangeMin: f32,
 	symbolTexturesRangeMax: f32,
@@ -248,7 +249,7 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 
 	var cellSize = vec2f(1.0 / uniforms.divisions);
 
-	var border = 0.25;
+	var border = uniforms.margin;
 
 	var modUv = modVec2f(uv - 0.5, cellSize);
 

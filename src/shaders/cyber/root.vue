@@ -38,8 +38,12 @@
 		<input type="range" min="0" max="16" step="0.01" v-model="timeFactor" />
 	</label>
 	<label>
-		<b>divisions:</b>
+		<b>cell divisions:</b>
 		<input type="range" min="8" max="512" step="1" v-model="divisions" />
+	</label>
+	<label>
+		<b>margin between cells:</b>
+		<input type="range" min="0" max="1" step="0.01" v-model="margin" />
 	</label>
 	<label>
 		<b>with numbers:</b>
@@ -97,6 +101,7 @@ watch(limitFpsTo30, () => {
 });
 const timeFactor = ref(getUrlParam('timeFactor', 'float') ?? 1.0);
 const divisions = ref(getUrlParam('divisions', 'int') ?? 64);
+const margin = ref(getUrlParam('margin', 'float') ?? 0.25);
 const discardBrightPixels = ref(getUrlParam('discardBrightPixels', 'bool') ?? true);
 const enableSampledCellJoining = ref(getUrlParam('enableSampledCellJoining', 'bool') ?? true);
 const coverSource = ref(getUrlParam('coverSource', 'bool') ?? true);
@@ -210,6 +215,7 @@ async function init() {
 			time: ctx.time,
 			timeFactor: parseFloat(timeFactor.value),
 			divisions: parseInt(divisions.value),
+			margin: parseFloat(margin.value),
 			symbolTexturesCount: symbolTextureUrls.length,
 			symbolTexturesRangeMin: parseFloat(symbolTexturesRangeMin.value),
 			symbolTexturesRangeMax: parseFloat(symbolTexturesRangeMax.value),
