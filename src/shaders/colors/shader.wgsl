@@ -163,7 +163,7 @@ fn premultiplyAlpha(color: vec4f) -> vec4f {
 }
 
 struct Uniforms {
-	aspectRatio: vec2f,
+	aspectRatio: f32,
 	time: f32,
 };
 
@@ -176,7 +176,7 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	let u_scale = 48.0;
 	let noiseScale = 32.0;
 
-	let uv = (fragData.uv - vec2(0.5, 0.5)) * uniforms.aspectRatio;
+	let uv = (fragData.uv - vec2(0.5, 0.5)) / vec2f(1.0, uniforms.aspectRatio);
 
 	let noiseR = snoise(vec3f((uv + u_seed + 1.0) * (u_scale / noiseScale), time));
 	let noiseG = snoise(vec3f((uv + u_seed + 2.0) * (u_scale / noiseScale), time));

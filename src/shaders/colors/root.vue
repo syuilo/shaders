@@ -9,9 +9,13 @@ import { initWebGPU } from '@/webgpu.ts';
 import { makeShaderDataDefinitions, makeStructuredView } from 'webgpu-utils';
 
 const canvas = useTemplateRef('canvas');
+let _dispose: (() => void) | null = null;
 
 onMounted(async () => {
-	const { start, device, pipeline } = await initWebGPU(canvas.value!, code);
+		if (_dispose) _dispose();
+
+	const { start, device, pipeline, dispose } = await initWebGPU(canvas.value!, code, { fps: 60 });
+	_dispose = dispose;
 
 	const defs = makeShaderDataDefinitions(code);
 	const uniformValues = makeStructuredView(defs.uniforms.uniforms);
@@ -30,7 +34,7 @@ onMounted(async () => {
 
 	start(ctx => {
 		uniformValues.set({
-			aspectRatio: ctx.aspectRatioMin,
+			aspectRatio: ctx.width / ctx.height,
 			time: ctx.time,
 		});
 
