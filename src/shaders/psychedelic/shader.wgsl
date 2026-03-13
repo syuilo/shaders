@@ -202,12 +202,12 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 
 	if (uniforms.noiseAEnabled == 1) {
 		noiseR = snoise(vec3f((warpedUv + u_seed + 1.0 + n) * (u_scale / noiseScale), time * 0.5));
-		noiseG = snoise(vec3f((warpedUv + u_seed + 2.0 + n) * (u_scale / noiseScale), time * 0.5));
-		noiseB = snoise(vec3f((warpedUv + u_seed + 3.0 + n) * (u_scale / noiseScale), time * 0.5));
+		noiseG = snoise(vec3f((warpedUv + u_seed + 2.0 + n) * (u_scale / noiseScale), time * 0.4));
+		noiseB = snoise(vec3f((warpedUv + u_seed + 3.0 + n) * (u_scale / noiseScale), time * 0.3));
 	} else {
 		noiseR = snoise(vec3f((warpedUv + u_seed + 1.0) * (u_scale / noiseScale), time * 0.5));
-		noiseG = snoise(vec3f((warpedUv + u_seed + 2.0) * (u_scale / noiseScale), time * 0.5));
-		noiseB = snoise(vec3f((warpedUv + u_seed + 3.0) * (u_scale / noiseScale), time * 0.5));
+		noiseG = snoise(vec3f((warpedUv + u_seed + 2.0) * (u_scale / noiseScale), time * 0.4));
+		noiseB = snoise(vec3f((warpedUv + u_seed + 3.0) * (u_scale / noiseScale), time * 0.3));
 	}
 
 	var c = vec3f(0.0, 0.0, 0.6);
