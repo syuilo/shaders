@@ -4,8 +4,16 @@
 <div v-if="showMenu" id="menu">
 	<h1>WebGPU - PSYCHEDELIC SHADER by syuilo</h1>
 	<label>
+		<b>noiseAEnabled:</b>
+		<input type="checkbox" v-model="noiseAEnabled" />
+	</label>
+	<label>
 		<b>noiseAScale:</b>
 		<input type="range" min="2" max="256" step="1" v-model="noiseAScale" />
+	</label>
+	<label>
+		<b>mirror:</b>
+		<input type="checkbox" v-model="mirror" />
 	</label>
 </div>
 </template>
@@ -22,7 +30,9 @@ const showMenu = ref(false);
 const canvas = useTemplateRef('canvas');
 let _dispose: (() => void) | null = null;
 
+const noiseAEnabled = ref(getUrlParam('noiseAEnabled', 'bool') ?? true);
 const noiseAScale = ref(getUrlParam('noiseAScale', 'int') ?? 64);
+const mirror = ref(getUrlParam('mirror', 'bool') ?? false);
 
 onMounted(async () => {
 		if (_dispose) _dispose();
@@ -49,7 +59,9 @@ onMounted(async () => {
 		uniformValues.set({
 			aspectRatio: ctx.width / ctx.height,
 			time: ctx.time,
+			noiseAEnabled: noiseAEnabled.value ? 1.0 : 0.0,
 			noiseAScale: parseFloat(noiseAScale.value),
+			mirror: mirror.value ? 1.0 : 0.0,
 		});
 
 		ctx.device.queue.writeBuffer(uniformBuffer, 0, uniformValues.arrayBuffer);

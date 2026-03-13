@@ -170,7 +170,9 @@ fn remap(value: f32, inMin: f32, inMax: f32, outMin: f32, outMax: f32) -> f32 {
 struct Uniforms {
 	aspectRatio: f32,
 	time: f32,
+	noiseAEnabled: u32,
 	noiseAScale: f32,
+	mirror: u32,
 };
 
 @group(0) @binding(1) var<uniform> uniforms: Uniforms;
@@ -184,9 +186,9 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 
 	var uv = (fragData.uv - vec2(0.5, 0.5)) / vec2f(1.0, uniforms.aspectRatio);
 
-	//if (uv.x > 0.0) {
-	//	uv = vec2f(-uv.x, uv.y);
-	//}
+	if (uniforms.mirror == 1 && uv.x > 0.0) {
+		uv = vec2f(-uv.x, uv.y);
+	}
 
 	let warpedUv = uv + vec2f(
 		snoise(vec3f((uv + u_seed + 4.0) * (u_scale / 48.0), time)),
@@ -194,12 +196,19 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 
 	let n = snoise(vec3f((warpedUv + u_seed + 6.0) * (u_scale / uniforms.noiseAScale), time * 0.5));
 
-	//let noiseR = snoise(vec3f((warpedUv + u_seed + 1.0) * (u_scale / noiseScale), time * 0.5));
-	//let noiseG = snoise(vec3f((warpedUv + u_seed + 2.0) * (u_scale / noiseScale), time * 0.5));
-	//let noiseB = snoise(vec3f((warpedUv + u_seed + 3.0) * (u_scale / noiseScale), time * 0.5));
-	let noiseR = snoise(vec3f((warpedUv + u_seed + 1.0 + n) * (u_scale / noiseScale), time * 0.5));
-	let noiseG = snoise(vec3f((warpedUv + u_seed + 2.0 + n) * (u_scale / noiseScale), time * 0.5));
-	let noiseB = snoise(vec3f((warpedUv + u_seed + 3.0 + n) * (u_scale / noiseScale), time * 0.5));
+	var noiseR: f32;
+	var noiseG: f32;
+	var noiseB: f32;
+
+	if (uniforms.noiseAEnabled == 1) {
+		noiseR = snoise(vec3f((warpedUv + u_seed + 1.0 + n) * (u_scale / noiseScale), time * 0.5));
+		noiseG = snoise(vec3f((warpedUv + u_seed + 2.0 + n) * (u_scale / noiseScale), time * 0.5));
+		noiseB = snoise(vec3f((warpedUv + u_seed + 3.0 + n) * (u_scale / noiseScale), time * 0.5));
+	} else {
+		noiseR = snoise(vec3f((warpedUv + u_seed + 1.0) * (u_scale / noiseScale), time * 0.5));
+		noiseG = snoise(vec3f((warpedUv + u_seed + 2.0) * (u_scale / noiseScale), time * 0.5));
+		noiseB = snoise(vec3f((warpedUv + u_seed + 3.0) * (u_scale / noiseScale), time * 0.5));
+	}
 
 	var c = vec3f(0.0, 0.0, 0.6);
 	//c = mix(c, vec3f(1.0, 0.0, 1.0), remap(noiseR % 0.1, 0.0, 0.1, 0.0, 1.0));
