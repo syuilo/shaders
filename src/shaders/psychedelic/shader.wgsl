@@ -170,6 +170,7 @@ fn remap(value: f32, inMin: f32, inMax: f32, outMin: f32, outMax: f32) -> f32 {
 struct Uniforms {
 	aspectRatio: f32,
 	time: f32,
+	noiseAScale: f32,
 };
 
 @group(0) @binding(1) var<uniform> uniforms: Uniforms;
@@ -191,9 +192,14 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 		snoise(vec3f((uv + u_seed + 4.0) * (u_scale / 48.0), time)),
 		snoise(vec3f((uv + u_seed + 5.0) * (u_scale / 48.0), time))) * 2.0;
 
-	let noiseR = snoise(vec3f((warpedUv + u_seed + 1.0) * (u_scale / noiseScale), time * 0.5));
-	let noiseG = snoise(vec3f((warpedUv + u_seed + 2.0) * (u_scale / noiseScale), time * 0.5));
-	let noiseB = snoise(vec3f((warpedUv + u_seed + 3.0) * (u_scale / noiseScale), time * 0.5));
+	let n = snoise(vec3f((warpedUv + u_seed + 6.0) * (u_scale / uniforms.noiseAScale), time * 0.5));
+
+	//let noiseR = snoise(vec3f((warpedUv + u_seed + 1.0) * (u_scale / noiseScale), time * 0.5));
+	//let noiseG = snoise(vec3f((warpedUv + u_seed + 2.0) * (u_scale / noiseScale), time * 0.5));
+	//let noiseB = snoise(vec3f((warpedUv + u_seed + 3.0) * (u_scale / noiseScale), time * 0.5));
+	let noiseR = snoise(vec3f((warpedUv + u_seed + 1.0 + n) * (u_scale / noiseScale), time * 0.5));
+	let noiseG = snoise(vec3f((warpedUv + u_seed + 2.0 + n) * (u_scale / noiseScale), time * 0.5));
+	let noiseB = snoise(vec3f((warpedUv + u_seed + 3.0 + n) * (u_scale / noiseScale), time * 0.5));
 
 	var c = vec3f(0.0, 0.0, 0.6);
 	//c = mix(c, vec3f(1.0, 0.0, 1.0), remap(noiseR % 0.1, 0.0, 0.1, 0.0, 1.0));
