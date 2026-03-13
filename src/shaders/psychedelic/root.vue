@@ -1,5 +1,13 @@
 <template>
 <canvas ref="canvas" style="display: block; width: 100%; height: 100%;"></canvas>
+<button id="menuButton" @click="showMenu = !showMenu">MENU</button>
+<div v-if="showMenu" id="menu">
+	<h1>WebGPU - PSYCHEDELIC SHADER by syuilo</h1>
+	<label>
+		<b>noiseAScale:</b>
+		<input type="range" min="2" max="256" step="1" v-model="noiseAScale" />
+	</label>
+</div>
 </template>
 
 <script lang="ts" setup>
@@ -8,6 +16,8 @@ import code from './shader.wgsl?raw';
 import { initWebGPU } from '@/webgpu.ts';
 import { makeShaderDataDefinitions, makeStructuredView } from 'webgpu-utils';
 import { getUrlParam } from '@/utils.ts';
+
+const showMenu = ref(false);
 
 const canvas = useTemplateRef('canvas');
 let _dispose: (() => void) | null = null;
