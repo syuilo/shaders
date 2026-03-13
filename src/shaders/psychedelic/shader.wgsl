@@ -172,6 +172,7 @@ struct Uniforms {
 	time: f32,
 	noiseAEnabled: u32,
 	noiseAScale: f32,
+	selfModulo: u32,
 	mirror: u32,
 };
 
@@ -226,9 +227,15 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	//}
 
 
+	if (uniforms.selfModulo == 1) {
+		c = mix(c, blendLightenVec3f(c, mix(vec3f(1.0, 0.0, 1.0), vec3f(1.0, 0.3, 0.0), remap(noiseR % (1.0 - noiseR), 0.0, (1.0 - noiseR), 0.0, 1.0))), noiseR * 2.0);
+		c = mix(c, blendLightenVec3f(c, mix(vec3f(0.3, 0.3, 0.0), vec3f(0.0, 0.5, 0.0), remap(noiseG % (1.0 - noiseG), 0.0, (1.0 - noiseG), 0.0, 1.0))), noiseG);
+		c = mix(c, blendLightenVec3f(c, mix(vec3f(0.8, 0.8, 0.0), vec3f(0.8, 0.4, 0.0), remap(noiseB % (1.0 - noiseB), 0.0, (1.0 - noiseB), 0.0, 1.0))), noiseB * 4.0);
+	} else {
 		c = mix(c, blendLightenVec3f(c, mix(vec3f(1.0, 0.0, 1.0), vec3f(1.0, 0.3, 0.0), remap(noiseR % 0.1, 0.0, 0.1, 0.0, 1.0))), noiseR * 2.0);
 		c = mix(c, blendLightenVec3f(c, mix(vec3f(0.3, 0.3, 0.0), vec3f(0.0, 0.5, 0.0), remap(noiseG % 0.1, 0.0, 0.1, 0.0, 1.0))), noiseG);
 		c = mix(c, blendLightenVec3f(c, mix(vec3f(0.8, 0.8, 0.0), vec3f(0.8, 0.4, 0.0), remap(noiseB % 0.1, 0.0, 0.1, 0.0, 1.0))), noiseB * 4.0);
+	}
 
 	c = mix(c, normalize(c), snoise(vec3f((uv + u_seed + 4.0) * (u_scale / 48.0), time)));
 	//c = normalize(c);

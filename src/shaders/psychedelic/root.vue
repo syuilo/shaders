@@ -12,6 +12,10 @@
 		<input type="range" min="2" max="256" step="1" v-model="noiseAScale" />
 	</label>
 	<label>
+		<b>selfModulo:</b>
+		<input type="checkbox" v-model="selfModulo" />
+	</label>
+	<label>
 		<b>mirror:</b>
 		<input type="checkbox" v-model="mirror" />
 	</label>
@@ -32,6 +36,7 @@ let _dispose: (() => void) | null = null;
 
 const noiseAEnabled = ref(getUrlParam('noiseAEnabled', 'bool') ?? true);
 const noiseAScale = ref(getUrlParam('noiseAScale', 'int') ?? 64);
+const selfModulo = ref(getUrlParam('selfModulo', 'bool') ?? true);
 const mirror = ref(getUrlParam('mirror', 'bool') ?? false);
 
 onMounted(async () => {
@@ -61,6 +66,7 @@ onMounted(async () => {
 			time: ctx.time,
 			noiseAEnabled: noiseAEnabled.value ? 1.0 : 0.0,
 			noiseAScale: parseFloat(noiseAScale.value),
+			selfModulo: selfModulo.value ? 1.0 : 0.0,
 			mirror: mirror.value ? 1.0 : 0.0,
 		});
 
