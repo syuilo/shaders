@@ -14,7 +14,7 @@ let _dispose: (() => void) | null = null;
 onMounted(async () => {
 		if (_dispose) _dispose();
 
-	const { start, device, pipeline, dispose } = await initWebGPU(canvas.value!, code, { fps: 60 });
+	const { start, device, pipeline, dispose } = await initWebGPU(canvas.value!, code, { fps: null });
 	_dispose = dispose;
 
 	const defs = makeShaderDataDefinitions(code);
