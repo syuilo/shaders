@@ -3,13 +3,16 @@
 </template>
 
 <script lang="ts" setup>
-import { onMounted, useTemplateRef } from 'vue';
+import { onMounted, ref, useTemplateRef } from 'vue';
 import code from './shader.wgsl?raw';
 import { initWebGPU } from '@/webgpu.ts';
 import { makeShaderDataDefinitions, makeStructuredView } from 'webgpu-utils';
+import { getUrlParam } from '@/utils.ts';
 
 const canvas = useTemplateRef('canvas');
 let _dispose: (() => void) | null = null;
+
+const scale = ref(getUrlParam('scale', 'float') ?? 1.0);
 
 onMounted(async () => {
 		if (_dispose) _dispose();
@@ -34,6 +37,7 @@ onMounted(async () => {
 
 	start(ctx => {
 		uniformValues.set({
+			scale: parseFloat(scale.value),
 			aspectRatio: ctx.width / ctx.height,
 			time: ctx.time,
 		});

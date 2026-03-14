@@ -14,7 +14,7 @@ fn vs(@builtin(vertex_index) vertexIndex: u32) -> VertexOut {
 	let pos = vertices[vertexIndex];
 	var output: VertexOut;
 	output.position = vec4f(pos, 0, 1);
-	output.uv = ((pos.xy * uniforms.scale) + 1.0) / 2.0; // -1 ~ +1 -> 0 ~ 1
+	output.uv = (pos.xy + 1.0) / 2.0; // -1 ~ +1 -> 0 ~ 1
 	return output;
 }
 
@@ -170,32 +170,61 @@ fn premultiplyAlpha(color: vec4f) -> vec4f {
 }
 
 struct Uniforms {
-	scale: f32,
 	aspectRatio: f32,
-	time: f32,
+	divisions: f32,
+	sourceTextureAspectRatio: f32,
+	coverSource: u32,
+	threshold: f32,
 };
 
 @group(0) @binding(1) var<uniform> uniforms: Uniforms;
+@group(0) @binding(2) var sourceSampler: sampler;
+@group(0) @binding(3) var sourceTexture: texture_2d<f32>;
+
+// https://docs.arduino.cc/language-reference/en/functions/math/map/
+fn remap(value: f32, inMin: f32, inMax: f32, outMin: f32, outMax: f32) -> f32 {
+	return (value - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
+}
+
+fn getPixelatedUv(uv: vec2f, cellSize: vec2f) -> vec2f {
+	return (cellSize * floor((uv - 0.5) / cellSize)) + (cellSize / 2.0);
+}
+
+fn getLuminance(color: vec3f) -> f32 {
+	return dot(color, vec3f(0.299, 0.587, 0.114));
+}
 
 @fragment
 fn fs(fragData: VertexOut) -> @location(0) vec4f {
-	let time = uniforms.time * 0.0001;
-	let seed = 1000.0;
+	let uv = (fragData.uv - 0.5) / vec2f(1.0, uniforms.aspectRatio);
+	var cellSize = vec2f(1.0 / uniforms.divisions);
 
-	let uv = (fragData.uv - vec2(0.5, 0.5)) / vec2f(1.0, uniforms.aspectRatio);
+	let sourceScale = select(
+		select(1.0, uniforms.sourceTextureAspectRatio / uniforms.aspectRatio, uniforms.sourceTextureAspectRatio < uniforms.aspectRatio),
+		select(1.0, uniforms.sourceTextureAspectRatio / uniforms.aspectRatio, uniforms.sourceTextureAspectRatio > uniforms.aspectRatio),
+		uniforms.coverSource == 1);
+	let sourceUv = (uv * vec2f(1.0, uniforms.sourceTextureAspectRatio) / sourceScale);
 
-	let noiseR = snoise(vec3f(uv + seed + 1.0, time));
-	let noiseG = snoise(vec3f(uv + seed + 2.0, time));
-	let noiseB = snoise(vec3f(uv + seed + 3.0, time));
+	let cellUv = getPixelatedUv(sourceUv + 0.5, cellSize);
 
-	var c = vec3f(0.0);
-	c = mix(c, vec3f(1.0, 0.0, 0.0), noiseR);
-	c = mix(c, vec3f(0.0, 1.0, 0.0), noiseG);
-	c = mix(c, vec3f(0.0, 0.0, 1.0), noiseB);
-	c = normalize(c);
-	c = blendAddVec3f(c, vec3f(1.0));
+	var a = 0;
+	for (var i = 0; i < i32(uniforms.divisions); i = i + 1) {
+		let luminance = getLuminance(textureSample(sourceTexture, sourceSampler, vec2f(
+			cellSize.x * f32(i) + 0.5,
+			cellUv.y
+		)).rgb);
+		if (luminance >= uniforms.threshold) {
+			a = i;
+		}
+	}
 
-	c = clamp(c, vec3f(0.0), vec3f(1.0));
+	let sourceColor = textureSample(sourceTexture, sourceSampler, sourceUv + 0.5);
+	let celledColor = textureSample(sourceTexture, sourceSampler, cellUv + 0.5);
 
-	return vec4f(c, 1.0);
+	if (sourceUv.x + 0.5 > cellSize.x * f32(a)) {
+		//return celledColor;
+		return vec4f(1.0, 0.0, 0.0, 1.0);
+	}
+
+	return sourceColor;
 }
