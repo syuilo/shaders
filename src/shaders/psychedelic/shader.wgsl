@@ -160,6 +160,12 @@ fn snoise0to1(v: vec3f) -> f32 {
 	return (snoise(v) + 1.0) / 2.0;
 }
 
+fn snoiseFractal(v: vec3f) -> f32 {
+	return (snoise(v) + (snoise(v * 2.0) / 2.0) + (snoise(v * 4.0) / 4.0) + (snoise(v * 8.0) / 8.0)) / (1.0 + 0.5 + 0.25 + 0.125);
+	//return (snoise(v) + (snoise(v * 2.0) / 2.0) + (snoise(v * 4.0) / 4.0) + (snoise(v * 8.0) / 8.0));
+	//return snoise(v);
+}
+
 // equivalent to GLSL's mod function
 fn modVec2f(a: vec2f, b: vec2f) -> vec2f {
 	return a - b * floor(a / b);
@@ -205,44 +211,51 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 
 	let n = snoise(vec3f((warpedUv + seed + 6.0) * noiseAScale, time * 0.5));
 
-	var noiseR: f32;
-	var noiseG: f32;
+	var noiseA: f32;
 	var noiseB: f32;
+	var noiseC: f32;
 
 	if (uniforms.noiseAEnabled == 1) {
-		noiseR = snoise(vec3f((warpedUv + seed + 1.0 + n) * noiseScale, time * 0.5));
-		noiseG = snoise(vec3f((warpedUv + seed + 2.0 + n) * noiseScale, time * 0.4));
-		noiseB = snoise(vec3f((warpedUv + seed + 3.0 + n) * noiseScale, time * 0.3));
+		noiseA = snoiseFractal(vec3f((warpedUv + seed + 1.0 + n) * noiseScale, time * 0.5));
+		noiseB = snoiseFractal(vec3f((warpedUv + seed + 2.0 + n) * noiseScale, time * 0.4));
+		noiseC = snoiseFractal(vec3f((warpedUv + seed + 3.0 + n) * noiseScale, time * 0.3));
 	} else {
-		noiseR = snoise(vec3f((warpedUv + seed + 1.0) * noiseScale, time * 0.5));
-		noiseG = snoise(vec3f((warpedUv + seed + 2.0) * noiseScale, time * 0.4));
-		noiseB = snoise(vec3f((warpedUv + seed + 3.0) * noiseScale, time * 0.3));
+		noiseA = snoiseFractal(vec3f((warpedUv + seed + 1.0) * noiseScale, time * 0.5));
+		noiseB = snoiseFractal(vec3f((warpedUv + seed + 2.0) * noiseScale, time * 0.4));
+		noiseC = snoiseFractal(vec3f((warpedUv + seed + 3.0) * noiseScale, time * 0.3));
 	}
 
-	var c = vec3f(0.0, 0.0, 0.6);
-	//c = mix(c, vec3f(1.0, 0.0, 1.0), remap(noiseR % 0.1, 0.0, 0.1, 0.0, 1.0));
-	//c = mix(c, vec3f(1.0, 0.7, 0.0), remap(noiseG % 0.1, 0.0, 0.1, 0.0, 1.0));
-	//c = mix(c, vec3f(0.0, 0.5, 0.0), remap(noiseB % 0.1, 0.0, 0.1, 0.0, 1.0));
+	//if (noiseA > 1.0) {
+	//	return vec4f(0.0, 1.0, 0.0, 1.0);
+	//}
+	//if (noiseA < -1.0) {
+	//	return vec4f(0.0, 0.0, 1.0, 1.0);
+	//}
 
-	//if (noiseR > 0.3) {
-	//	c = blendLightenVec3f(c, mix(vec3f(1.0, 0.0, 1.0), vec3f(1.0, 0.3, 0.0), remap(noiseR % 0.1, 0.0, 0.1, 0.0, 1.0)));
+	var c = vec3f(0.0, 0.0, 0.6);
+	//c = mix(c, vec3f(1.0, 0.0, 1.0), remap(noiseA % 0.1, 0.0, 0.1, 0.0, 1.0));
+	//c = mix(c, vec3f(1.0, 0.7, 0.0), remap(noiseB % 0.1, 0.0, 0.1, 0.0, 1.0));
+	//c = mix(c, vec3f(0.0, 0.5, 0.0), remap(noiseC % 0.1, 0.0, 0.1, 0.0, 1.0));
+
+	//if (noiseA > 0.3) {
+	//	c = blendLightenVec3f(c, mix(vec3f(1.0, 0.0, 1.0), vec3f(1.0, 0.3, 0.0), remap(noiseA % 0.1, 0.0, 0.1, 0.0, 1.0)));
 	//}
-	//if (noiseG > 0.2) {
-	//	c = blendLightenVec3f(c, mix(vec3f(0.3, 0.3, 0.0), vec3f(0.0, 0.5, 0.0), remap(noiseG % 0.1, 0.0, 0.1, 0.0, 1.0)));
+	//if (noiseB > 0.2) {
+	//	c = blendLightenVec3f(c, mix(vec3f(0.3, 0.3, 0.0), vec3f(0.0, 0.5, 0.0), remap(noiseB % 0.1, 0.0, 0.1, 0.0, 1.0)));
 	//}
-	//if (noiseB > 0.1) {
-	//	c = blendLightenVec3f(c, mix(vec3f(1.0, 1.0, 0.0), vec3f(1.0, 0.5, 0.0), remap(noiseB % 0.1, 0.0, 0.1, 0.0, 1.0)));
+	//if (noiseC > 0.1) {
+	//	c = blendLightenVec3f(c, mix(vec3f(1.0, 1.0, 0.0), vec3f(1.0, 0.5, 0.0), remap(noiseC % 0.1, 0.0, 0.1, 0.0, 1.0)));
 	//}
 
 
 	if (uniforms.selfModulo == 1) {
-		c = mix(c, blendLightenVec3f(c, mix(vec3f(1.0, 0.0, 1.0), vec3f(1.0, 0.3, 0.0), remap(noiseR % (1.0 - noiseR), 0.0, (1.0 - noiseR), 0.0, 1.0))), noiseR * 2.0);
-		c = mix(c, blendLightenVec3f(c, mix(vec3f(0.3, 0.3, 0.0), vec3f(0.0, 0.5, 0.0), remap(noiseG % (1.0 - noiseG), 0.0, (1.0 - noiseG), 0.0, 1.0))), noiseG);
-		c = mix(c, blendLightenVec3f(c, mix(vec3f(0.8, 0.8, 0.0), vec3f(0.8, 0.4, 0.0), remap(noiseB % (1.0 - noiseB), 0.0, (1.0 - noiseB), 0.0, 1.0))), noiseB * 4.0);
+		c = mix(c, blendLightenVec3f(c, mix(vec3f(1.0, 0.0, 1.0), vec3f(1.0, 0.3, 0.0), remap(noiseA % (1.0 - noiseA), 0.0, (1.0 - noiseA), 0.0, 1.0))), noiseA * 2.0);
+		c = mix(c, blendLightenVec3f(c, mix(vec3f(0.3, 0.3, 0.0), vec3f(0.0, 0.5, 0.0), remap(noiseB % (1.0 - noiseB), 0.0, (1.0 - noiseB), 0.0, 1.0))), noiseB);
+		c = mix(c, blendLightenVec3f(c, mix(vec3f(0.8, 0.8, 0.0), vec3f(0.8, 0.4, 0.0), remap(noiseC % (1.0 - noiseC), 0.0, (1.0 - noiseC), 0.0, 1.0))), noiseC * 4.0);
 	} else {
-		c = mix(c, blendLightenVec3f(c, mix(vec3f(1.0, 0.0, 1.0), vec3f(1.0, 0.3, 0.0), remap(noiseR % 0.1, 0.0, 0.1, 0.0, 1.0))), noiseR * 2.0);
-		c = mix(c, blendLightenVec3f(c, mix(vec3f(0.3, 0.3, 0.0), vec3f(0.0, 0.5, 0.0), remap(noiseG % 0.1, 0.0, 0.1, 0.0, 1.0))), noiseG);
-		c = mix(c, blendLightenVec3f(c, mix(vec3f(0.8, 0.8, 0.0), vec3f(0.8, 0.4, 0.0), remap(noiseB % 0.1, 0.0, 0.1, 0.0, 1.0))), noiseB * 4.0);
+		c = mix(c, blendLightenVec3f(c, mix(vec3f(1.0, 0.0, 1.0), vec3f(1.0, 0.3, 0.0), remap(noiseA % 0.1, 0.0, 0.1, 0.0, 1.0))), noiseA * 2.0);
+		c = mix(c, blendLightenVec3f(c, mix(vec3f(0.3, 0.3, 0.0), vec3f(0.0, 0.5, 0.0), remap(noiseB % 0.1, 0.0, 0.1, 0.0, 1.0))), noiseB);
+		c = mix(c, blendLightenVec3f(c, mix(vec3f(0.8, 0.8, 0.0), vec3f(0.8, 0.4, 0.0), remap(noiseC % 0.1, 0.0, 0.1, 0.0, 1.0))), noiseC * 4.0);
 	}
 
 	c = mix(c, normalize(c), snoise(vec3f((uv + seed + 4.0), time)));
