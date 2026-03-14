@@ -1,4 +1,3 @@
-import { makeShaderDataDefinitions, makeStructuredView } from 'webgpu-utils';
 import { getUrlParam } from './utils.ts';
 
 export async function initWebGPU(canvas: HTMLCanvasElement, code: string, opts = {}) {

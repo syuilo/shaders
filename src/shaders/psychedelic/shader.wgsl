@@ -3,19 +3,18 @@ struct VertexOut {
 	@location(0) uv: vec2f,
 };
 
+const vertices = array(
+	vec2f(-1, -1),
+	vec2f( 3, -1),
+	vec2f(-1,  3),
+);
+
 @vertex
 fn vs(@builtin(vertex_index) vertexIndex: u32) -> VertexOut {
-	let pos = array(
-    vec2f(-1, -1),
-    vec2f( 3, -1),
-    vec2f(-1,  3),
-  );
-
-	let xy = pos[vertexIndex];
-
+	let pos = vertices[vertexIndex];
 	var output: VertexOut;
-	output.position = vec4f(xy, 0, 1);
-	output.uv = (xy.xy + 1.0) / 2.0;
+	output.position = vec4f(pos, 0, 1);
+	output.uv = (pos.xy + 1.0) / 2.0; // -1 ~ +1 -> 0 ~ 1
 	return output;
 }
 
