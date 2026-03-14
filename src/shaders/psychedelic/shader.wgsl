@@ -15,6 +15,7 @@ fn vs(@builtin(vertex_index) vertexIndex: u32) -> VertexOut {
 	var output: VertexOut;
 	output.position = vec4f(pos, 0, 1);
 	output.uv = (pos.xy + 1.0) / 2.0; // -1 ~ +1 -> 0 ~ 1
+	output.uv *= uniforms.scale;
 	return output;
 }
 
@@ -175,6 +176,7 @@ fn remap(value: f32, inMin: f32, inMax: f32, outMin: f32, outMax: f32) -> f32 {
 }
 
 struct Uniforms {
+	scale: f32,
 	aspectRatio: f32,
 	time: f32,
 	noiseAEnabled: u32,
@@ -188,9 +190,9 @@ struct Uniforms {
 @fragment
 fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	let time = uniforms.time * 0.0001;
-	let u_seed = 1000.0;
-	let u_scale = 48.0;
-	let noiseScale = 64.0;
+	let seed = 1000.0;
+	let noiseScale = 0.75;
+	let noiseAScale = 0.75 * uniforms.noiseAScale;
 
 	var uv = (fragData.uv - vec2(0.5, 0.5)) / vec2f(1.0, uniforms.aspectRatio);
 
@@ -199,23 +201,23 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	}
 
 	let warpedUv = uv + vec2f(
-		snoise(vec3f((uv + u_seed + 4.0) * (u_scale / 48.0), time)),
-		snoise(vec3f((uv + u_seed + 5.0) * (u_scale / 48.0), time))) * 2.0;
+		snoise(vec3f((uv + seed + 4.0), time)),
+		snoise(vec3f((uv + seed + 5.0), time))) * 2.0;
 
-	let n = snoise(vec3f((warpedUv + u_seed + 6.0) * (u_scale / uniforms.noiseAScale), time * 0.5));
+	let n = snoise(vec3f((warpedUv + seed + 6.0) * noiseAScale, time * 0.5));
 
 	var noiseR: f32;
 	var noiseG: f32;
 	var noiseB: f32;
 
 	if (uniforms.noiseAEnabled == 1) {
-		noiseR = snoise(vec3f((warpedUv + u_seed + 1.0 + n) * (u_scale / noiseScale), time * 0.5));
-		noiseG = snoise(vec3f((warpedUv + u_seed + 2.0 + n) * (u_scale / noiseScale), time * 0.4));
-		noiseB = snoise(vec3f((warpedUv + u_seed + 3.0 + n) * (u_scale / noiseScale), time * 0.3));
+		noiseR = snoise(vec3f((warpedUv + seed + 1.0 + n) * noiseScale, time * 0.5));
+		noiseG = snoise(vec3f((warpedUv + seed + 2.0 + n) * noiseScale, time * 0.4));
+		noiseB = snoise(vec3f((warpedUv + seed + 3.0 + n) * noiseScale, time * 0.3));
 	} else {
-		noiseR = snoise(vec3f((warpedUv + u_seed + 1.0) * (u_scale / noiseScale), time * 0.5));
-		noiseG = snoise(vec3f((warpedUv + u_seed + 2.0) * (u_scale / noiseScale), time * 0.4));
-		noiseB = snoise(vec3f((warpedUv + u_seed + 3.0) * (u_scale / noiseScale), time * 0.3));
+		noiseR = snoise(vec3f((warpedUv + seed + 1.0) * noiseScale, time * 0.5));
+		noiseG = snoise(vec3f((warpedUv + seed + 2.0) * noiseScale, time * 0.4));
+		noiseB = snoise(vec3f((warpedUv + seed + 3.0) * noiseScale, time * 0.3));
 	}
 
 	var c = vec3f(0.0, 0.0, 0.6);
@@ -244,7 +246,7 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 		c = mix(c, blendLightenVec3f(c, mix(vec3f(0.8, 0.8, 0.0), vec3f(0.8, 0.4, 0.0), remap(noiseB % 0.1, 0.0, 0.1, 0.0, 1.0))), noiseB * 4.0);
 	}
 
-	c = mix(c, normalize(c), snoise(vec3f((uv + u_seed + 4.0) * (u_scale / 48.0), time)));
+	c = mix(c, normalize(c), snoise(vec3f((uv + seed + 4.0), time)));
 	//c = normalize(c);
 
 	c = blendSubtractVec3f(c, vec3f(0.5));

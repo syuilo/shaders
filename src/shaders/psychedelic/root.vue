@@ -4,12 +4,16 @@
 <div v-if="showMenu" id="menu">
 	<h1>WebGPU - PSYCHEDELIC SHADER by syuilo</h1>
 	<label>
+		<b>scale:</b>
+		<input type="range" min="0.01" max="8" step="0.1" v-model="scale" />
+	</label>
+	<label>
 		<b>noiseAEnabled:</b>
 		<input type="checkbox" v-model="noiseAEnabled" />
 	</label>
 	<label>
 		<b>noiseAScale:</b>
-		<input type="range" min="2" max="256" step="1" v-model="noiseAScale" />
+		<input type="range" min="0" max="32" step="0.1" v-model="noiseAScale" />
 	</label>
 	<label>
 		<b>selfModulo:</b>
@@ -34,8 +38,9 @@ const showMenu = ref(false);
 const canvas = useTemplateRef('canvas');
 let _dispose: (() => void) | null = null;
 
+const scale = ref(getUrlParam('scale', 'float') ?? 1.0);
 const noiseAEnabled = ref(getUrlParam('noiseAEnabled', 'bool') ?? true);
-const noiseAScale = ref(getUrlParam('noiseAScale', 'int') ?? 64);
+const noiseAScale = ref(getUrlParam('noiseAScale', 'float') ?? 1.5);
 const selfModulo = ref(getUrlParam('selfModulo', 'bool') ?? true);
 const mirror = ref(getUrlParam('mirror', 'bool') ?? false);
 
@@ -62,6 +67,7 @@ onMounted(async () => {
 
 	start(ctx => {
 		uniformValues.set({
+			scale: parseFloat(scale.value),
 			aspectRatio: ctx.width / ctx.height,
 			time: ctx.time,
 			noiseAEnabled: noiseAEnabled.value ? 1.0 : 0.0,
