@@ -188,8 +188,8 @@ struct Uniforms {
 	scale: f32,
 	aspectRatio: f32,
 	time: f32,
-	overNoiseEnabled: u32,
-	overNoiseScale: f32,
+	turbulenceEnabled: u32,
+	turbulenceScale: f32,
 	channelAFactor: f32,
 	channelBFactor: f32,
 	channelCFactor: f32,
@@ -204,7 +204,7 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	let time = uniforms.time * 0.0001;
 	let seed = 1000.0;
 	let noiseScale = 0.75;
-	let overNoiseScale = 0.75 * uniforms.overNoiseScale;
+	let turbulenceScale = 0.75 * uniforms.turbulenceScale;
 
 	var uv = (fragData.uv - vec2(0.5, 0.5)) / vec2f(1.0, uniforms.aspectRatio);
 
@@ -216,16 +216,16 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 		snoise(vec3f((uv + seed + 4.0), time)),
 		snoise(vec3f((uv + seed + 5.0), time))) * 2.0;
 
-	let n = snoise(vec3f((warpedUv + seed + 6.0) * overNoiseScale, time * 0.5));
+	let turbulence = snoise(vec3f((warpedUv + seed + 6.0) * turbulenceScale, time * 0.5));
 
 	var noiseA: f32;
 	var noiseB: f32;
 	var noiseC: f32;
 
-	if (uniforms.overNoiseEnabled == 1) {
-		noiseA = snoiseFractal(vec3f((warpedUv + seed + 1.0 + n) * noiseScale, time * 0.5));
-		noiseB = snoiseFractal(vec3f((warpedUv + seed + 2.0 + n) * noiseScale, time * 0.4));
-		noiseC = snoiseFractal(vec3f((warpedUv + seed + 3.0 + n) * noiseScale, time * 0.3));
+	if (uniforms.turbulenceEnabled == 1) {
+		noiseA = snoiseFractal(vec3f((warpedUv + seed + 1.0 + turbulence) * noiseScale, time * 0.5));
+		noiseB = snoiseFractal(vec3f((warpedUv + seed + 2.0 + turbulence) * noiseScale, time * 0.4));
+		noiseC = snoiseFractal(vec3f((warpedUv + seed + 3.0 + turbulence) * noiseScale, time * 0.3));
 	} else {
 		noiseA = snoiseFractal(vec3f((warpedUv + seed + 1.0) * noiseScale, time * 0.5));
 		noiseB = snoiseFractal(vec3f((warpedUv + seed + 2.0) * noiseScale, time * 0.4));

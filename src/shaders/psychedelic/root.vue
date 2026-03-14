@@ -20,12 +20,12 @@
 		<input type="range" min="0" max="8" step="0.1" v-model="channelCFactor" />
 	</label>
 	<label>
-		<b>overNoiseEnabled:</b>
-		<input type="checkbox" v-model="overNoiseEnabled" />
+		<b>turbulenceEnabled:</b>
+		<input type="checkbox" v-model="turbulenceEnabled" />
 	</label>
 	<label>
-		<b>overNoiseScale:</b>
-		<input type="range" min="0" max="32" step="0.1" v-model="overNoiseScale" />
+		<b>turbulenceScale:</b>
+		<input type="range" min="0" max="32" step="0.1" v-model="turbulenceScale" />
 	</label>
 	<label>
 		<b>selfModulo:</b>
@@ -51,10 +51,10 @@ const canvas = useTemplateRef('canvas');
 let _dispose: (() => void) | null = null;
 
 const scale = ref(getUrlParam('scale', 'float') ?? 1.0);
-const overNoiseEnabled = ref(getUrlParam('overNoiseEnabled', 'bool') ?? true);
-const overNoiseScale = ref(getUrlParam('overNoiseScale', 'float') ?? 1.5);
+const turbulenceEnabled = ref(getUrlParam('turbulenceEnabled', 'bool') ?? true);
+const turbulenceScale = ref(getUrlParam('turbulenceScale', 'float') ?? 1.5);
 const channelAFactor = ref(getUrlParam('channelAFactor', 'float') ?? 2.0);
-const channelBFactor = ref(getUrlParam('channelBFactor', 'float') ?? 1.0);
+const channelBFactor = ref(getUrlParam('channelBFactor', 'float') ?? 1.5);
 const channelCFactor = ref(getUrlParam('channelCFactor', 'float') ?? 4.0);
 const selfModulo = ref(getUrlParam('selfModulo', 'bool') ?? true);
 const mirror = ref(getUrlParam('mirror', 'bool') ?? false);
@@ -85,8 +85,8 @@ onMounted(async () => {
 			scale: parseFloat(scale.value),
 			aspectRatio: ctx.width / ctx.height,
 			time: ctx.time,
-			overNoiseEnabled: overNoiseEnabled.value ? 1.0 : 0.0,
-			overNoiseScale: parseFloat(overNoiseScale.value),
+			turbulenceEnabled: turbulenceEnabled.value ? 1.0 : 0.0,
+			turbulenceScale: parseFloat(turbulenceScale.value),
 			channelAFactor: parseFloat(channelAFactor.value),
 			channelBFactor: parseFloat(channelBFactor.value),
 			channelCFactor: parseFloat(channelCFactor.value),
