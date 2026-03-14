@@ -250,15 +250,15 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	//c = mix(c, vec3f(1.0, 0.7, 0.0), remap(noiseB % 0.1, 0.0, 0.1, 0.0, 1.0));
 	//c = mix(c, vec3f(0.0, 0.5, 0.0), remap(noiseC % 0.1, 0.0, 0.1, 0.0, 1.0));
 
-	//if (noiseA > 0.3) {
-	//	c = blendOverlayVec3f(c, mix(vec3f(1.0, 0.0, 1.0), vec3f(1.0, 0.3, 0.0), remap(noiseA % 0.1, 0.0, 0.1, 0.0, 1.0)));
-	//}
-	//if (noiseB > 0.2) {
-	//	c = blendOverlayVec3f(c, mix(vec3f(0.3, 0.3, 0.0), vec3f(0.0, 0.5, 0.0), remap(noiseB % 0.1, 0.0, 0.1, 0.0, 1.0)));
-	//}
-	//if (noiseC > 0.1) {
-	//	c = blendOverlayVec3f(c, mix(vec3f(1.0, 1.0, 0.0), vec3f(1.0, 0.5, 0.0), remap(noiseC % 0.1, 0.0, 0.1, 0.0, 1.0)));
-	//}
+	if (noiseA < -0.35) {
+		c = blendOverlayVec3f(c, mix(vec3f(1.0, 0.0, 1.0), vec3f(1.0, 0.3, 0.0), remap(noiseA % 0.1, 0.0, 0.1, 0.0, 1.0)));
+	}
+	if (noiseB < -0.35) {
+		c = blendOverlayVec3f(c, mix(vec3f(0.3, 0.3, 0.0), vec3f(0.0, 0.5, 0.0), remap(noiseB % 0.1, 0.0, 0.1, 0.0, 1.0)));
+	}
+	if (noiseC < -0.35) {
+		c = blendOverlayVec3f(c, mix(vec3f(0.8, 0.8, 0.0), vec3f(0.8, 0.4, 0.0), remap(noiseC % 0.1, 0.0, 0.1, 0.0, 1.0)));
+	}
 
 
 	if (uniforms.selfModulo == 1) {
