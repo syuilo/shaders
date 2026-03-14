@@ -8,24 +8,12 @@
 		<input type="range" min="0.125" max="8" step="0.1" v-model="scale" />
 	</label>
 	<label>
-		<b>channelAFactor:</b>
-		<input type="range" min="0" max="8" step="0.1" v-model="channelAFactor" />
+		<b>noiseAEnabled:</b>
+		<input type="checkbox" v-model="noiseAEnabled" />
 	</label>
 	<label>
-		<b>channelBFactor:</b>
-		<input type="range" min="0" max="8" step="0.1" v-model="channelBFactor" />
-	</label>
-	<label>
-		<b>channelCFactor:</b>
-		<input type="range" min="0" max="8" step="0.1" v-model="channelCFactor" />
-	</label>
-	<label>
-		<b>overNoiseEnabled:</b>
-		<input type="checkbox" v-model="overNoiseEnabled" />
-	</label>
-	<label>
-		<b>overNoiseScale:</b>
-		<input type="range" min="0" max="32" step="0.1" v-model="overNoiseScale" />
+		<b>noiseAScale:</b>
+		<input type="range" min="0" max="32" step="0.1" v-model="noiseAScale" />
 	</label>
 	<label>
 		<b>selfModulo:</b>
@@ -51,11 +39,8 @@ const canvas = useTemplateRef('canvas');
 let _dispose: (() => void) | null = null;
 
 const scale = ref(getUrlParam('scale', 'float') ?? 1.0);
-const overNoiseEnabled = ref(getUrlParam('overNoiseEnabled', 'bool') ?? true);
-const overNoiseScale = ref(getUrlParam('overNoiseScale', 'float') ?? 1.5);
-const channelAFactor = ref(getUrlParam('channelAFactor', 'float') ?? 2.0);
-const channelBFactor = ref(getUrlParam('channelBFactor', 'float') ?? 1.0);
-const channelCFactor = ref(getUrlParam('channelCFactor', 'float') ?? 4.0);
+const noiseAEnabled = ref(getUrlParam('noiseAEnabled', 'bool') ?? true);
+const noiseAScale = ref(getUrlParam('noiseAScale', 'float') ?? 1.5);
 const selfModulo = ref(getUrlParam('selfModulo', 'bool') ?? true);
 const mirror = ref(getUrlParam('mirror', 'bool') ?? false);
 
@@ -85,11 +70,8 @@ onMounted(async () => {
 			scale: parseFloat(scale.value),
 			aspectRatio: ctx.width / ctx.height,
 			time: ctx.time,
-			overNoiseEnabled: overNoiseEnabled.value ? 1.0 : 0.0,
-			overNoiseScale: parseFloat(overNoiseScale.value),
-			channelAFactor: parseFloat(channelAFactor.value),
-			channelBFactor: parseFloat(channelBFactor.value),
-			channelCFactor: parseFloat(channelCFactor.value),
+			noiseAEnabled: noiseAEnabled.value ? 1.0 : 0.0,
+			noiseAScale: parseFloat(noiseAScale.value),
 			selfModulo: selfModulo.value ? 1.0 : 0.0,
 			mirror: mirror.value ? 1.0 : 0.0,
 		});

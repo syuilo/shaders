@@ -166,10 +166,6 @@ fn snoiseFractal(v: vec3f) -> f32 {
 	//return snoise(v);
 }
 
-fn snoiseFractal0to1(v: vec3f) -> f32 {
-	return (snoise0to1(v) + (snoise0to1(v * 2.0) / 2.0) + (snoise0to1(v * 4.0) / 4.0) + (snoise0to1(v * 8.0) / 8.0)) / (1.0 + 0.5 + 0.25 + 0.125);
-}
-
 // equivalent to GLSL's mod function
 fn modVec2f(a: vec2f, b: vec2f) -> vec2f {
 	return a - b * floor(a / b);
@@ -184,15 +180,61 @@ fn remap(value: f32, inMin: f32, inMax: f32, outMin: f32, outMax: f32) -> f32 {
 	return (value - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
 }
 
+const u_nodes_x_count = 5;
+const u_nodes_y_count = 5;
+
+fn circleShape(uv: vec2f, radius: f32, position: vec2f) -> f32 {
+	let value = distance(uv * vec2f(1.0, uniforms.aspectRatio), position * vec2f(1.0, uniforms.aspectRatio));
+	return step(value, radius);
+}
+
+fn lineShape(uv: vec2f, p1: vec2f, p2: vec2f, width: f32) -> f32 {
+	let a = abs(distance(p1, uv));
+	let b = abs(distance(p2, uv));
+	let c = abs(distance(p1, p2));
+
+	if (a >= c || b >= c) {
+		return 0.0;
+	}
+
+	let p = (a + b + c) * 0.5;
+
+	// median to (p1, p2) vector
+	let h = 2.0 / c * sqrt(p * (p - a) * (p - b) * (p - c));
+
+	return mix(1.0, 0.0, smoothstep(0.5 * width, 1.5 * width, h));
+}
+
+// progress: -1.0 ~ +1.0
+// -1.0: (start)      (end)
+// -0.5: (start)---   (end)
+//  0.0: (start)------(end)
+// +0.5: (start)   ---(end)
+// +1.0: (start)      (end)
+fn lineShapeProgress(uv: vec2f, p1: vec2f, p2: vec2f, width: f32, progress: f32) -> f32 {
+	if (progress < 0.0) {
+		let currentP = mix(p1, p2, progress + 1.0);
+		return lineShape(uv, p1, currentP, width);
+	} else {
+		let currentP = mix(p1, p2, progress);
+		return lineShape(uv, currentP, p2, width);
+	}
+}
+
+fn getNodePosition(x: u32, y: u32) -> vec2f {
+	return vec2f(f32(x) / f32(u_nodes_x_count + 1), f32(y) / f32(u_nodes_y_count + 1));
+}
+
+fn easeInOutCubic(t: f32) -> f32 {
+	return select(4.0 * t * t * t, 1.0 - pow(-2.0 * t + 2.0, 3.0) / 2.0, t > 0.5);
+}
+
 struct Uniforms {
 	scale: f32,
 	aspectRatio: f32,
 	time: f32,
-	overNoiseEnabled: u32,
-	overNoiseScale: f32,
-	channelAFactor: f32,
-	channelBFactor: f32,
-	channelCFactor: f32,
+	noiseAEnabled: u32,
+	noiseAScale: f32,
 	selfModulo: u32,
 	mirror: u32,
 };
@@ -203,80 +245,39 @@ struct Uniforms {
 fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	let time = uniforms.time * 0.0001;
 	let seed = 1000.0;
-	let noiseScale = 0.75;
-	let overNoiseScale = 0.75 * uniforms.overNoiseScale;
+	let particlesCount = 4;
+	var uv = fragData.uv;
 
-	var uv = (fragData.uv - vec2(0.5, 0.5)) / vec2f(1.0, uniforms.aspectRatio);
+	let step = floor(uniforms.time * 0.001);
+	let stepProgress = fract(uniforms.time * 0.001);
 
-	if (uniforms.mirror == 1 && uv.x > 0.0) {
-		uv = vec2f(-uv.x, uv.y);
+	let prevX1 = u32(floor(snoise0to1(vec3f(1.0, 0.0, step - 1.0)) * f32(u_nodes_x_count)));
+	let prevY1 = u32(floor(snoise0to1(vec3f(0.0, 1.0, step - 1.0)) * f32(u_nodes_y_count)));
+	let prevX2 = u32(floor(snoise0to1(vec3f(1.0, 0.0, step - 2.0)) * f32(u_nodes_x_count)));
+	let prevY2 = u32(floor(snoise0to1(vec3f(0.0, 1.0, step - 2.0)) * f32(u_nodes_y_count)));
+	let prevX3 = u32(floor(snoise0to1(vec3f(1.0, 0.0, step - 3.0)) * f32(u_nodes_x_count)));
+	let prevY3 = u32(floor(snoise0to1(vec3f(0.0, 1.0, step - 3.0)) * f32(u_nodes_y_count)));
+
+	let currentX = u32(floor(snoise0to1(vec3f(1.0, 0.0, step)) * f32(u_nodes_x_count)));
+	let currentY = u32(floor(snoise0to1(vec3f(0.0, 1.0, step)) * f32(u_nodes_y_count)));
+
+	var v = 0.0;
+
+	for (var i: u32 = 0; i < u_nodes_x_count; i++) {
+		for (var j: u32 = 0; j < u_nodes_y_count; j++) {
+			let radius = 0.015;
+			if ((i == currentX && j == currentY)) {
+				v += max(0.0, circleShape(uv, radius * min((easeInOutCubic(stepProgress) * 2.0), 1.0), getNodePosition(i + 1, j + 1)));
+			} else if ((i == prevX1 && j == prevY1) || (i == prevX2 && j == prevY2) || (i == prevX3 && j == prevY3)) {
+				v += max(0.0, circleShape(uv, radius, getNodePosition(i + 1, j + 1)));
+			} else {
+				v += max(0.0, circleShape(uv, radius, getNodePosition(i + 1, j + 1))) * 0.125;
+			}
+		}
 	}
 
-	let warpedUv = uv + vec2f(
-		snoise(vec3f((uv + seed + 4.0), time)),
-		snoise(vec3f((uv + seed + 5.0), time))) * 2.0;
-
-	let n = snoise(vec3f((warpedUv + seed + 6.0) * overNoiseScale, time * 0.5));
-
-	var noiseA: f32;
-	var noiseB: f32;
-	var noiseC: f32;
-
-	if (uniforms.overNoiseEnabled == 1) {
-		noiseA = snoiseFractal(vec3f((warpedUv + seed + 1.0 + n) * noiseScale, time * 0.5));
-		noiseB = snoiseFractal(vec3f((warpedUv + seed + 2.0 + n) * noiseScale, time * 0.4));
-		noiseC = snoiseFractal(vec3f((warpedUv + seed + 3.0 + n) * noiseScale, time * 0.3));
-	} else {
-		noiseA = snoiseFractal(vec3f((warpedUv + seed + 1.0) * noiseScale, time * 0.5));
-		noiseB = snoiseFractal(vec3f((warpedUv + seed + 2.0) * noiseScale, time * 0.4));
-		noiseC = snoiseFractal(vec3f((warpedUv + seed + 3.0) * noiseScale, time * 0.3));
-	}
-
-	//if (noiseA > 1.0 || noiseB > 1.0 || noiseC > 1.0) {
-	//	return vec4f(1.0, 0.0, 0.0, 1.0);
-	//}
-	//if (noiseA < -1.0 || noiseB < -1.0 || noiseC < -1.0) {
-	//	return vec4f(0.0, 0.0, 1.0, 1.0);
-	//}
-	//if (noiseA > 0.9 || noiseB > 0.9 || noiseC > 0.9) {
-	//	return vec4f(1.0, 1.0, 1.0, 1.0);
-	//}
-	//if (noiseA < -0.9 || noiseB < -0.9 || noiseC < -0.9) {
-	//	return vec4f(1.0, 1.0, 1.0, 1.0);
-	//}
-
-	var c = vec3f(0.0, 0.0, 0.6);
-	//c = mix(c, vec3f(1.0, 0.0, 1.0), remap(noiseA % 0.1, 0.0, 0.1, 0.0, 1.0));
-	//c = mix(c, vec3f(1.0, 0.7, 0.0), remap(noiseB % 0.1, 0.0, 0.1, 0.0, 1.0));
-	//c = mix(c, vec3f(0.0, 0.5, 0.0), remap(noiseC % 0.1, 0.0, 0.1, 0.0, 1.0));
-
-	//if (noiseA > 0.3) {
-	//	c = blendOverlayVec3f(c, mix(vec3f(1.0, 0.0, 1.0), vec3f(1.0, 0.3, 0.0), remap(noiseA % 0.1, 0.0, 0.1, 0.0, 1.0)));
-	//}
-	//if (noiseB > 0.2) {
-	//	c = blendOverlayVec3f(c, mix(vec3f(0.3, 0.3, 0.0), vec3f(0.0, 0.5, 0.0), remap(noiseB % 0.1, 0.0, 0.1, 0.0, 1.0)));
-	//}
-	//if (noiseC > 0.1) {
-	//	c = blendOverlayVec3f(c, mix(vec3f(1.0, 1.0, 0.0), vec3f(1.0, 0.5, 0.0), remap(noiseC % 0.1, 0.0, 0.1, 0.0, 1.0)));
-	//}
+	v += lineShapeProgress(uv, getNodePosition(prevX1 + 1, prevY1 + 1), getNodePosition(currentX + 1, currentY + 1), 0.0025, easeInOutCubic(stepProgress) * 2.0 - 1.0);
 
 
-	if (uniforms.selfModulo == 1) {
-		c = mix(c, blendLightenVec3f(c, mix(vec3f(1.0, 0.0, 1.0), vec3f(1.0, 0.3, 0.0), remap(noiseA % (1.0 - noiseA), 0.0, (1.0 - noiseA), 0.0, 1.0))), noiseA * uniforms.channelAFactor);
-		c = mix(c, blendLightenVec3f(c, mix(vec3f(0.3, 0.3, 0.0), vec3f(0.0, 0.5, 0.0), remap(noiseB % (1.0 - noiseB), 0.0, (1.0 - noiseB), 0.0, 1.0))), noiseB * uniforms.channelBFactor);
-		c = mix(c, blendLightenVec3f(c, mix(vec3f(0.8, 0.8, 0.0), vec3f(0.8, 0.4, 0.0), remap(noiseC % (1.0 - noiseC), 0.0, (1.0 - noiseC), 0.0, 1.0))), noiseC * uniforms.channelCFactor);
-	} else {
-		c = mix(c, blendLightenVec3f(c, mix(vec3f(1.0, 0.0, 1.0), vec3f(1.0, 0.3, 0.0), remap(noiseA % 0.1, 0.0, 0.1, 0.0, 1.0))), noiseA * uniforms.channelAFactor);
-		c = mix(c, blendLightenVec3f(c, mix(vec3f(0.3, 0.3, 0.0), vec3f(0.0, 0.5, 0.0), remap(noiseB % 0.1, 0.0, 0.1, 0.0, 1.0))), noiseB * uniforms.channelBFactor);
-		c = mix(c, blendLightenVec3f(c, mix(vec3f(0.8, 0.8, 0.0), vec3f(0.8, 0.4, 0.0), remap(noiseC % 0.1, 0.0, 0.1, 0.0, 1.0))), noiseC * uniforms.channelCFactor);
-	}
-
-	c = mix(c, normalize(c), snoise(vec3f((uv + seed + 4.0), time)));
-	//c = normalize(c);
-
-	c = blendSubtractVec3f(c, vec3f(0.5));
-
-	c = clamp(c, vec3f(0.0), vec3f(1.0));
-
-	return vec4f(c, 1.0);
+	return vec4f(v, v, v, 1.0);
 }

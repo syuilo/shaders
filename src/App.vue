@@ -14,6 +14,7 @@ switch (shader) {
 	case 'colors': component = import('./shaders/colors/root.vue'); break;
 	case 'psychedelic': component = import('./shaders/psychedelic/root.vue'); break;
 	case 'cyber': component = import('./shaders/cyber/root.vue'); break;
+	case 'nodes': component = import('./shaders/nodes/root.vue'); break;
 }
 
 const c = defineAsyncComponent(() => component);
