@@ -35,6 +35,10 @@
 		<b>mirror:</b>
 		<input type="checkbox" v-model="mirror" />
 	</label>
+	<label>
+		<b>test:</b>
+		<input type="checkbox" v-model="test" />
+	</label>
 </div>
 </template>
 
@@ -58,6 +62,7 @@ const channelBFactor = ref(getUrlParam('channelBFactor', 'float') ?? 1.5);
 const channelCFactor = ref(getUrlParam('channelCFactor', 'float') ?? 4.0);
 const selfModulo = ref(getUrlParam('selfModulo', 'bool') ?? true);
 const mirror = ref(getUrlParam('mirror', 'bool') ?? false);
+const test = ref(getUrlParam('test', 'bool') ?? false);
 
 onMounted(async () => {
 		if (_dispose) _dispose();
@@ -92,6 +97,7 @@ onMounted(async () => {
 			channelCFactor: parseFloat(channelCFactor.value),
 			selfModulo: selfModulo.value ? 1.0 : 0.0,
 			mirror: mirror.value ? 1.0 : 0.0,
+			test: test.value ? 1.0 : 0.0,
 		});
 
 		ctx.device.queue.writeBuffer(uniformBuffer, 0, uniformValues.arrayBuffer);

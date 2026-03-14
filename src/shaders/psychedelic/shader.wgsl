@@ -195,6 +195,7 @@ struct Uniforms {
 	channelCFactor: f32,
 	selfModulo: u32,
 	mirror: u32,
+	test: u32,
 };
 
 @group(0) @binding(1) var<uniform> uniforms: Uniforms;
@@ -251,15 +252,14 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	//c = mix(c, vec3f(0.0, 0.5, 0.0), remap(noiseC % 0.1, 0.0, 0.1, 0.0, 1.0));
 
 	if (noiseA < -0.35) {
-		c = blendOverlayVec3f(c, mix(vec3f(1.0, 0.0, 1.0), vec3f(1.0, 0.3, 0.0), remap(noiseA % 0.1, 0.0, 0.1, 0.0, 1.0)));
+		c = blendNormalVec3f(c, mix(vec3f(0.0, 0.0, 1.0), vec3f(0.0, 0.0, 0.0), remap(noiseA % 0.1, 0.0, 0.1, 0.0, 1.0)));
 	}
 	if (noiseB < -0.35) {
-		c = blendOverlayVec3f(c, mix(vec3f(0.3, 0.3, 0.0), vec3f(0.0, 0.5, 0.0), remap(noiseB % 0.1, 0.0, 0.1, 0.0, 1.0)));
+		c = blendOverlayVec3f(c, vec3f(0.0, 0.0, 0.0));
 	}
 	if (noiseC < -0.35) {
-		c = blendOverlayVec3f(c, mix(vec3f(0.8, 0.8, 0.0), vec3f(0.8, 0.4, 0.0), remap(noiseC % 0.1, 0.0, 0.1, 0.0, 1.0)));
+		c = blendOverlayVec3f(c, vec3f(0.0, 0.0, 0.0));
 	}
-
 
 	if (uniforms.selfModulo == 1) {
 		c = mix(c, blendLightenVec3f(c, mix(vec3f(1.0, 0.0, 1.0), vec3f(1.0, 0.3, 0.0), remap(noiseA % (1.0 - noiseA), 0.0, (1.0 - noiseA), 0.0, 1.0))), noiseA * uniforms.channelAFactor);
