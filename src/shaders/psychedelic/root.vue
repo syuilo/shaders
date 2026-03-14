@@ -5,7 +5,7 @@
 	<h1>WebGPU - PSYCHEDELIC SHADER by syuilo</h1>
 	<label>
 		<b>scale:</b>
-		<input type="range" min="0.01" max="8" step="0.1" v-model="scale" />
+		<input type="range" min="0.125" max="8" step="0.1" v-model="scale" />
 	</label>
 	<label>
 		<b>noiseAEnabled:</b>

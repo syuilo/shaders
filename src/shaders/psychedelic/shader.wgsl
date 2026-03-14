@@ -14,8 +14,7 @@ fn vs(@builtin(vertex_index) vertexIndex: u32) -> VertexOut {
 	let pos = vertices[vertexIndex];
 	var output: VertexOut;
 	output.position = vec4f(pos, 0, 1);
-	output.uv = (pos.xy + 1.0) / 2.0; // -1 ~ +1 -> 0 ~ 1
-	output.uv *= uniforms.scale;
+	output.uv = ((pos.xy * uniforms.scale) + 1.0) / 2.0; // -1 ~ +1 -> 0 ~ 1
 	return output;
 }
 
