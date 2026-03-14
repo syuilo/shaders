@@ -4,10 +4,18 @@ struct VertexOut {
 };
 
 @vertex
-fn vs(@location(0) position: vec4f) -> VertexOut {
+fn vs(@builtin(vertex_index) vertexIndex: u32) -> VertexOut {
+	let pos = array(
+    vec2f(-1, -1),
+    vec2f( 3, -1),
+    vec2f(-1,  3),
+  );
+
+	let xy = pos[vertexIndex];
+
 	var output: VertexOut;
-	output.position = position;
-	output.uv = (position.xy + 1.0) / 2.0;
+	output.position = vec4f(xy, 0, 1);
+	output.uv = (xy.xy + 1.0) / 2.0;
 	return output;
 }
 

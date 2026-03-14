@@ -39,29 +39,10 @@ export async function initWebGPU(canvas: HTMLCanvasElement, code: string, opts =
 		colorSpace: 'display-p3',
 	});
 
-	const vertices = new Float32Array([-1, -1, -1, 1, 1, 1, -1, -1, 1, 1, 1, -1]);
-
-	const vertexBuffer = device.createBuffer({
-		size: vertices.byteLength, // make it big enough to store vertices in
-		usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-	});
-
-	device.queue.writeBuffer(vertexBuffer, 0, vertices, 0, vertices.length);
-
-	const vertexBuffers = [{
-		arrayStride: 2 * 4, // 2 floats per vertex, 4 bytes per float
-		attributes: [{
-			shaderLocation: 0,
-			offset: 0,
-			format: 'float32x2',
-		}],
-	}];
-
 	const pipeline = device.createRenderPipeline({
 		vertex: {
 			module: shaderModule,
 			entryPoint: 'vs',
-			buffers: vertexBuffers,
 		},
 		fragment: {
 			module: shaderModule,
@@ -102,7 +83,6 @@ export async function initWebGPU(canvas: HTMLCanvasElement, code: string, opts =
 			const commandEncoder = device.createCommandEncoder();
 			const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
 			passEncoder.setPipeline(pipeline);
-			passEncoder.setVertexBuffer(0, vertexBuffer);
 
 			renderCb({ device, passEncoder, time, width: canvas.width, height: canvas.height });
 
