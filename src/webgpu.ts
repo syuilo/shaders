@@ -85,7 +85,7 @@ export async function initWebGPU(canvas: HTMLCanvasElement, code: string, opts =
 
 			renderCb({ device, passEncoder, time, width: canvas.width, height: canvas.height });
 
-			passEncoder.draw(6);
+			passEncoder.draw(3);
 			passEncoder.end();
 			device.queue.submit([commandEncoder.finish()]);
 		}
