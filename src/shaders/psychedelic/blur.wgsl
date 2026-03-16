@@ -254,7 +254,7 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 		let offset = direction * (r * radius);
 		let weight = exp(-radius * radius * 4.0);
 		var sampleUv = fragData.uv + (offset * vec2f(1.0, uniforms.aspectRatio));
-		if (uniforms.isIos == 1) { // iOSではなぜか範囲肺のサンプリングが異様に重いのでクランプ
+		if (uniforms.isIos == 1) { // iOSではなぜか範囲外のサンプリングが異様に重いのでクランプ
 			sampleUv.x = clamp(sampleUv.x, 0.0, 1.0);
 			sampleUv.y = clamp(sampleUv.y, 0.0, 1.0);
 		}
