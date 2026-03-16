@@ -5,19 +5,19 @@
 	<h1>WebGPU - PSYCHEDELIC SHADER by syuilo</h1>
 	<label>
 		<b>scale:</b>
-		<input type="range" min="0.125" max="8" step="0.1" v-model="scale" />
+		<input type="range" min="0.1" max="2" step="0.1" v-model="scale" /> {{ scale }}
 	</label>
 	<label>
 		<b>channelAFactor:</b>
-		<input type="range" min="0" max="8" step="0.1" v-model="channelAFactor" />
+		<input type="range" min="0" max="8" step="0.1" v-model="channelAFactor" /> {{ channelAFactor }}
 	</label>
 	<label>
 		<b>channelBFactor:</b>
-		<input type="range" min="0" max="8" step="0.1" v-model="channelBFactor" />
+		<input type="range" min="0" max="8" step="0.1" v-model="channelBFactor" /> {{ channelBFactor }}
 	</label>
 	<label>
 		<b>channelCFactor:</b>
-		<input type="range" min="0" max="8" step="0.1" v-model="channelCFactor" />
+		<input type="range" min="0" max="8" step="0.1" v-model="channelCFactor" /> {{ channelCFactor }}
 	</label>
 	<label>
 		<b>turbulenceEnabled:</b>
@@ -25,7 +25,7 @@
 	</label>
 	<label>
 		<b>turbulenceScale:</b>
-		<input type="range" min="0" max="32" step="0.1" v-model="turbulenceScale" />
+		<input type="range" min="0" max="32" step="0.1" v-model="turbulenceScale" /> {{ turbulenceScale }}
 	</label>
 	<label>
 		<b>selfModulo:</b>
@@ -37,7 +37,7 @@
 	</label>
 	<label>
 		<b>blurStrength:</b>
-		<input type="range" min="0" max="1" step="0.01" v-model="blurStrength" />
+		<input type="range" min="0" max="1" step="0.01" v-model="blurStrength" /> {{ blurStrength }}
 	</label>
 	<label>
 		<b>blurTurbulenceEnabled:</b>
@@ -45,7 +45,7 @@
 	</label>
 	<label>
 		<b>blurQuality:</b>
-		<input type="range" min="4" max="512" step="1" v-model="blurQuality" />
+		<input type="range" min="4" max="512" step="1" v-model="blurQuality" /> {{ blurQuality }}
 	</label>
 	<label>
 		<b>test:</b>
@@ -78,7 +78,7 @@ const channelBFactor = ref(getUrlParam('channelBFactor', 'float') ?? 2.0);
 const channelCFactor = ref(getUrlParam('channelCFactor', 'float') ?? 6.0);
 const selfModulo = ref(getUrlParam('selfModulo', 'bool') ?? true);
 const mirror = ref(getUrlParam('mirror', 'bool') ?? false);
-const blurStrength = ref(getUrlParam('blurStrength', 'float') ?? 0.05);
+const blurStrength = ref(getUrlParam('blurStrength', 'float') ?? 0.2);
 const blurTurbulenceEnabled = ref(getUrlParam('blurTurbulenceEnabled', 'bool') ?? true);
 const blurQuality = ref(getUrlParam('blurQuality', 'int') ?? 64);
 const test = ref(getUrlParam('test', 'bool') ?? false);
@@ -210,6 +210,7 @@ async function init() {
 				strength: parseFloat(blurStrength.value),
 				quality: parseInt(blurQuality.value),
 				isIos: isIos ? 1.0 : 0.0,
+				test: test.value ? 1.0 : 0.0,
 			});
 			ctx.device.queue.writeBuffer(blurUniformBuffer, 0, blurUniformValues.arrayBuffer);
 

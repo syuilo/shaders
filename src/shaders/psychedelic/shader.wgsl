@@ -227,14 +227,15 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	let turbulenceScale = 0.75 * uniforms.turbulenceScale;
 
 	var uv = fragData.uv / vec2f(1.0, uniforms.aspectRatio);
+	uv *= uniforms.scale;
 
 	if (uniforms.mirror == 1 && uv.x > 0.0) {
 		uv = vec2f(-uv.x, uv.y);
 	}
 
-	let warpedUv = uv + vec2f(
+	let warpedUv = uv + (vec2f(
 		snoise(vec3f((uv + seed + 4.0), time)),
-		snoise(vec3f((uv + seed + 5.0), time))) * 2.0;
+		snoise(vec3f((uv + seed + 5.0), time))) * 2.0);
 
 	let turbulence = select(0.0, snoise(vec3f((warpedUv + seed + 6.0) * turbulenceScale, time * 0.5)), uniforms.turbulenceEnabled == 1);
 
@@ -296,6 +297,7 @@ struct BlurUniforms {
 	strength: f32,
 	quality: i32,
 	isIos: u32,
+	test: u32,
 };
 
 @group(1) @binding(1) var<uniform> blurCommonUniforms: Uniforms;
@@ -314,24 +316,27 @@ fn fsBlur(fragData: VertexOut) -> @location(0) vec4f {
 	let time = blurCommonUniforms.time * 0.0001;
 	let seed = 1000.0;
 	var uv = fragData.uv / vec2f(1.0, blurCommonUniforms.aspectRatio);
+	uv *= blurCommonUniforms.scale;
 
-	let warpedUv = uv + vec2f(
+	let warpedUv = uv + (vec2f(
 		snoise(vec3f((uv + seed + 4.0), time)),
-		snoise(vec3f((uv + seed + 5.0), time))) * 2.0;
+		snoise(vec3f((uv + seed + 5.0), time))) * 2.0);
 
 	let turbulenceScale = 0.75 * blurUniforms.turbulenceScale;
 	let turbulence = select(0.0, snoise(vec3f((warpedUv + seed + 6.0) * turbulenceScale, time * 0.5)), blurUniforms.turbulenceEnabled == 1);
 
-	var r = (warpedUv.x + warpedUv.y + turbulence) * blurUniforms.strength;
+	var r = ((warpedUv.x - uv.x) + (warpedUv.y - uv.y) + turbulence) * blurUniforms.strength;
 	r = max(r, 0.0);
 	r = min(r, 1.0);
+
+	//return vec4f(r, 0.0, 0.0, 1.0);
 
 	///*
 	var result = vec4f(0.0);
 	var totalSamples = 0.0;
 	//let sampleCount = 256;
 	let sampleCount = blurUniforms.quality;
-	let jitter = rand(uv) * 2.0;
+	let jitter = rand(uv) * 4.0;
 
 	for (var i = 0; i < sampleCount; i++) {
 		let radius = sqrt((f32(i) + 0.5) / f32(sampleCount));
