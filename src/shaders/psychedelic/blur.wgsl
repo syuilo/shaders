@@ -220,23 +220,25 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	let seed = 1000.0;
 	var uv = (fragData.uv - vec2(0.5, 0.5)) / vec2f(1.0, uniforms.aspectRatio);
 	//var uv = fragData.uv;
-	//uv.y = 1.0 - uv.y;
+	uv.y = -uv.y; // なぜかYが反転するので直す
 
 	//return mix(textureSample(targetTexture, targetSampler, fragData.uv), vec4f(uv, 0.0, 1.0), 0.25);
-	return vec4f(uv, 0.0, 1.0);
+	//return vec4f(uv, 0.0, 1.0);
 
 	let warpedUv = uv + vec2f(
 		snoise(vec3f((uv + seed + 4.0), time)),
 		snoise(vec3f((uv + seed + 5.0), time))) * 2.0;
 
 	var r = (warpedUv.x + warpedUv.y) * 0.03;
-	//r = max(r, 0.0);
+	r = max(r, 0.0);
 	//let r = uv.y * 0.125;
 	//var r = (textureSample(targetTexture, targetSampler, uv).r + textureSample(targetTexture, targetSampler, uv).g + textureSample(targetTexture, targetSampler, uv).b) / 3.0;
 	//r = r * 0.2;
 
 	//return mix(textureSample(targetTexture, targetSampler, fragData.uv), vec4f(1.0, 0.0, 0.0, 1.0), (warpedUv.x + warpedUv.y) * 0.5);
 	//return mix(textureSample(targetTexture, targetSampler, fragData.uv), vec4f(1.0, 0.0, 0.0, 1.0), uv.y);
+
+	//return vec4f(r, r, r, 1.0);
 
 	///*
 	var result = vec4f(0.0);
@@ -252,7 +254,7 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 		let direction = vec2f(cos(theta), sin(theta));
 		let offset = direction * (r * radius);
 		let weight = exp(-radius * radius * 4.0);
-		result += textureSample(targetTexture, targetSampler, fragData.uv + offset) * weight;
+		result += textureSample(targetTexture, targetSampler, fragData.uv + (offset * vec2f(1.0, uniforms.aspectRatio))) * weight;
 		//result += vec3f(snoiseFractal(vec3f((uv + offset + seed + 1.0) * 0.75, time * 0.5))) * weight;
 		totalSamples += weight;
 	}

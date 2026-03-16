@@ -176,6 +176,10 @@ fn modVec2f(a: vec2f, b: vec2f) -> vec2f {
 	return a - b * floor(a / b);
 }
 
+fn modf32(a: f32, b: f32) -> f32 {
+	return a - b * floor(a / b);
+}
+
 fn premultiplyAlpha(color: vec4f) -> vec4f {
 	return vec4f(color.rgb * color.a, color.a);
 }
@@ -211,7 +215,14 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	var uv = (fragData.uv - vec2(0.5, 0.5)) / vec2f(1.0, uniforms.aspectRatio);
 	//var uv = fragData.uv;
 
-	return vec4f(uv, 0.0, 1.0);
+	//return vec4f(uv, 0.0, 1.0);
+
+	// draw checker
+	//if (modf32(floor(uv.x * 10.0) + floor(uv.y * 10.0), 2.0) < 1.0) {
+	//	return vec4f(0.0, 0.0, 0.0, 1.0);
+	//} else {
+	//	return vec4f(1.0, 1.0, 1.0, 1.0);
+	//}
 
 	if (uniforms.mirror == 1 && uv.x > 0.0) {
 		uv = vec2f(-uv.x, uv.y);
