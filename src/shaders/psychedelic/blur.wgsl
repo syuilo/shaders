@@ -188,17 +188,16 @@ fn rand(seed: vec2f) -> f32 {
 	return fract(sin(dot(seed, vec2f(12.9898, 78.233))) * 43758.5453);
 }
 
+const goldenAngle = 2.399963229728653; // radians
+
 struct Uniforms {
 	scale: f32,
 	aspectRatio: f32,
 	time: f32,
 	turbulenceEnabled: u32,
 	turbulenceScale: f32,
-	channelAFactor: f32,
-	channelBFactor: f32,
-	channelCFactor: f32,
-	selfModulo: u32,
 	mirror: u32,
+	strength: f32,
 	test: u32,
 };
 
@@ -208,7 +207,7 @@ struct Uniforms {
 
 @fragment
 fn fs(fragData: VertexOut) -> @location(0) vec4f {
-	if (uniforms.test == 1) {
+	if (uniforms.strength == 0.0) {
 		return textureSample(targetTexture, targetSampler, fragData.uv);
 		//var uv = (fragData.uv - vec2(0.5, 0.5)) / vec2f(1.0, uniforms.aspectRatio);
 		//return vec4f(uv, 0.0, 1.0);
@@ -229,7 +228,7 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 		snoise(vec3f((uv + seed + 4.0), time)),
 		snoise(vec3f((uv + seed + 5.0), time))) * 2.0;
 
-	var r = (warpedUv.x + warpedUv.y) * 0.03;
+	var r = (warpedUv.x + warpedUv.y) * uniforms.strength;
 	r = max(r, 0.0);
 	//let r = uv.y * 0.125;
 	//var r = (textureSample(targetTexture, targetSampler, uv).r + textureSample(targetTexture, targetSampler, uv).g + textureSample(targetTexture, targetSampler, uv).b) / 3.0;
@@ -245,7 +244,6 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	var totalSamples = 0.0;
 	//let sampleCount = 256;
 	let sampleCount = 256;
-	let goldenAngle = 2.399963229728653; // radians
 	let jitter = rand(uv);
 
 	for (var i = 0; i < sampleCount; i++) {

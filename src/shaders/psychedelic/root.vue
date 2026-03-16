@@ -36,6 +36,10 @@
 		<input type="checkbox" v-model="mirror" />
 	</label>
 	<label>
+		<b>blurStrength:</b>
+		<input type="range" min="0" max="1" step="0.01" v-model="blurStrength" />
+	</label>
+	<label>
 		<b>test:</b>
 		<input type="checkbox" v-model="test" />
 	</label>
@@ -63,6 +67,7 @@ const channelBFactor = ref(getUrlParam('channelBFactor', 'float') ?? 1.5);
 const channelCFactor = ref(getUrlParam('channelCFactor', 'float') ?? 4.0);
 const selfModulo = ref(getUrlParam('selfModulo', 'bool') ?? true);
 const mirror = ref(getUrlParam('mirror', 'bool') ?? false);
+const blurStrength = ref(getUrlParam('blurStrength', 'float') ?? 0.05);
 const test = ref(getUrlParam('test', 'bool') ?? false);
 
 onMounted(async () => {
@@ -202,10 +207,7 @@ onMounted(async () => {
 				time: ctx.time,
 				turbulenceEnabled: turbulenceEnabled.value ? 1.0 : 0.0,
 				turbulenceScale: parseFloat(turbulenceScale.value),
-				channelAFactor: parseFloat(channelAFactor.value),
-				channelBFactor: parseFloat(channelBFactor.value),
-				channelCFactor: parseFloat(channelCFactor.value),
-				selfModulo: selfModulo.value ? 1.0 : 0.0,
+				strength: parseFloat(blurStrength.value),
 				mirror: mirror.value ? 1.0 : 0.0,
 				test: test.value ? 1.0 : 0.0,
 			});
