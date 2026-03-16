@@ -38,11 +38,9 @@ export async function initWebGPU(canvas: HTMLCanvasElement, opts = {}) {
 	const copyPipeline = device.createRenderPipeline({
 		vertex: {
 			module: copyShaderModule,
-			entryPoint: 'vs',
 		},
 		fragment: {
 			module: copyShaderModule,
-			entryPoint: 'fs',
 			targets: [{
 				format: navigator.gpu.getPreferredCanvasFormat(),
 			}],
