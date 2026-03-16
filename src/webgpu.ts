@@ -101,7 +101,7 @@ export async function initWebGPU(canvas: HTMLCanvasElement, opts = {}) {
 				});
 				passEncoder.setPipeline(copyPipeline);
 				passEncoder.setBindGroup(0, copyBindGroup);
-				passEncoder.draw(3);
+				passEncoder.draw(6);
 				passEncoder.end();
 			}
 

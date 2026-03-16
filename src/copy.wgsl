@@ -4,18 +4,29 @@ struct VertexOut {
 };
 
 const vertices = array(
-	vec2f(-1, -1),
-	vec2f( 3, -1),
-	vec2f(-1,  3),
+	// 1st triangle
+	vec2f(-1.0, -1.0),  // center
+	vec2f( 1.0, -1.0),  // right, center
+	vec2f(-1.0,  1.0),  // center, top
+
+	// 2st triangle
+	vec2f(-1.0,  1.0),  // center, top
+	vec2f( 1.0, -1.0),  // right, center
+	vec2f( 1.0,  1.0),  // right, top
 );
 
 @vertex
 fn vs(@builtin(vertex_index) vertexIndex: u32) -> VertexOut {
 	let pos = vertices[vertexIndex];
 	var output: VertexOut;
-	output.position = vec4f(pos, 0, 1);
-	output.uv = (pos.xy + 1.0) / 2.0; // -1 ~ +1 -> 0 ~ 1
+	output.position = vec4f(pos, 0.0, 1.0);
+	output.uv = pos.xy;
 	return output;
+}
+
+// テクスチャ座標(0~1、+Yが下)に変換
+fn convertTexCoords(uv: vec2f) -> vec2f {
+	return vec2f(uv.x, -uv.y) * 0.5 + vec2f(0.5);
 }
 
 @group(0) @binding(1) var targetSampler: sampler;
@@ -24,5 +35,7 @@ fn vs(@builtin(vertex_index) vertexIndex: u32) -> VertexOut {
 @fragment
 fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	//return textureSample(targetTexture, targetSampler, vec2f(fragData.uv.x, 1.0 - fragData.uv.y));
-	return textureSample(targetTexture, targetSampler, fragData.uv);
+	//return textureSample(targetTexture, targetSampler, fragData.uv);
+	//return mix(textureSample(targetTexture, targetSampler, sampleUv), vec4f(fragData.uv, 0.0, 1.0), 0.9);
+	return textureSample(targetTexture, targetSampler, convertTexCoords(fragData.uv));
 }

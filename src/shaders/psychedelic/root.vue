@@ -194,7 +194,7 @@ async function init() {
 			});
 			passEncoder.setPipeline(pipeline);
 			passEncoder.setBindGroup(0, bindGroup);
-			passEncoder.draw(3);
+			passEncoder.draw(6);
 			passEncoder.end();
 		}
 
@@ -222,7 +222,7 @@ async function init() {
 			});
 			passEncoder.setPipeline(blurPipeline);
 			passEncoder.setBindGroup(0, blurBindGroup);
-			passEncoder.draw(3);
+			passEncoder.draw(6);
 			passEncoder.end();
 		}
 	});

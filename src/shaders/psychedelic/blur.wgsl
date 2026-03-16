@@ -4,17 +4,23 @@ struct VertexOut {
 };
 
 const vertices = array(
-	vec2f(-1, -1),
-	vec2f( 3, -1),
-	vec2f(-1,  3),
+	// 1st triangle
+	vec2f(-1.0, -1.0),  // center
+	vec2f( 1.0, -1.0),  // right, center
+	vec2f(-1.0,  1.0),  // center, top
+
+	// 2st triangle
+	vec2f(-1.0,  1.0),  // center, top
+	vec2f( 1.0, -1.0),  // right, center
+	vec2f( 1.0,  1.0),  // right, top
 );
 
 @vertex
 fn vs(@builtin(vertex_index) vertexIndex: u32) -> VertexOut {
 	let pos = vertices[vertexIndex];
 	var output: VertexOut;
-	output.position = vec4f(pos, 0, 1);
-	output.uv = ((pos.xy * uniforms.scale) + 1.0) / 2.0; // -1 ~ +1 -> 0 ~ 1
+	output.position = vec4f(pos, 0.0, 1.0);
+	output.uv = pos.xy;
 	return output;
 }
 
@@ -175,6 +181,10 @@ fn modVec2f(a: vec2f, b: vec2f) -> vec2f {
 	return a - b * floor(a / b);
 }
 
+fn modf32(a: f32, b: f32) -> f32 {
+	return a - b * floor(a / b);
+}
+
 fn premultiplyAlpha(color: vec4f) -> vec4f {
 	return vec4f(color.rgb * color.a, color.a);
 }
@@ -186,6 +196,11 @@ fn remap(value: f32, inMin: f32, inMax: f32, outMin: f32, outMax: f32) -> f32 {
 
 fn rand(seed: vec2f) -> f32 {
 	return fract(sin(dot(seed, vec2f(12.9898, 78.233))) * 43758.5453);
+}
+
+// テクスチャ座標(0~1、+Yが下)に変換
+fn convertTexCoords(uv: vec2f) -> vec2f {
+	return vec2f(uv.x, -uv.y) * 0.5 + vec2f(0.5);
 }
 
 const goldenAngle = 2.399963229728653; // radians
@@ -218,9 +233,7 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 
 	let time = uniforms.time * 0.0001;
 	let seed = 1000.0;
-	var uv = (fragData.uv - vec2(0.5, 0.5)) / vec2f(1.0, uniforms.aspectRatio);
-	//var uv = fragData.uv;
-	uv.y = -uv.y; // なぜかYが反転するので直す
+	var uv = fragData.uv / vec2f(1.0, uniforms.aspectRatio);
 
 	//return mix(textureSample(targetTexture, targetSampler, fragData.uv), vec4f(uv, 0.0, 1.0), 0.25);
 	//return vec4f(uv, 0.0, 1.0);
@@ -258,7 +271,7 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 			sampleUv.x = clamp(sampleUv.x, 0.0, 1.0);
 			sampleUv.y = clamp(sampleUv.y, 0.0, 1.0);
 		}
-		result += textureSample(targetTexture, targetSampler, sampleUv) * weight;
+		result += textureSample(targetTexture, targetSampler, convertTexCoords(sampleUv)) * weight;
 		//result += vec3f(snoiseFractal(vec3f((uv + offset + seed + 1.0) * 0.75, time * 0.5))) * weight;
 		totalSamples += weight;
 	}
