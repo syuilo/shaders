@@ -37,7 +37,7 @@
 	</label>
 	<label>
 		<b>blurStrength:</b>
-		<input type="range" min="0" max="0.5" step="0.01" v-model="blurStrength" />
+		<input type="range" min="0" max="1" step="0.01" v-model="blurStrength" />
 	</label>
 	<label>
 		<b>blurTurbulenceEnabled:</b>
