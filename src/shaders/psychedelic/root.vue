@@ -37,7 +37,11 @@
 	</label>
 	<label>
 		<b>blurStrength:</b>
-		<input type="range" min="0" max="1" step="0.01" v-model="blurStrength" />
+		<input type="range" min="0" max="0.5" step="0.01" v-model="blurStrength" />
+	</label>
+	<label>
+		<b>blurTurbulenceEnabled:</b>
+		<input type="checkbox" v-model="blurTurbulenceEnabled" />
 	</label>
 	<label>
 		<b>test:</b>
@@ -72,6 +76,7 @@ const channelCFactor = ref(getUrlParam('channelCFactor', 'float') ?? 4.0);
 const selfModulo = ref(getUrlParam('selfModulo', 'bool') ?? true);
 const mirror = ref(getUrlParam('mirror', 'bool') ?? false);
 const blurStrength = ref(getUrlParam('blurStrength', 'float') ?? 0.05);
+const blurTurbulenceEnabled = ref(getUrlParam('blurTurbulenceEnabled', 'bool') ?? true);
 const test = ref(getUrlParam('test', 'bool') ?? false);
 const fps = ref(getUrlParam('fps', 'float') ?? null);
 
@@ -203,7 +208,7 @@ async function init() {
 				scale: parseFloat(scale.value),
 				aspectRatio: ctx.width / ctx.height,
 				time: ctx.time,
-				turbulenceEnabled: turbulenceEnabled.value ? 1.0 : 0.0,
+				turbulenceEnabled: blurTurbulenceEnabled.value ? 1.0 : 0.0,
 				turbulenceScale: parseFloat(turbulenceScale.value),
 				strength: parseFloat(blurStrength.value),
 				isIos: isIos ? 1.0 : 0.0,

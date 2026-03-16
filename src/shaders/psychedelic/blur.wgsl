@@ -224,7 +224,7 @@ struct Uniforms {
 @fragment
 fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	if (uniforms.strength == 0.0) {
-		return textureSample(targetTexture, targetSampler, fragData.uv);
+		return textureSample(targetTexture, targetSampler, convertTexCoords(fragData.uv));
 		//var uv = (fragData.uv - vec2(0.5, 0.5)) / vec2f(1.0, uniforms.aspectRatio);
 		//return vec4f(uv, 0.0, 1.0);
 	}
@@ -242,8 +242,12 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 		snoise(vec3f((uv + seed + 4.0), time)),
 		snoise(vec3f((uv + seed + 5.0), time))) * 2.0;
 
-	var r = (warpedUv.x + warpedUv.y) * uniforms.strength;
+	let turbulenceScale = 0.75 * uniforms.turbulenceScale;
+	let turbulence = select(0.0, snoise(vec3f((warpedUv + seed + 6.0) * turbulenceScale, time * 0.5)), uniforms.turbulenceEnabled == 1);
+
+	var r = (warpedUv.x + warpedUv.y + turbulence) * uniforms.strength;
 	r = max(r, 0.0);
+	r = min(r, 1.0);
 	//let r = uv.y * 0.125;
 	//var r = (textureSample(targetTexture, targetSampler, uv).r + textureSample(targetTexture, targetSampler, uv).g + textureSample(targetTexture, targetSampler, uv).b) / 3.0;
 	//r = r * 0.2;

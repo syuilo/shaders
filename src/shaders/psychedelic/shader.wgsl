@@ -241,21 +241,11 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 		snoise(vec3f((uv + seed + 4.0), time)),
 		snoise(vec3f((uv + seed + 5.0), time))) * 2.0;
 
-	let turbulence = snoise(vec3f((warpedUv + seed + 6.0) * turbulenceScale, time * 0.5));
+	let turbulence = select(0.0, snoise(vec3f((warpedUv + seed + 6.0) * turbulenceScale, time * 0.5)), uniforms.turbulenceEnabled == 1);
 
-	var noiseA: f32;
-	var noiseB: f32;
-	var noiseC: f32;
-
-	if (uniforms.turbulenceEnabled == 1) {
-		noiseA = snoiseFractal(vec3f((warpedUv + seed + 1.0 + turbulence) * noiseScale, time * 0.5));
-		noiseB = snoiseFractal(vec3f((warpedUv + seed + 2.0 + turbulence) * noiseScale, time * 0.4));
-		noiseC = snoiseFractal(vec3f((warpedUv + seed + 3.0 + turbulence) * noiseScale, time * 0.3));
-	} else {
-		noiseA = snoiseFractal(vec3f((warpedUv + seed + 1.0) * noiseScale, time * 0.5));
-		noiseB = snoiseFractal(vec3f((warpedUv + seed + 2.0) * noiseScale, time * 0.4));
-		noiseC = snoiseFractal(vec3f((warpedUv + seed + 3.0) * noiseScale, time * 0.3));
-	}
+	var noiseA = snoiseFractal(vec3f((warpedUv + seed + 1.0 + turbulence) * noiseScale, time * 0.5));
+	var noiseB = snoiseFractal(vec3f((warpedUv + seed + 2.0 + turbulence) * noiseScale, time * 0.4));
+	var noiseC = snoiseFractal(vec3f((warpedUv + seed + 3.0 + turbulence) * noiseScale, time * 0.3));
 
 	//if (noiseA > 1.0 || noiseB > 1.0 || noiseC > 1.0) {
 	//	return vec4f(1.0, 0.0, 0.0, 1.0);
