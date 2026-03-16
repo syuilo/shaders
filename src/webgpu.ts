@@ -1,6 +1,7 @@
 import { getUrlParam } from './utils.ts';
+import copyShaderCode from './copy.wgsl?raw';
 
-export async function initWebGPU(canvas: HTMLCanvasElement, code: string, opts = {}) {
+export async function initWebGPU(canvas: HTMLCanvasElement, opts = {}) {
 	const pixelRatio = getUrlParam('pixelRatio', 'number') ?? window.devicePixelRatio;
 
 	const adapter = await navigator.gpu?.requestAdapter({
@@ -27,33 +28,48 @@ export async function initWebGPU(canvas: HTMLCanvasElement, code: string, opts =
 
 	setCanvasSize(canvas.offsetWidth * pixelRatio, canvas.offsetHeight * pixelRatio);
 
-	const shaderModule = device.createShaderModule({
-		code: code,
-	});
-
 	context.configure({
 		device,
-		format: navigator.gpu.getPreferredCanvasFormat(),
+		format: 'rgba8unorm',
 		alphaMode: 'premultiplied',
 		colorSpace: 'display-p3',
 	});
 
-	const pipeline = device.createRenderPipeline({
+	const copyShaderModule = device.createShaderModule({
+		code: copyShaderCode,
+	});
+
+	const copyPipeline = device.createRenderPipeline({
 		vertex: {
-			module: shaderModule,
+			module: copyShaderModule,
 			entryPoint: 'vs',
 		},
 		fragment: {
-			module: shaderModule,
+			module: copyShaderModule,
 			entryPoint: 'fs',
 			targets: [{
-				format: navigator.gpu.getPreferredCanvasFormat(),
+				format: 'rgba8unorm',
 			}],
 		},
 		primitive: {
 			topology: 'triangle-list',
 		},
 		layout: 'auto',
+	});
+
+	const sampler = device.createSampler({
+		magFilter: 'linear',
+		minFilter: 'linear',
+		mipmapFilter: 'linear',
+		addressModeU: 'mirror-repeat',
+		addressModeV: 'mirror-repeat',
+		addressModeW: 'mirror-repeat',
+	});
+
+	const renderTarget = device.createTexture({
+		size: { width: canvas.width, height: canvas.height, depthOrArrayLayers: 1 },
+		format: 'rgba8unorm',
+		usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
 	});
 
 	let disposed = false;
@@ -63,30 +79,38 @@ export async function initWebGPU(canvas: HTMLCanvasElement, code: string, opts =
 		// ただそのままUNIX時間を入れると、秒数が大きすぎて浮動小数点数の関係で精度が落ちるため、1日間隔でループ
 		const initialTime = Date.now() % (1000 * 60 * 60 * 24);
 
-		const renderPassDescriptor: GPURenderPassDescriptor = {
-			colorAttachments: [{
-				view: context.getCurrentTexture().createView(),
-				clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
-				loadOp: 'clear',
-				storeOp: 'store',
-			}],
-		};
-
 		function render(timeStamp: number) {
 			if (disposed) return;
 
 			const time = initialTime + Math.floor(timeStamp);
 
-			renderPassDescriptor.colorAttachments[0].view = context.getCurrentTexture().createView();
-
 			const commandEncoder = device.createCommandEncoder();
-			const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
-			passEncoder.setPipeline(pipeline);
 
-			renderCb({ device, passEncoder, time, width: canvas.width, height: canvas.height });
+			renderCb({ device, renderTarget, commandEncoder, time, width: canvas.width, height: canvas.height });
 
-			passEncoder.draw(3);
-			passEncoder.end();
+			{
+				const passEncoder = commandEncoder.beginRenderPass({
+					colorAttachments: [{
+						view: context.getCurrentTexture().createView(),
+						clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+						loadOp: 'clear',
+						storeOp: 'store',
+					}],
+				});
+				passEncoder.setPipeline(copyPipeline);
+
+				passEncoder.setBindGroup(0, device.createBindGroup({
+					layout: copyPipeline.getBindGroupLayout(0),
+					entries: [
+						{ binding: 1, resource: sampler },
+						{ binding: 2, resource: renderTarget.createView() }
+					],
+				}));
+
+				passEncoder.draw(3);
+				passEncoder.end();
+			}
+
 			device.queue.submit([commandEncoder.finish()]);
 		}
 
@@ -127,7 +151,7 @@ export async function initWebGPU(canvas: HTMLCanvasElement, code: string, opts =
 		context.unconfigure();
 	}
 
-	return { start, device, pipeline, dispose };
+	return { start, device, sampler, dispose };
 }
 
 export function setupWebcam() {

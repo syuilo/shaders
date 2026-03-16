@@ -45,6 +45,7 @@
 <script lang="ts" setup>
 import { onMounted, ref, useTemplateRef } from 'vue';
 import code from './shader.wgsl?raw';
+import blurShaderCode from './blur.wgsl?raw';
 import { initWebGPU } from '@/webgpu.ts';
 import { makeShaderDataDefinitions, makeStructuredView } from 'webgpu-utils';
 import { getUrlParam } from '@/utils.ts';
@@ -67,8 +68,30 @@ const test = ref(getUrlParam('test', 'bool') ?? false);
 onMounted(async () => {
 		if (_dispose) _dispose();
 
-	const { start, device, pipeline, dispose } = await initWebGPU(canvas.value!, code, { fps: null });
+	const { start, device, sampler, dispose } = await initWebGPU(canvas.value!, { fps: null });
 	_dispose = dispose;
+
+	const shaderModule = device.createShaderModule({
+		code: code,
+	});
+
+	const pipeline = device.createRenderPipeline({
+		vertex: {
+			module: shaderModule,
+			entryPoint: 'vs',
+		},
+		fragment: {
+			module: shaderModule,
+			entryPoint: 'fs',
+			targets: [{
+				format: 'rgba8unorm',
+			}],
+		},
+		primitive: {
+			topology: 'triangle-list',
+		},
+		layout: 'auto',
+	});
 
 	const defs = makeShaderDataDefinitions(code);
 	const uniformValues = makeStructuredView(defs.uniforms.uniforms);
@@ -85,24 +108,122 @@ onMounted(async () => {
 		],
 	});
 
+	const buffer = device.createTexture({
+		size: { width: canvas.value!.width, height: canvas.value!.height, depthOrArrayLayers: 1 },
+		format: 'rgba8unorm',
+		usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+	});
+
+	const blurShaderModule = device.createShaderModule({
+		code: blurShaderCode,
+	});
+
+	const blurPipeline = device.createRenderPipeline({
+		vertex: {
+			module: blurShaderModule,
+			entryPoint: 'vs',
+		},
+		fragment: {
+			module: blurShaderModule,
+			entryPoint: 'fs',
+			targets: [{
+				format: 'rgba8unorm',
+			}],
+		},
+		primitive: {
+			topology: 'triangle-list',
+		},
+		layout: 'auto',
+	});
+
+	const blurDefs = makeShaderDataDefinitions(blurShaderCode);
+	const blurUniformValues = makeStructuredView(blurDefs.uniforms.uniforms);
+
+	const blurUniformBuffer = device.createBuffer({
+		size: blurUniformValues.arrayBuffer.byteLength,
+		usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+	});
+
+	const blurBindGroup = device.createBindGroup({
+		layout: blurPipeline.getBindGroupLayout(0),
+		entries: [
+			{ binding: 1, resource: { buffer: blurUniformBuffer }},
+		],
+	});
+
 	start(ctx => {
-		uniformValues.set({
-			scale: parseFloat(scale.value),
-			aspectRatio: ctx.width / ctx.height,
-			time: ctx.time,
-			turbulenceEnabled: turbulenceEnabled.value ? 1.0 : 0.0,
-			turbulenceScale: parseFloat(turbulenceScale.value),
-			channelAFactor: parseFloat(channelAFactor.value),
-			channelBFactor: parseFloat(channelBFactor.value),
-			channelCFactor: parseFloat(channelCFactor.value),
-			selfModulo: selfModulo.value ? 1.0 : 0.0,
-			mirror: mirror.value ? 1.0 : 0.0,
-			test: test.value ? 1.0 : 0.0,
-		});
+		{
+			const passEncoder = ctx.commandEncoder.beginRenderPass({
+				colorAttachments: [{
+					view: buffer.createView(),
+					clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+					loadOp: 'clear',
+					storeOp: 'store',
+				}],
+			});
+			passEncoder.setPipeline(pipeline);
 
-		ctx.device.queue.writeBuffer(uniformBuffer, 0, uniformValues.arrayBuffer);
+			uniformValues.set({
+				scale: parseFloat(scale.value),
+				aspectRatio: ctx.width / ctx.height,
+				time: ctx.time,
+				turbulenceEnabled: turbulenceEnabled.value ? 1.0 : 0.0,
+				turbulenceScale: parseFloat(turbulenceScale.value),
+				channelAFactor: parseFloat(channelAFactor.value),
+				channelBFactor: parseFloat(channelBFactor.value),
+				channelCFactor: parseFloat(channelCFactor.value),
+				selfModulo: selfModulo.value ? 1.0 : 0.0,
+				mirror: mirror.value ? 1.0 : 0.0,
+				test: test.value ? 1.0 : 0.0,
+			});
 
-		ctx.passEncoder.setBindGroup(0, bindGroup);
+			ctx.device.queue.writeBuffer(uniformBuffer, 0, uniformValues.arrayBuffer);
+
+			passEncoder.setBindGroup(0, bindGroup);
+
+			passEncoder.draw(3);
+			passEncoder.end();
+		}
+
+		{
+			const passEncoder = ctx.commandEncoder.beginRenderPass({
+				colorAttachments: [{
+					view: ctx.renderTarget.createView(),
+					clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+					loadOp: 'clear',
+					storeOp: 'store',
+				}],
+			});
+			passEncoder.setPipeline(blurPipeline);
+
+			blurUniformValues.set({
+				scale: parseFloat(scale.value),
+				aspectRatio: ctx.width / ctx.height,
+				time: ctx.time,
+				turbulenceEnabled: turbulenceEnabled.value ? 1.0 : 0.0,
+				turbulenceScale: parseFloat(turbulenceScale.value),
+				channelAFactor: parseFloat(channelAFactor.value),
+				channelBFactor: parseFloat(channelBFactor.value),
+				channelCFactor: parseFloat(channelCFactor.value),
+				selfModulo: selfModulo.value ? 1.0 : 0.0,
+				mirror: mirror.value ? 1.0 : 0.0,
+				test: test.value ? 1.0 : 0.0,
+			});
+
+			ctx.device.queue.writeBuffer(blurUniformBuffer, 0, blurUniformValues.arrayBuffer);
+
+			passEncoder.setBindGroup(0, device.createBindGroup({
+				layout: blurPipeline.getBindGroupLayout(0),
+				entries: [
+					{ binding: 1, resource: { buffer: blurUniformBuffer }},
+					{ binding: 2, resource: sampler },
+					{ binding: 3, resource: buffer.createView() }
+				],
+			}));
+
+			passEncoder.draw(3);
+			passEncoder.end();
+		}
 	});
 });
 </script>

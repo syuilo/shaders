@@ -15,7 +15,6 @@ fn vs(@builtin(vertex_index) vertexIndex: u32) -> VertexOut {
 	var output: VertexOut;
 	output.position = vec4f(pos, 0, 1);
 	output.uv = ((pos.xy * uniforms.scale) + 1.0) / 2.0; // -1 ~ +1 -> 0 ~ 1
-	//output.uv.y = 1.0 - output.uv.y; // flip Y axis
 	return output;
 }
 
@@ -185,6 +184,10 @@ fn remap(value: f32, inMin: f32, inMax: f32, outMin: f32, outMax: f32) -> f32 {
 	return (value - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
 }
 
+fn rand(seed: vec2f) -> f32 {
+	return fract(sin(dot(seed, vec2f(12.9898, 78.233))) * 43758.5453);
+}
+
 struct Uniforms {
 	scale: f32,
 	aspectRatio: f32,
@@ -200,90 +203,75 @@ struct Uniforms {
 };
 
 @group(0) @binding(1) var<uniform> uniforms: Uniforms;
+@group(0) @binding(2) var targetSampler: sampler;
+@group(0) @binding(3) var targetTexture: texture_2d<f32>;
 
 @fragment
 fn fs(fragData: VertexOut) -> @location(0) vec4f {
+	if (uniforms.test == 1) {
+		return textureSample(targetTexture, targetSampler, fragData.uv);
+		//var uv = (fragData.uv - vec2(0.5, 0.5)) / vec2f(1.0, uniforms.aspectRatio);
+		//return vec4f(uv, 0.0, 1.0);
+	}
+
+	//return textureSample(targetTexture, targetSampler, fragData.uv);
+
 	let time = uniforms.time * 0.0001;
 	let seed = 1000.0;
-	let noiseScale = 0.75;
-	let turbulenceScale = 0.75 * uniforms.turbulenceScale;
-
 	var uv = (fragData.uv - vec2(0.5, 0.5)) / vec2f(1.0, uniforms.aspectRatio);
 	//var uv = fragData.uv;
+	//uv.y = 1.0 - uv.y;
 
+	//return mix(textureSample(targetTexture, targetSampler, fragData.uv), vec4f(uv, 0.0, 1.0), 0.25);
 	return vec4f(uv, 0.0, 1.0);
-
-	if (uniforms.mirror == 1 && uv.x > 0.0) {
-		uv = vec2f(-uv.x, uv.y);
-	}
 
 	let warpedUv = uv + vec2f(
 		snoise(vec3f((uv + seed + 4.0), time)),
 		snoise(vec3f((uv + seed + 5.0), time))) * 2.0;
 
-	let turbulence = snoise(vec3f((warpedUv + seed + 6.0) * turbulenceScale, time * 0.5));
+	var r = (warpedUv.x + warpedUv.y) * 0.03;
+	//r = max(r, 0.0);
+	//let r = uv.y * 0.125;
+	//var r = (textureSample(targetTexture, targetSampler, uv).r + textureSample(targetTexture, targetSampler, uv).g + textureSample(targetTexture, targetSampler, uv).b) / 3.0;
+	//r = r * 0.2;
 
-	var noiseA: f32;
-	var noiseB: f32;
-	var noiseC: f32;
+	//return mix(textureSample(targetTexture, targetSampler, fragData.uv), vec4f(1.0, 0.0, 0.0, 1.0), (warpedUv.x + warpedUv.y) * 0.5);
+	//return mix(textureSample(targetTexture, targetSampler, fragData.uv), vec4f(1.0, 0.0, 0.0, 1.0), uv.y);
 
-	if (uniforms.turbulenceEnabled == 1) {
-		noiseA = snoiseFractal(vec3f((warpedUv + seed + 1.0 + turbulence) * noiseScale, time * 0.5));
-		noiseB = snoiseFractal(vec3f((warpedUv + seed + 2.0 + turbulence) * noiseScale, time * 0.4));
-		noiseC = snoiseFractal(vec3f((warpedUv + seed + 3.0 + turbulence) * noiseScale, time * 0.3));
-	} else {
-		noiseA = snoiseFractal(vec3f((warpedUv + seed + 1.0) * noiseScale, time * 0.5));
-		noiseB = snoiseFractal(vec3f((warpedUv + seed + 2.0) * noiseScale, time * 0.4));
-		noiseC = snoiseFractal(vec3f((warpedUv + seed + 3.0) * noiseScale, time * 0.3));
+	///*
+	var result = vec4f(0.0);
+	var totalSamples = 0.0;
+	//let sampleCount = 256;
+	let sampleCount = 256;
+	let goldenAngle = 2.399963229728653; // radians
+	let jitter = rand(uv);
+
+	for (var i = 0; i < sampleCount; i++) {
+		let radius = sqrt((f32(i) + 0.5) / f32(sampleCount));
+		let theta = (f32(i) + jitter) * goldenAngle;
+		let direction = vec2f(cos(theta), sin(theta));
+		let offset = direction * (r * radius);
+		let weight = exp(-radius * radius * 4.0);
+		result += textureSample(targetTexture, targetSampler, fragData.uv + offset) * weight;
+		//result += vec3f(snoiseFractal(vec3f((uv + offset + seed + 1.0) * 0.75, time * 0.5))) * weight;
+		totalSamples += weight;
 	}
 
-	//if (noiseA > 1.0 || noiseB > 1.0 || noiseC > 1.0) {
-	//	return vec4f(1.0, 0.0, 0.0, 1.0);
-	//}
-	//if (noiseA < -1.0 || noiseB < -1.0 || noiseC < -1.0) {
-	//	return vec4f(0.0, 0.0, 1.0, 1.0);
-	//}
-	//if (noiseA > 0.9 || noiseB > 0.9 || noiseC > 0.9) {
-	//	return vec4f(1.0, 1.0, 1.0, 1.0);
-	//}
-	//if (noiseA < -0.9 || noiseB < -0.9 || noiseC < -0.9) {
-	//	return vec4f(1.0, 1.0, 1.0, 1.0);
-	//}
+	return result / totalSamples;
+	// */
 
-	var c = vec3f(0.0, 0.0, 0.6);
-	//c = mix(c, vec3f(1.0, 0.0, 1.0), remap(noiseA % 0.1, 0.0, 0.1, 0.0, 1.0));
-	//c = mix(c, vec3f(1.0, 0.7, 0.0), remap(noiseB % 0.1, 0.0, 0.1, 0.0, 1.0));
-	//c = mix(c, vec3f(0.0, 0.5, 0.0), remap(noiseC % 0.1, 0.0, 0.1, 0.0, 1.0));
-
-	if (noiseA < -0.35) {
-		c = blendNormalVec3f(c, mix(vec3f(0.0, 0.0, 1.0), vec3f(0.0, 0.0, 0.0), remap(noiseA % 0.1, 0.0, 0.1, 0.0, 1.0)));
-	}
-	if (noiseB < -0.35) {
-		c = blendOverlayVec3f(c, vec3f(0.0, 0.0, 0.0));
-	}
-	if (noiseC < -0.35) {
-		c = blendOverlayVec3f(c, vec3f(0.0, 0.0, 0.0));
+	/*
+	var result = vec4f(0.0);
+	let sampleCount = 64;
+	for (var i = 0; i < sampleCount; i++) {
+		var q = vec2(cos(degrees(f32(i / sampleCount) * 360.0)), sin(degrees(f32(i / sampleCount) * 360.0))) * (rand(vec2(f32(i), uv.x + uv.y)) + r);
+		var uv2 = uv + (q * r);
+		result += textureSample(targetTexture, targetSampler, uv2) / 2.0;
+		q = vec2(cos(degrees(f32(i / sampleCount) * 360.)), sin(degrees(f32(i / sampleCount) * 360.))) * (rand(vec2(f32(i) + 2., uv.x + uv.y + 24.)) + r);
+		uv2 = uv + (q * r);
+		result += textureSample(targetTexture, targetSampler, uv2) / 2.0;
 	}
 
-	if (uniforms.selfModulo == 1) {
-		c = mix(c, blendLightenVec3f(c, mix(vec3f(1.0, 0.0, 1.0), vec3f(1.0, 0.3, 0.0), remap(noiseA % (1.0 - noiseA), 0.0, (1.0 - noiseA), 0.0, 1.0))), noiseA * uniforms.channelAFactor);
-		c = mix(c, blendLightenVec3f(c, mix(vec3f(0.3, 0.3, 0.0), vec3f(0.0, 0.5, 0.0), remap(noiseB % (1.0 - noiseB), 0.0, (1.0 - noiseB), 0.0, 1.0))), noiseB * uniforms.channelBFactor);
-		c = mix(c, blendLightenVec3f(c, mix(vec3f(0.8, 0.8, 0.0), vec3f(0.8, 0.4, 0.0), remap(noiseC % (1.0 - noiseC), 0.0, (1.0 - noiseC), 0.0, 1.0))), noiseC * uniforms.channelCFactor);
-	} else {
-		c = mix(c, blendLightenVec3f(c, mix(vec3f(1.0, 0.0, 1.0), vec3f(1.0, 0.3, 0.0), remap(noiseA % 0.1, 0.0, 0.1, 0.0, 1.0))), noiseA * uniforms.channelAFactor);
-		c = mix(c, blendLightenVec3f(c, mix(vec3f(0.3, 0.3, 0.0), vec3f(0.0, 0.5, 0.0), remap(noiseB % 0.1, 0.0, 0.1, 0.0, 1.0))), noiseB * uniforms.channelBFactor);
-		c = mix(c, blendLightenVec3f(c, mix(vec3f(0.8, 0.8, 0.0), vec3f(0.8, 0.4, 0.0), remap(noiseC % 0.1, 0.0, 0.1, 0.0, 1.0))), noiseC * uniforms.channelCFactor);
-	}
-
-	c = mix(c, normalize(c), snoise(vec3f((uv + seed + 4.0), time)));
-	//c = normalize(c);
-
-	c = blendSubtractVec3f(c, vec3f(0.5));
-
-	c = clamp(c, vec3f(0.0), vec3f(1.0));
-
-	//c = mix(c, vec3f(0.0, 1.0, 0.0), (warpedUv.x + warpedUv.y) * 0.5);
-	//c = mix(c, vec3f(0.0, 1.0, 0.0), uv.y);
-
-	return vec4f(c, 1.0);
+	return result / f32(sampleCount);
+	*/
 }
