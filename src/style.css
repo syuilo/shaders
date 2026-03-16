@@ -32,6 +32,10 @@ html, body {
 	z-index: 10;
 }
 
+#menuButton.hide {
+	opacity: 0;
+}
+
 #menu {
 	position: fixed;
 	bottom: 0;

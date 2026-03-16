@@ -1,6 +1,6 @@
 <template>
 <canvas ref="canvas" style="display: block; width: 100%; height: 100%;"></canvas>
-<button id="menuButton" @click="showMenu = !showMenu">MENU</button>
+<button id="menuButton" :class="hideMenuButton ? 'hide' : null" @click="showMenu = !showMenu">MENU</button>
 <div v-if="showMenu" id="menu">
 	<h1>WebGPU - PSYCHEDELIC SHADER by syuilo</h1>
 	<label>
@@ -43,6 +43,10 @@
 		<b>test:</b>
 		<input type="checkbox" v-model="test" />
 	</label>
+	<label>
+		<b>Hide menu button:</b>
+		<input type="checkbox" v-model="hideMenuButton" />
+	</label>
 </div>
 </template>
 
@@ -52,7 +56,7 @@ import code from './shader.wgsl?raw';
 import blurShaderCode from './blur.wgsl?raw';
 import { initWebGPU } from '@/webgpu.ts';
 import { makeShaderDataDefinitions, makeStructuredView } from 'webgpu-utils';
-import { getUrlParam } from '@/utils.ts';
+import { debouncePromise, getUrlParam } from '@/utils.ts';
 
 const showMenu = ref(false);
 
@@ -69,11 +73,16 @@ const selfModulo = ref(getUrlParam('selfModulo', 'bool') ?? true);
 const mirror = ref(getUrlParam('mirror', 'bool') ?? false);
 const blurStrength = ref(getUrlParam('blurStrength', 'float') ?? 0.05);
 const test = ref(getUrlParam('test', 'bool') ?? false);
+const fps = ref(getUrlParam('fps', 'float') ?? null);
 
-onMounted(async () => {
-		if (_dispose) _dispose();
+const hideMenuButton = ref(false);
 
-	const { start, device, sampler, dispose } = await initWebGPU(canvas.value!, { fps: null });
+async function init() {
+	console.log('Initializing WebGPU...');
+
+	if (_dispose) _dispose();
+
+	const { start, device, sampler, dispose } = await initWebGPU(canvas.value!, { fps: fps.value });
 	_dispose = dispose;
 
 	const shaderModule = device.createShaderModule({
@@ -89,7 +98,7 @@ onMounted(async () => {
 			module: shaderModule,
 			entryPoint: 'fs',
 			targets: [{
-				format: 'rgba8unorm',
+				format: navigator.gpu.getPreferredCanvasFormat(),
 			}],
 		},
 		primitive: {
@@ -115,7 +124,7 @@ onMounted(async () => {
 
 	const buffer = device.createTexture({
 		size: { width: canvas.value!.width, height: canvas.value!.height, depthOrArrayLayers: 1 },
-		format: 'rgba8unorm',
+		format: navigator.gpu.getPreferredCanvasFormat(),
 		usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
 	});
 
@@ -132,7 +141,7 @@ onMounted(async () => {
 			module: blurShaderModule,
 			entryPoint: 'fs',
 			targets: [{
-				format: 'rgba8unorm',
+				format: navigator.gpu.getPreferredCanvasFormat(),
 			}],
 		},
 		primitive: {
@@ -153,21 +162,13 @@ onMounted(async () => {
 		layout: blurPipeline.getBindGroupLayout(0),
 		entries: [
 			{ binding: 1, resource: { buffer: blurUniformBuffer }},
+			{ binding: 2, resource: sampler },
+			{ binding: 3, resource: buffer.createView() }
 		],
 	});
 
 	start(ctx => {
 		{
-			const passEncoder = ctx.commandEncoder.beginRenderPass({
-				colorAttachments: [{
-					view: buffer.createView(),
-					clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
-					loadOp: 'clear',
-					storeOp: 'store',
-				}],
-			});
-			passEncoder.setPipeline(pipeline);
-
 			uniformValues.set({
 				scale: parseFloat(scale.value),
 				aspectRatio: ctx.width / ctx.height,
@@ -181,26 +182,23 @@ onMounted(async () => {
 				mirror: mirror.value ? 1.0 : 0.0,
 				test: test.value ? 1.0 : 0.0,
 			});
-
 			ctx.device.queue.writeBuffer(uniformBuffer, 0, uniformValues.arrayBuffer);
 
-			passEncoder.setBindGroup(0, bindGroup);
-
-			passEncoder.draw(3);
-			passEncoder.end();
-		}
-
-		{
 			const passEncoder = ctx.commandEncoder.beginRenderPass({
 				colorAttachments: [{
-					view: ctx.renderTarget.createView(),
+					view: buffer.createView(),
 					clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
 					loadOp: 'clear',
 					storeOp: 'store',
 				}],
 			});
-			passEncoder.setPipeline(blurPipeline);
+			passEncoder.setPipeline(pipeline);
+			passEncoder.setBindGroup(0, bindGroup);
+			passEncoder.draw(3);
+			passEncoder.end();
+		}
 
+		{
 			blurUniformValues.set({
 				scale: parseFloat(scale.value),
 				aspectRatio: ctx.width / ctx.height,
@@ -211,22 +209,37 @@ onMounted(async () => {
 				mirror: mirror.value ? 1.0 : 0.0,
 				test: test.value ? 1.0 : 0.0,
 			});
-
 			ctx.device.queue.writeBuffer(blurUniformBuffer, 0, blurUniformValues.arrayBuffer);
 
-			passEncoder.setBindGroup(0, device.createBindGroup({
-				layout: blurPipeline.getBindGroupLayout(0),
-				entries: [
-					{ binding: 1, resource: { buffer: blurUniformBuffer }},
-					{ binding: 2, resource: sampler },
-					{ binding: 3, resource: buffer.createView() }
-				],
-			}));
-
+			const passEncoder = ctx.commandEncoder.beginRenderPass({
+				colorAttachments: [{
+					view: ctx.renderTarget.createView(),
+					clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+					loadOp: 'clear',
+					storeOp: 'store',
+				}],
+			});
+			passEncoder.setPipeline(blurPipeline);
+			passEncoder.setBindGroup(0, blurBindGroup);
 			passEncoder.draw(3);
 			passEncoder.end();
 		}
 	});
+}
+
+const debouncedInit = debouncePromise(init, 500);
+
+onMounted(async () => {
+	debouncedInit();
+
+	const observer = new ResizeObserver(entries => {
+		for (const entry of entries) {
+			if (entry.target === canvas.value) {
+				debouncedInit();
+			}
+		}
+	});
+	observer.observe(canvas.value!);
 });
 </script>
 

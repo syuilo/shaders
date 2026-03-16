@@ -21,16 +21,12 @@ export async function initWebGPU(canvas: HTMLCanvasElement, opts = {}) {
 	}
 	const context = _context as GPUCanvasContext;
 
-	function setCanvasSize(width: number, height: number) {
-		canvas.width = Math.max(1, Math.min(width, device.limits.maxTextureDimension2D));
-		canvas.height = Math.max(1, Math.min(height, device.limits.maxTextureDimension2D));
-	}
-
-	setCanvasSize(canvas.offsetWidth * pixelRatio, canvas.offsetHeight * pixelRatio);
+	canvas.width = Math.max(1, Math.min(canvas.offsetWidth * pixelRatio, device.limits.maxTextureDimension2D));
+	canvas.height = Math.max(1, Math.min(canvas.offsetHeight * pixelRatio, device.limits.maxTextureDimension2D));
 
 	context.configure({
 		device,
-		format: 'rgba8unorm',
+		format: navigator.gpu.getPreferredCanvasFormat(),
 		alphaMode: 'premultiplied',
 		colorSpace: 'display-p3',
 	});
@@ -48,7 +44,7 @@ export async function initWebGPU(canvas: HTMLCanvasElement, opts = {}) {
 			module: copyShaderModule,
 			entryPoint: 'fs',
 			targets: [{
-				format: 'rgba8unorm',
+				format: navigator.gpu.getPreferredCanvasFormat(),
 			}],
 		},
 		primitive: {
@@ -68,8 +64,16 @@ export async function initWebGPU(canvas: HTMLCanvasElement, opts = {}) {
 
 	const renderTarget = device.createTexture({
 		size: { width: canvas.width, height: canvas.height, depthOrArrayLayers: 1 },
-		format: 'rgba8unorm',
+		format: navigator.gpu.getPreferredCanvasFormat(),
 		usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+	});
+
+	const copyBindGroup = device.createBindGroup({
+		layout: copyPipeline.getBindGroupLayout(0),
+		entries: [
+			{ binding: 1, resource: sampler },
+			{ binding: 2, resource: renderTarget.createView() }
+		],
 	});
 
 	let disposed = false;
@@ -98,15 +102,7 @@ export async function initWebGPU(canvas: HTMLCanvasElement, opts = {}) {
 					}],
 				});
 				passEncoder.setPipeline(copyPipeline);
-
-				passEncoder.setBindGroup(0, device.createBindGroup({
-					layout: copyPipeline.getBindGroupLayout(0),
-					entries: [
-						{ binding: 1, resource: sampler },
-						{ binding: 2, resource: renderTarget.createView() }
-					],
-				}));
-
+				passEncoder.setBindGroup(0, copyBindGroup);
 				passEncoder.draw(3);
 				passEncoder.end();
 			}
@@ -132,17 +128,6 @@ export async function initWebGPU(canvas: HTMLCanvasElement, opts = {}) {
 		}
 
 		window.requestAnimationFrame(renderLoop);
-
-		const observer = new ResizeObserver(entries => {
-			for (const entry of entries) {
-				const canvas = entry.target;
-				const width = entry.contentBoxSize[0].inlineSize * pixelRatio;
-				const height = entry.contentBoxSize[0].blockSize * pixelRatio;
-				setCanvasSize(width, height);
-				render(performance.now());
-			}
-		});
-		observer.observe(canvas);
 	}
 
 	function dispose() {
