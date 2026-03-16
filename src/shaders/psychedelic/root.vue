@@ -56,7 +56,7 @@ import code from './shader.wgsl?raw';
 import blurShaderCode from './blur.wgsl?raw';
 import { initWebGPU } from '@/webgpu.ts';
 import { makeShaderDataDefinitions, makeStructuredView } from 'webgpu-utils';
-import { debouncePromise, getUrlParam } from '@/utils.ts';
+import { debouncePromise, getUrlParam, isIos } from '@/utils.ts';
 
 const showMenu = ref(false);
 
@@ -206,6 +206,7 @@ async function init() {
 				turbulenceEnabled: turbulenceEnabled.value ? 1.0 : 0.0,
 				turbulenceScale: parseFloat(turbulenceScale.value),
 				strength: parseFloat(blurStrength.value),
+				isIos: isIos ? 1.0 : 0.0,
 				mirror: mirror.value ? 1.0 : 0.0,
 				test: test.value ? 1.0 : 0.0,
 			});

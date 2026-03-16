@@ -41,3 +41,5 @@ export function debouncePromise(fn, ms = 0) {
 		pending.push({ resolve: res, reject: rej });
 	});
 }
+
+export const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);

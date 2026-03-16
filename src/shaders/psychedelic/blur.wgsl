@@ -198,6 +198,7 @@ struct Uniforms {
 	turbulenceScale: f32,
 	mirror: u32,
 	strength: f32,
+	isIos: u32,
 	test: u32,
 };
 
@@ -252,7 +253,12 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 		let direction = vec2f(cos(theta), sin(theta));
 		let offset = direction * (r * radius);
 		let weight = exp(-radius * radius * 4.0);
-		result += textureSample(targetTexture, targetSampler, fragData.uv + (offset * vec2f(1.0, uniforms.aspectRatio))) * weight;
+		var sampleUv = fragData.uv + (offset * vec2f(1.0, uniforms.aspectRatio));
+		if (uniforms.isIos == 1) { // iOSではなぜか範囲肺のサンプリングが異様に重いのでクランプ
+			sampleUv.x = clamp(sampleUv.x, 0.0, 1.0);
+			sampleUv.y = clamp(sampleUv.y, 0.0, 1.0);
+		}
+		result += textureSample(targetTexture, targetSampler, sampleUv) * weight;
 		//result += vec3f(snoiseFractal(vec3f((uv + offset + seed + 1.0) * 0.75, time * 0.5))) * weight;
 		totalSamples += weight;
 	}
