@@ -44,6 +44,10 @@
 		<input type="checkbox" v-model="blurTurbulenceEnabled" />
 	</label>
 	<label>
+		<b>blurQuality:</b>
+		<input type="range" min="4" max="512" step="1" v-model="blurQuality" />
+	</label>
+	<label>
 		<b>test:</b>
 		<input type="checkbox" v-model="test" />
 	</label>
@@ -55,7 +59,7 @@
 </template>
 
 <script lang="ts" setup>
-import { onMounted, ref, useTemplateRef } from 'vue';
+import { onMounted, onUnmounted, ref, useTemplateRef } from 'vue';
 import code from './shader.wgsl?raw';
 import { initWebGPU } from '@/webgpu.ts';
 import { makeShaderDataDefinitions, makeStructuredView } from 'webgpu-utils';
@@ -69,13 +73,14 @@ let _dispose: (() => void) | null = null;
 const scale = ref(getUrlParam('scale', 'float') ?? 1.0);
 const turbulenceEnabled = ref(getUrlParam('turbulenceEnabled', 'bool') ?? true);
 const turbulenceScale = ref(getUrlParam('turbulenceScale', 'float') ?? 1.5);
-const channelAFactor = ref(getUrlParam('channelAFactor', 'float') ?? 2.0);
-const channelBFactor = ref(getUrlParam('channelBFactor', 'float') ?? 1.5);
-const channelCFactor = ref(getUrlParam('channelCFactor', 'float') ?? 4.0);
+const channelAFactor = ref(getUrlParam('channelAFactor', 'float') ?? 4.0);
+const channelBFactor = ref(getUrlParam('channelBFactor', 'float') ?? 2.0);
+const channelCFactor = ref(getUrlParam('channelCFactor', 'float') ?? 6.0);
 const selfModulo = ref(getUrlParam('selfModulo', 'bool') ?? true);
 const mirror = ref(getUrlParam('mirror', 'bool') ?? false);
 const blurStrength = ref(getUrlParam('blurStrength', 'float') ?? 0.05);
 const blurTurbulenceEnabled = ref(getUrlParam('blurTurbulenceEnabled', 'bool') ?? true);
+const blurQuality = ref(getUrlParam('blurQuality', 'int') ?? 64);
 const test = ref(getUrlParam('test', 'bool') ?? false);
 const fps = ref(getUrlParam('fps', 'float') ?? null);
 
@@ -160,9 +165,10 @@ async function init() {
 	const blurBindGroup = device.createBindGroup({
 		layout: blurPipeline.getBindGroupLayout(1),
 		entries: [
-			{ binding: 1, resource: { buffer: blurUniformBuffer }},
-			{ binding: 2, resource: sampler },
-			{ binding: 3, resource: buffer.createView() }
+			{ binding: 1, resource: { buffer: uniformBuffer }},
+			{ binding: 2, resource: { buffer: blurUniformBuffer }},
+			{ binding: 3, resource: sampler },
+			{ binding: 4, resource: buffer.createView() }
 		],
 	});
 
@@ -199,15 +205,11 @@ async function init() {
 
 		{
 			blurUniformValues.set({
-				scale: parseFloat(scale.value),
-				aspectRatio: ctx.width / ctx.height,
-				time: ctx.time,
 				turbulenceEnabled: blurTurbulenceEnabled.value ? 1.0 : 0.0,
 				turbulenceScale: parseFloat(turbulenceScale.value),
 				strength: parseFloat(blurStrength.value),
+				quality: parseInt(blurQuality.value),
 				isIos: isIos ? 1.0 : 0.0,
-				mirror: mirror.value ? 1.0 : 0.0,
-				test: test.value ? 1.0 : 0.0,
 			});
 			ctx.device.queue.writeBuffer(blurUniformBuffer, 0, blurUniformValues.arrayBuffer);
 
@@ -240,6 +242,10 @@ onMounted(async () => {
 		}
 	});
 	observer.observe(canvas.value!);
+});
+
+onUnmounted(() => {
+	if (_dispose) _dispose();
 });
 </script>
 

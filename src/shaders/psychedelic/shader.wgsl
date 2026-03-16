@@ -291,20 +291,17 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 }
 
 struct BlurUniforms {
-	scale: f32,
-	aspectRatio: f32,
-	time: f32,
 	turbulenceEnabled: u32,
 	turbulenceScale: f32,
-	mirror: u32,
 	strength: f32,
+	quality: i32,
 	isIos: u32,
-	test: u32,
 };
 
-@group(1) @binding(1) var<uniform> blurUniforms: BlurUniforms;
-@group(1) @binding(2) var targetSampler: sampler;
-@group(1) @binding(3) var targetTexture: texture_2d<f32>;
+@group(1) @binding(1) var<uniform> blurCommonUniforms: Uniforms;
+@group(1) @binding(2) var<uniform> blurUniforms: BlurUniforms;
+@group(1) @binding(3) var targetSampler: sampler;
+@group(1) @binding(4) var targetTexture: texture_2d<f32>;
 
 const goldenAngle = 2.399963229728653; // radians
 
@@ -314,9 +311,9 @@ fn fsBlur(fragData: VertexOut) -> @location(0) vec4f {
 		return textureSample(targetTexture, targetSampler, convertTexCoords(fragData.uv));
 	}
 
-	let time = blurUniforms.time * 0.0001;
+	let time = blurCommonUniforms.time * 0.0001;
 	let seed = 1000.0;
-	var uv = fragData.uv / vec2f(1.0, blurUniforms.aspectRatio);
+	var uv = fragData.uv / vec2f(1.0, blurCommonUniforms.aspectRatio);
 
 	let warpedUv = uv + vec2f(
 		snoise(vec3f((uv + seed + 4.0), time)),
@@ -333,8 +330,8 @@ fn fsBlur(fragData: VertexOut) -> @location(0) vec4f {
 	var result = vec4f(0.0);
 	var totalSamples = 0.0;
 	//let sampleCount = 256;
-	let sampleCount = 256;
-	let jitter = rand(uv);
+	let sampleCount = blurUniforms.quality;
+	let jitter = rand(uv) * 2.0;
 
 	for (var i = 0; i < sampleCount; i++) {
 		let radius = sqrt((f32(i) + 0.5) / f32(sampleCount));
@@ -342,7 +339,7 @@ fn fsBlur(fragData: VertexOut) -> @location(0) vec4f {
 		let direction = vec2f(cos(theta), sin(theta));
 		let offset = direction * (r * radius);
 		let weight = exp(-radius * radius * 4.0);
-		var sampleUv = fragData.uv + (offset * vec2f(1.0, blurUniforms.aspectRatio));
+		var sampleUv = fragData.uv + (offset * vec2f(1.0, blurCommonUniforms.aspectRatio));
 		if (blurUniforms.isIos == 1) { // iOSではなぜか範囲外のサンプリングが異様に重いのでクランプ
 			sampleUv.x = clamp(sampleUv.x, -1.0, 1.0);
 			sampleUv.y = clamp(sampleUv.y, -1.0, 1.0);
