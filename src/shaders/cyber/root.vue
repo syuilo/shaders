@@ -120,10 +120,30 @@ let lastPointerMovedAt = 0;
 async function init() {
 	if (_dispose) _dispose();
 
-	const { start, device, pipeline, dispose } = await initWebGPU(canvas.value!, code, {
+	const { start, device, sampler, dispose } = await initWebGPU(canvas.value!, {
 		fps: limitFpsTo30.value ? 30 : null,
 	});
 	_dispose = dispose;
+
+	const shaderModule = device.createShaderModule({
+		code: code,
+	});
+
+	const pipeline = device.createRenderPipeline({
+		vertex: {
+			module: shaderModule,
+		},
+		fragment: {
+			module: shaderModule,
+			targets: [{
+				format: navigator.gpu.getPreferredCanvasFormat(),
+			}],
+		},
+		primitive: {
+			topology: 'triangle-list',
+		},
+		layout: 'auto',
+	});
 
 	const symbolTextureUrls = [
 		'./assets/symbols/dot.png',
@@ -164,12 +184,6 @@ async function init() {
 		//'./assets/symbols/stripe.png',
 		//'./assets/symbols/fill.png',
 	];
-
-	const sampler = device.createSampler({
-		magFilter: 'linear',
-		minFilter: 'linear',
-		mipmapFilter: 'linear',
-	});
 
 	const symbolTextures = await createTextureFromImages(device, symbolTextureUrls, {
 		mips: true,
@@ -223,7 +237,16 @@ async function init() {
 		});
 		ctx.device.queue.writeBuffer(uniformBuffer, 0, uniformValues.arrayBuffer);
 
-		ctx.passEncoder.setBindGroup(0, bindGroup);
+		const passEncoder = ctx.commandEncoder.beginRenderPass({
+			colorAttachments: [{
+				view: ctx.renderTarget.createView(),
+				clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+				loadOp: 'clear',
+				storeOp: 'store',
+			}],
+		});
+		passEncoder.setPipeline(pipeline);
+		passEncoder.setBindGroup(0, bindGroup);
 
 		if (sorceType === 'video' && videoElement.readyState >= 4) {
 			ctx.device.queue.copyExternalImageToTexture(
@@ -232,6 +255,9 @@ async function init() {
 				{ width: sourceTexture.width, height: sourceTexture.height },
 			);
 		}
+
+		passEncoder.draw(6);
+		passEncoder.end();
 	});
 }
 
