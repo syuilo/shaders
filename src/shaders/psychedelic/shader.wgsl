@@ -203,6 +203,10 @@ fn convertTexCoords(uv: vec2f) -> vec2f {
 	return vec2f(uv.x, -uv.y) * 0.5 + vec2f(0.5);
 }
 
+fn convertTexCoordsClamp(uv: vec2f) -> vec2f {
+	return clamp(convertTexCoords(uv), vec2f(0.0), vec2f(1.0));
+}
+
 struct Uniforms {
 	scale: f32,
 	aspectRatio: f32,
@@ -297,6 +301,7 @@ struct BlurUniforms {
 	strength: f32,
 	quality: i32,
 	isIos: u32,
+	isHorizontal: u32,
 	test: u32,
 };
 
@@ -307,15 +312,10 @@ struct BlurUniforms {
 
 const goldenAngle = 2.399963229728653; // radians
 
-@fragment
-fn fsBlur(fragData: VertexOut) -> @location(0) vec4f {
-	if (blurUniforms.strength == 0.0) {
-		return textureSample(targetTexture, targetSampler, convertTexCoords(fragData.uv));
-	}
-
+fn getBlurRadius(_uv: vec2f) -> f32 {
 	let time = blurCommonUniforms.time * 0.0001;
 	let seed = 1000.0;
-	var uv = fragData.uv / vec2f(1.0, blurCommonUniforms.aspectRatio);
+	var uv = _uv / vec2f(1.0, blurCommonUniforms.aspectRatio);
 	uv *= blurCommonUniforms.scale;
 
 	let warpedUv = uv + (vec2f(
@@ -329,14 +329,23 @@ fn fsBlur(fragData: VertexOut) -> @location(0) vec4f {
 	r = max(r, 0.0);
 	r = min(r, 1.0);
 
-	//return vec4f(r, 0.0, 0.0, 1.0);
+	return r;
+}
+
+@fragment
+fn fsBlur(fragData: VertexOut) -> @location(0) vec4f {
+	if (blurUniforms.strength == 0.0) {
+		return textureSample(targetTexture, targetSampler, convertTexCoords(fragData.uv));
+	}
+
+	let r = getBlurRadius(fragData.uv);
 
 	///*
 	var result = vec4f(0.0);
 	var totalSamples = 0.0;
 	//let sampleCount = 256;
 	let sampleCount = blurUniforms.quality;
-	let jitter = rand(uv) * 4.0;
+	let jitter = rand(fragData.uv / vec2f(1.0, blurCommonUniforms.aspectRatio)) * 4.0;
 
 	for (var i = 0; i < sampleCount; i++) {
 		let radius = sqrt((f32(i) + 0.5) / f32(sampleCount));
@@ -371,4 +380,37 @@ fn fsBlur(fragData: VertexOut) -> @location(0) vec4f {
 
 	return result / f32(sampleCount);
 	*/
+}
+
+@fragment
+fn fsBlurLight(fragData: VertexOut) -> @location(0) vec4f {
+	if (blurUniforms.strength == 0.0) {
+		return textureSample(targetTexture, targetSampler, convertTexCoords(fragData.uv));
+	}
+
+	let r = getBlurRadius(fragData.uv);
+
+	let sampleCount = 16;
+	let t = 1.0 / f32((sampleCount * 2) + 1);
+	var result = textureSample(targetTexture, targetSampler, convertTexCoords(fragData.uv)) * t;
+	//let jitter = rand(uv) * 0.25;
+	let jitter = 0.0;
+
+	if (blurUniforms.isHorizontal == 1) {
+		for (var i = 1; i < sampleCount; i++) {
+			let v = (cos(f32(i / (sampleCount + 1)) / PI) + 1) * 0.5;
+			var sampleUv = fragData.uv;
+			result += textureSample(targetTexture, targetSampler, convertTexCoordsClamp(vec2(sampleUv.x + (((f32(i) / f32(sampleCount)) + jitter) * r), sampleUv.y))) * v * t;
+			result += textureSample(targetTexture, targetSampler, convertTexCoordsClamp(vec2(sampleUv.x - (((f32(i) / f32(sampleCount)) + jitter) * r), sampleUv.y))) * v * t;
+		}
+	} else {
+		for (var i = 1; i < sampleCount; i++) {
+			let v = (cos(f32(i / (sampleCount + 1)) / PI) + 1) * 0.5;
+			var sampleUv = fragData.uv;
+			result += textureSample(targetTexture, targetSampler, convertTexCoordsClamp(vec2(sampleUv.x, sampleUv.y + (((f32(i) / f32(sampleCount)) + jitter) * r)))) * v * t;
+			result += textureSample(targetTexture, targetSampler, convertTexCoordsClamp(vec2(sampleUv.x, sampleUv.y - (((f32(i) / f32(sampleCount)) + jitter) * r)))) * v * t;
+		}
+	}
+
+	return result;
 }
