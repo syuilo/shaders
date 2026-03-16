@@ -194,6 +194,10 @@ fn remap(value: f32, inMin: f32, inMax: f32, outMin: f32, outMax: f32) -> f32 {
 	return (value - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
 }
 
+fn rand(seed: vec2f) -> f32 {
+	return fract(sin(dot(seed, vec2f(12.9898, 78.233))) * 43758.5453);
+}
+
 // テクスチャ座標(0~1、+Yが下)に変換
 fn convertTexCoords(uv: vec2f) -> vec2f {
 	return vec2f(uv.x, -uv.y) * 0.5 + vec2f(0.5);
@@ -223,15 +227,6 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	let turbulenceScale = 0.75 * uniforms.turbulenceScale;
 
 	var uv = fragData.uv / vec2f(1.0, uniforms.aspectRatio);
-
-	//return vec4f(uv, 0.0, 1.0);
-
-	// draw checker
-	//if (modf32(floor(uv.x * 10.0) + floor(uv.y * 10.0), 2.0) < 1.0) {
-	//	return vec4f(0.0, 0.0, 0.0, 1.0);
-	//} else {
-	//	return vec4f(1.0, 1.0, 1.0, 1.0);
-	//}
 
 	if (uniforms.mirror == 1 && uv.x > 0.0) {
 		uv = vec2f(-uv.x, uv.y);
@@ -292,8 +287,86 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 
 	c = clamp(c, vec3f(0.0), vec3f(1.0));
 
-	//c = mix(c, vec3f(0.0, 1.0, 0.0), (warpedUv.x + warpedUv.y) * 0.5);
-	//c = mix(c, vec3f(0.0, 1.0, 0.0), uv.y);
-
 	return vec4f(c, 1.0);
+}
+
+struct BlurUniforms {
+	scale: f32,
+	aspectRatio: f32,
+	time: f32,
+	turbulenceEnabled: u32,
+	turbulenceScale: f32,
+	mirror: u32,
+	strength: f32,
+	isIos: u32,
+	test: u32,
+};
+
+@group(1) @binding(1) var<uniform> blurUniforms: BlurUniforms;
+@group(1) @binding(2) var targetSampler: sampler;
+@group(1) @binding(3) var targetTexture: texture_2d<f32>;
+
+const goldenAngle = 2.399963229728653; // radians
+
+@fragment
+fn fsBlur(fragData: VertexOut) -> @location(0) vec4f {
+	if (blurUniforms.strength == 0.0) {
+		return textureSample(targetTexture, targetSampler, convertTexCoords(fragData.uv));
+	}
+
+	let time = blurUniforms.time * 0.0001;
+	let seed = 1000.0;
+	var uv = fragData.uv / vec2f(1.0, blurUniforms.aspectRatio);
+
+	let warpedUv = uv + vec2f(
+		snoise(vec3f((uv + seed + 4.0), time)),
+		snoise(vec3f((uv + seed + 5.0), time))) * 2.0;
+
+	let turbulenceScale = 0.75 * blurUniforms.turbulenceScale;
+	let turbulence = select(0.0, snoise(vec3f((warpedUv + seed + 6.0) * turbulenceScale, time * 0.5)), blurUniforms.turbulenceEnabled == 1);
+
+	var r = (warpedUv.x + warpedUv.y + turbulence) * blurUniforms.strength;
+	r = max(r, 0.0);
+	r = min(r, 1.0);
+
+	///*
+	var result = vec4f(0.0);
+	var totalSamples = 0.0;
+	//let sampleCount = 256;
+	let sampleCount = 256;
+	let jitter = rand(uv);
+
+	for (var i = 0; i < sampleCount; i++) {
+		let radius = sqrt((f32(i) + 0.5) / f32(sampleCount));
+		let theta = (f32(i) + jitter) * goldenAngle;
+		let direction = vec2f(cos(theta), sin(theta));
+		let offset = direction * (r * radius);
+		let weight = exp(-radius * radius * 4.0);
+		var sampleUv = fragData.uv + (offset * vec2f(1.0, blurUniforms.aspectRatio));
+		if (blurUniforms.isIos == 1) { // iOSではなぜか範囲外のサンプリングが異様に重いのでクランプ
+			sampleUv.x = clamp(sampleUv.x, -1.0, 1.0);
+			sampleUv.y = clamp(sampleUv.y, -1.0, 1.0);
+		}
+		result += textureSample(targetTexture, targetSampler, convertTexCoords(sampleUv)) * weight;
+		//result += vec3f(snoiseFractal(vec3f((uv + offset + seed + 1.0) * 0.75, time * 0.5))) * weight;
+		totalSamples += weight;
+	}
+
+	return result / totalSamples;
+	// */
+
+	/*
+	var result = vec4f(0.0);
+	let sampleCount = 64;
+	for (var i = 0; i < sampleCount; i++) {
+		var q = vec2(cos(degrees(f32(i / sampleCount) * 360.0)), sin(degrees(f32(i / sampleCount) * 360.0))) * (rand(vec2(f32(i), uv.x + uv.y)) + r);
+		var uv2 = uv + (q * r);
+		result += textureSample(targetTexture, targetSampler, uv2) / 2.0;
+		q = vec2(cos(degrees(f32(i / sampleCount) * 360.)), sin(degrees(f32(i / sampleCount) * 360.))) * (rand(vec2(f32(i) + 2., uv.x + uv.y + 24.)) + r);
+		uv2 = uv + (q * r);
+		result += textureSample(targetTexture, targetSampler, uv2) / 2.0;
+	}
+
+	return result / f32(sampleCount);
+	*/
 }

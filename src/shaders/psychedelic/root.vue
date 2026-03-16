@@ -57,7 +57,6 @@
 <script lang="ts" setup>
 import { onMounted, ref, useTemplateRef } from 'vue';
 import code from './shader.wgsl?raw';
-import blurShaderCode from './blur.wgsl?raw';
 import { initWebGPU } from '@/webgpu.ts';
 import { makeShaderDataDefinitions, makeStructuredView } from 'webgpu-utils';
 import { debouncePromise, getUrlParam, isIos } from '@/utils.ts';
@@ -133,18 +132,14 @@ async function init() {
 		usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
 	});
 
-	const blurShaderModule = device.createShaderModule({
-		code: blurShaderCode,
-	});
-
 	const blurPipeline = device.createRenderPipeline({
 		vertex: {
-			module: blurShaderModule,
+			module: shaderModule,
 			entryPoint: 'vs',
 		},
 		fragment: {
-			module: blurShaderModule,
-			entryPoint: 'fs',
+			module: shaderModule,
+			entryPoint: 'fsBlur',
 			targets: [{
 				format: navigator.gpu.getPreferredCanvasFormat(),
 			}],
@@ -155,8 +150,7 @@ async function init() {
 		layout: 'auto',
 	});
 
-	const blurDefs = makeShaderDataDefinitions(blurShaderCode);
-	const blurUniformValues = makeStructuredView(blurDefs.uniforms.uniforms);
+	const blurUniformValues = makeStructuredView(defs.uniforms.blurUniforms);
 
 	const blurUniformBuffer = device.createBuffer({
 		size: blurUniformValues.arrayBuffer.byteLength,
@@ -164,7 +158,7 @@ async function init() {
 	});
 
 	const blurBindGroup = device.createBindGroup({
-		layout: blurPipeline.getBindGroupLayout(0),
+		layout: blurPipeline.getBindGroupLayout(1),
 		entries: [
 			{ binding: 1, resource: { buffer: blurUniformBuffer }},
 			{ binding: 2, resource: sampler },
@@ -226,7 +220,7 @@ async function init() {
 				}],
 			});
 			passEncoder.setPipeline(blurPipeline);
-			passEncoder.setBindGroup(0, blurBindGroup);
+			passEncoder.setBindGroup(1, blurBindGroup);
 			passEncoder.draw(6);
 			passEncoder.end();
 		}
