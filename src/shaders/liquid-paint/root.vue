@@ -8,6 +8,10 @@
 		<input type="range" min="0.1" max="2" step="0.1" v-model="scale" /> {{ scale }}
 	</label>
 	<label>
+		<b>timeFactor:</b>
+		<input type="range" min="0" max="4" step="0.1" v-model="timeFactor" /> {{ timeFactor }}
+	</label>
+	<label>
 		<b>pallette:</b>
 		<select v-model="pallette">
 			<option value="cider">cider</option>
@@ -16,19 +20,19 @@
 	</label>
 	<label>
 		<b>discardThreshold:</b>
-		<input type="range" min="-1" max="1" step="0.01" v-model="discardThreshold" /> {{ discardThreshold }}
+		<input type="range" min="-1" max="1" step="0.1" v-model="discardThreshold" /> {{ discardThreshold }}
 	</label>
 	<label>
 		<b>channelAFactor:</b>
-		<input type="range" min="0" max="8" step="0.1" v-model="channelAFactor" /> {{ channelAFactor }}
+		<input type="range" min="-8" max="8" step="0.1" v-model="channelAFactor" /> {{ channelAFactor }}
 	</label>
 	<label>
 		<b>channelBFactor:</b>
-		<input type="range" min="0" max="8" step="0.1" v-model="channelBFactor" /> {{ channelBFactor }}
+		<input type="range" min="-8" max="8" step="0.1" v-model="channelBFactor" /> {{ channelBFactor }}
 	</label>
 	<label>
 		<b>channelCFactor:</b>
-		<input type="range" min="0" max="8" step="0.1" v-model="channelCFactor" /> {{ channelCFactor }}
+		<input type="range" min="-8" max="8" step="0.1" v-model="channelCFactor" /> {{ channelCFactor }}
 	</label>
 	<label>
 		<b>turbulenceEnabled:</b>
@@ -82,6 +86,7 @@ const canvas = useTemplateRef('canvas');
 let _dispose: (() => void) | null = null;
 
 const scale = ref(getUrlParam('scale', 'float') ?? 1.0);
+const timeFactor = ref(getUrlParam('timeFactor', 'float') ?? 1.0);
 const turbulenceEnabled = ref(getUrlParam('turbulenceEnabled', 'bool') ?? true);
 const turbulenceScale = ref(getUrlParam('turbulenceScale', 'float') ?? 1.5);
 const pallette = ref(getUrlParam('pallette', 'string') ?? 'cider');
@@ -216,7 +221,7 @@ async function init() {
 			uniformValues.set({
 				scale: parseFloat(scale.value),
 				aspectRatio: ctx.width / ctx.height,
-				time: ctx.time,
+				time: ctx.time * parseFloat(timeFactor.value),
 				turbulenceEnabled: turbulenceEnabled.value ? 1.0 : 0.0,
 				turbulenceScale: parseFloat(turbulenceScale.value),
 				pallette: pallette.value === 'cider' ? 0.0 : pallette.value === 'psyche' ? 1.0 : 0.0,
