@@ -255,6 +255,33 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 		var c = vec3f(1.0, 1.0, 1.0);
 
 		if (uniforms.discardThreshold > -1.0 && power < uniforms.discardThreshold) {
+			return vec4f(1.0, 1.0, 1.0, 1.0);
+		}
+
+		if (noiseA < -0.35) {
+			c = blendOverlayVec3f(c, vec3f(1.0, 0.0, 0.0));
+		}
+		if (noiseB < -0.35) {
+			c = blendOverlayVec3f(c, vec3f(0.0, 1.0, 0.0));
+		}
+		if (noiseC < -0.35) {
+			c = blendOverlayVec3f(c, vec3f(0.0, 0.0, 1.0));
+		}
+
+		c = mix(c, blendNormalVec3f(c, vec3f(1.0, 0.0, 0.0)), noiseA * uniforms.channelAFactor);
+		c = mix(c, blendNormalVec3f(c, vec3f(0.0, 1.0, 0.0)), noiseB * uniforms.channelBFactor);
+		c = mix(c, blendNormalVec3f(c, vec3f(0.0, 0.0, 1.0)), noiseC * uniforms.channelCFactor);
+
+		if (c.r < 0.25 && c.g < 0.25 && c.b < 0.25) {
+			c = vec3f(1.0, 1.0, 1.0);
+		}
+
+		c = clamp(c, vec3f(0.0), vec3f(1.0));
+		return vec4f(c, 1.0);
+	} else if (uniforms.pallette == 1) {
+		var c = vec3f(1.0, 1.0, 1.0);
+
+		if (uniforms.discardThreshold > -1.0 && power < uniforms.discardThreshold) {
 			return vec4f(c, 1.0);
 		}
 

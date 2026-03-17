@@ -14,6 +14,7 @@
 	<label>
 		<b>pallette:</b>
 		<select v-model="pallette">
+			<option value="colorful">colorful</option>
 			<option value="cider">cider</option>
 			<option value="psyche">psyche</option>
 		</select>
@@ -89,7 +90,7 @@ const scale = ref(getUrlParam('scale', 'float') ?? 1.0);
 const timeFactor = ref(getUrlParam('timeFactor', 'float') ?? 1.0);
 const turbulenceEnabled = ref(getUrlParam('turbulenceEnabled', 'bool') ?? true);
 const turbulenceScale = ref(getUrlParam('turbulenceScale', 'float') ?? 1.5);
-const pallette = ref(getUrlParam('pallette', 'string') ?? 'cider');
+const pallette = ref(getUrlParam('pallette', 'string') ?? 'colorful');
 const discardThreshold = ref(getUrlParam('discardThreshold', 'float') ?? -1.0);
 const channelAFactor = ref(getUrlParam('channelAFactor', 'float') ?? 4.0);
 const channelBFactor = ref(getUrlParam('channelBFactor', 'float') ?? 2.0);
@@ -224,7 +225,7 @@ async function init() {
 				time: ctx.time * parseFloat(timeFactor.value),
 				turbulenceEnabled: turbulenceEnabled.value ? 1.0 : 0.0,
 				turbulenceScale: parseFloat(turbulenceScale.value),
-				pallette: pallette.value === 'cider' ? 0.0 : pallette.value === 'psyche' ? 1.0 : 0.0,
+				pallette: pallette.value === 'colorful' ? 0.0 : pallette.value === 'cider' ? 1.0 : pallette.value === 'psyche' ? 2.0 : 0.0,
 				discardThreshold: parseFloat(discardThreshold.value),
 				channelAFactor: parseFloat(channelAFactor.value),
 				channelBFactor: parseFloat(channelBFactor.value),
