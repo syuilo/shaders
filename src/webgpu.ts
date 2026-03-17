@@ -1,5 +1,4 @@
 import { getUrlParam } from './utils.ts';
-import copyShaderCode from './copy.wgsl?raw';
 
 export async function initWebGPU(canvas: HTMLCanvasElement, opts = {}) {
 	const pixelRatio = getUrlParam('pixelRatio', 'number') ?? window.devicePixelRatio;
@@ -31,26 +30,6 @@ export async function initWebGPU(canvas: HTMLCanvasElement, opts = {}) {
 		colorSpace: 'display-p3',
 	});
 
-	const copyShaderModule = device.createShaderModule({
-		code: copyShaderCode,
-	});
-
-	const copyPipeline = device.createRenderPipeline({
-		vertex: {
-			module: copyShaderModule,
-		},
-		fragment: {
-			module: copyShaderModule,
-			targets: [{
-				format: navigator.gpu.getPreferredCanvasFormat(),
-			}],
-		},
-		primitive: {
-			topology: 'triangle-list',
-		},
-		layout: 'auto',
-	});
-
 	const sampler = device.createSampler({
 		magFilter: 'linear',
 		minFilter: 'linear',
@@ -58,20 +37,6 @@ export async function initWebGPU(canvas: HTMLCanvasElement, opts = {}) {
 		addressModeU: 'mirror-repeat',
 		addressModeV: 'mirror-repeat',
 		addressModeW: 'mirror-repeat',
-	});
-
-	const renderTarget = device.createTexture({
-		size: { width: canvas.width, height: canvas.height, depthOrArrayLayers: 1 },
-		format: navigator.gpu.getPreferredCanvasFormat(),
-		usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
-	});
-
-	const copyBindGroup = device.createBindGroup({
-		layout: copyPipeline.getBindGroupLayout(0),
-		entries: [
-			{ binding: 1, resource: sampler },
-			{ binding: 2, resource: renderTarget.createView() }
-		],
 	});
 
 	let disposed = false;
@@ -88,22 +53,7 @@ export async function initWebGPU(canvas: HTMLCanvasElement, opts = {}) {
 
 			const commandEncoder = device.createCommandEncoder();
 
-			renderCb({ device, renderTarget, commandEncoder, time, width: canvas.width, height: canvas.height });
-
-			{
-				const passEncoder = commandEncoder.beginRenderPass({
-					colorAttachments: [{
-						view: context.getCurrentTexture().createView(),
-						clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
-						loadOp: 'clear',
-						storeOp: 'store',
-					}],
-				});
-				passEncoder.setPipeline(copyPipeline);
-				passEncoder.setBindGroup(0, copyBindGroup);
-				passEncoder.draw(6);
-				passEncoder.end();
-			}
+			renderCb({ context, device, commandEncoder, time, width: canvas.width, height: canvas.height });
 
 			device.queue.submit([commandEncoder.finish()]);
 		}

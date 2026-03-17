@@ -155,13 +155,13 @@ async function init() {
 	const buffer = device.createTexture({
 		size: { width: canvas.value!.width, height: canvas.value!.height, depthOrArrayLayers: 1 },
 		format: navigator.gpu.getPreferredCanvasFormat(),
-		usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+		usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
 	});
 
 	const buffer2 = device.createTexture({
 		size: { width: canvas.value!.width, height: canvas.value!.height, depthOrArrayLayers: 1 },
 		format: navigator.gpu.getPreferredCanvasFormat(),
-		usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+		usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
 	});
 
 	const blurPipeline = device.createRenderPipeline({
@@ -300,7 +300,7 @@ async function init() {
 
 				const passEncoder = ctx.commandEncoder.beginRenderPass({
 					colorAttachments: [{
-						view: ctx.renderTarget.createView(),
+						view: ctx.context.getCurrentTexture().createView(),
 						clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
 						loadOp: 'clear',
 						storeOp: 'store',
@@ -333,7 +333,7 @@ async function init() {
 
 				const passEncoder = ctx.commandEncoder.beginRenderPass({
 					colorAttachments: [{
-						view: ctx.renderTarget.createView(),
+						view: ctx.context.getCurrentTexture().createView(),
 						clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
 						loadOp: 'clear',
 						storeOp: 'store',
