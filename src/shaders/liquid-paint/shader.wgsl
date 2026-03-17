@@ -449,8 +449,8 @@ fn fsBlurLight(fragData: VertexOut) -> @location(0) vec4f {
 			let v = (cos((f32(i) / f32(sampleCount + 1)) * PI) + 1.0) * 0.5;
 			var sampleUv = fragData.uv;
 			let offset = (f32(i) / f32(sampleCount)) + jitter;
-			result += textureSample(targetTexture, targetSampler, convertTexCoords(vec2(sampleUv.x + (offset * r), sampleUv.y))) * v;
-			result += textureSample(targetTexture, targetSampler, convertTexCoords(vec2(sampleUv.x - (offset * r), sampleUv.y))) * v;
+			result += textureSample(targetTexture, targetSampler, convertTexCoordsClamp(vec2(sampleUv.x + (offset * r), sampleUv.y))) * v;
+			result += textureSample(targetTexture, targetSampler, convertTexCoordsClamp(vec2(sampleUv.x - (offset * r), sampleUv.y))) * v;
 			totalWeight += v * 2.0;
 		}
 	} else {
@@ -460,8 +460,8 @@ fn fsBlurLight(fragData: VertexOut) -> @location(0) vec4f {
 			let v = (cos((f32(i) / f32(sampleCount + 1)) * PI) + 1.0) * 0.5;
 			var sampleUv = fragData.uv;
 			let offset = (f32(i) / f32(sampleCount)) + jitter;
-			result += textureSample(targetTexture, targetSampler, convertTexCoords(vec2(sampleUv.x, sampleUv.y + (offset * r)))) * v;
-			result += textureSample(targetTexture, targetSampler, convertTexCoords(vec2(sampleUv.x, sampleUv.y - (offset * r)))) * v;
+			result += textureSample(targetTexture, targetSampler, convertTexCoordsClamp(vec2(sampleUv.x, sampleUv.y + (offset * r)))) * v;
+			result += textureSample(targetTexture, targetSampler, convertTexCoordsClamp(vec2(sampleUv.x, sampleUv.y - (offset * r)))) * v;
 			totalWeight += v * 2.0;
 		}
 	}
