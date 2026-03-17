@@ -1,7 +1,8 @@
-import { getUrlParam } from './utils.ts';
-
-export async function initWebGPU(canvas: HTMLCanvasElement, opts = {}) {
-	const pixelRatio = getUrlParam('pixelRatio', 'number') ?? window.devicePixelRatio;
+export async function initWebGPU(canvas: HTMLCanvasElement, opts: {
+	fps?: number | null;
+	pixelRatio?: number | null;
+} = {}) {
+	const pixelRatio = opts.pixelRatio ?? window.devicePixelRatio;
 
 	const adapter = await navigator.gpu?.requestAdapter({
 		powerPreference: 'low-power',

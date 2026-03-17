@@ -45,10 +45,6 @@
 		<input type="range" min="0" max="32" step="0.1" v-model="turbulenceScale" /> {{ turbulenceScale }}
 	</label>
 	<label>
-		<b>mirror:</b>
-		<input type="checkbox" v-model="mirror" />
-	</label>
-	<label>
 		<b>blurStrength:</b>
 		<input type="range" min="0" max="3" step="0.1" v-model="blurStrength" /> {{ blurStrength }}
 	</label>
@@ -68,6 +64,27 @@
 		<b>test:</b>
 		<input type="checkbox" v-model="test" />
 	</label>
+	<hr>
+	<label>
+		<b>pixelRatioFactor:</b>
+		<select v-model="pixelRatioFactor">
+			<option :value="0.25">0.25</option>
+			<option :value="0.5">0.5</option>
+			<option :value="1.0">1.0</option>
+			<option :value="2.0">2.0</option>
+			<option :value="4.0">4.0</option>
+		</select>
+	</label>
+	<label>
+		<b>fps:</b>
+		<select v-model="fps">
+			<option :value="null">device default</option>
+			<option :value="15">(up to) 15 FPS</option>
+			<option :value="30">(up to) 30 FPS</option>
+			<option :value="60">(up to) 60 FPS</option>
+			<option :value="120">(up to) 120 FPS</option>
+		</select>
+	</label>
 	<label>
 		<b>Hide menu button:</b>
 		<input type="checkbox" v-model="hideMenuButton" />
@@ -76,7 +93,7 @@
 </template>
 
 <script lang="ts" setup>
-import { onMounted, onUnmounted, ref, useTemplateRef } from 'vue';
+import { onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue';
 import code from './shader.wgsl?raw';
 import { initWebGPU } from '@/webgpu.ts';
 import { makeShaderDataDefinitions, makeStructuredView } from 'webgpu-utils';
@@ -103,6 +120,7 @@ const blurTurbulenceEnabled = ref(getUrlParam('blurTurbulenceEnabled', 'bool') ?
 const blurQuality = ref(getUrlParam('blurQuality', 'int') ?? 64);
 const lowQualityBlur = ref(getUrlParam('lowQualityBlur', 'bool') ?? isIos);
 const test = ref(getUrlParam('test', 'bool') ?? false);
+const pixelRatioFactor = ref(getUrlParam('pixelRatioFactor', 'number') ?? (isIos ? 0.5 : 1.0));
 const fps = ref(getUrlParam('fps', 'float') ?? null);
 
 const hideMenuButton = ref(false);
@@ -112,7 +130,7 @@ async function init() {
 
 	if (_dispose) _dispose();
 
-	const { start, device, sampler, dispose } = await initWebGPU(canvas.value!, { fps: fps.value });
+	const { start, device, sampler, dispose } = await initWebGPU(canvas.value!, { fps: fps.value, pixelRatio: window.devicePixelRatio * pixelRatioFactor.value });
 	_dispose = dispose;
 
 	const shaderModule = device.createShaderModule({
@@ -369,6 +387,10 @@ onMounted(async () => {
 		}
 	});
 	observer.observe(canvas.value!);
+});
+
+watch([pixelRatioFactor, fps], () => {
+	debouncedInit();
 });
 
 onUnmounted(() => {
