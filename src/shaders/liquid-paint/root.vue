@@ -2,7 +2,7 @@
 <canvas ref="canvas" style="display: block; width: 100%; height: 100%;"></canvas>
 <button id="menuButton" :class="hideMenuButton ? 'hide' : null" @click="showMenu = !showMenu">MENU</button>
 <div v-if="showMenu" id="menu">
-	<h1>WebGPU - PSYCHEDELIC SHADER by syuilo</h1>
+	<h1>WebGPU - LIQUID PAINT SHADER by syuilo</h1>
 	<label>
 		<b>scale:</b>
 		<input type="range" min="0.1" max="2" step="0.1" v-model="scale" /> {{ scale }}
