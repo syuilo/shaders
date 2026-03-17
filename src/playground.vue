@@ -170,6 +170,16 @@ watch(
 		playgroundDef.value = await import(`./shaders/${name}/main.ts`).then(module => module.playground);
 		params = reactive(playgroundDef.value.getDefaultParams());
 
+		const urlParams = new URLSearchParams(window.location.search);
+		for (const k of Object.keys(playgroundDef.value.params)) {
+			const urlValue = urlParams.getAll(k);
+			for (const v of urlValue) {
+				if (v != '') {
+					params[k] = JSON.parse(v);
+				}
+			}
+		}
+
 		debouncedInit();
 	},
 	{ immediate: true }
