@@ -50,7 +50,7 @@
 	</label>
 	<label>
 		<b>blurStrength:</b>
-		<input type="range" min="0" max="3" step="0.01" v-model="blurStrength" /> {{ blurStrength }}
+		<input type="range" min="0" max="3" step="0.1" v-model="blurStrength" /> {{ blurStrength }}
 	</label>
 	<label>
 		<b>blurTurbulenceEnabled:</b>
