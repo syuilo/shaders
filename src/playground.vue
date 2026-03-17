@@ -26,6 +26,10 @@
 	<hr>
 
 	<label>
+		<b>timeFactor:</b>
+		<input type="range" min="0" max="4" step="0.1" v-model="timeFactor" /> {{ timeFactor }}
+	</label>
+	<label>
 		<b>pixelRatioFactor:</b>
 		<select v-model="pixelRatioFactor">
 			<option :value="0.25">0.25</option>

@@ -6,7 +6,6 @@ export const playground = definePlayground({
 	title: 'Liquid Paint',
 	params: {
 		scale: { type: 'range', min: 0.1, max: 2, step: 0.1, label: 'Scale' },
-		timeFactor: { type: 'range', min: 0, max: 4, step: 0.1, label: 'Time Factor' },
 		turbulenceEnabled: { type: 'boolean', label: 'Turbulence Enabled' },
 		turbulenceScale: { type: 'range', min: 0, max: 32, step: 0.1, label: 'Turbulence Scale' },
 		pallette: { type: 'enum', label: 'Pallette', enum: [{
@@ -29,7 +28,6 @@ export const playground = definePlayground({
 	},
 	getDefaultParams: () => ({
 		scale: 1.0,
-		timeFactor: 1.0,
 		turbulenceEnabled: true,
 		turbulenceScale: 1.5,
 		pallette: 'colorful',
@@ -152,7 +150,7 @@ export const playground = definePlayground({
 					uniformValues.set({
 						scale: parseFloat(params.scale),
 						aspectRatio: width / height,
-						time: ctx.time * parseFloat(params.timeFactor),
+						time: ctx.time,
 						turbulenceEnabled: params.turbulenceEnabled ? 1.0 : 0.0,
 						turbulenceScale: parseFloat(params.turbulenceScale),
 						pallette: params.pallette === 'colorful' ? 0.0 : params.pallette === 'cider' ? 1.0 : params.pallette === 'psyche' ? 2.0 : params.pallette === 'pastel' ? 3.0 : 0.0,
