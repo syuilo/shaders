@@ -8,6 +8,17 @@
 		<input type="range" min="0.1" max="2" step="0.1" v-model="scale" /> {{ scale }}
 	</label>
 	<label>
+		<b>pallette:</b>
+		<select v-model="pallette">
+			<option value="cider">cider</option>
+			<option value="psyche">psyche</option>
+		</select>
+	</label>
+	<label>
+		<b>discardThreshold:</b>
+		<input type="range" min="-1" max="1" step="0.01" v-model="discardThreshold" /> {{ discardThreshold }}
+	</label>
+	<label>
 		<b>channelAFactor:</b>
 		<input type="range" min="0" max="8" step="0.1" v-model="channelAFactor" /> {{ channelAFactor }}
 	</label>
@@ -28,16 +39,12 @@
 		<input type="range" min="0" max="32" step="0.1" v-model="turbulenceScale" /> {{ turbulenceScale }}
 	</label>
 	<label>
-		<b>selfModulo:</b>
-		<input type="checkbox" v-model="selfModulo" />
-	</label>
-	<label>
 		<b>mirror:</b>
 		<input type="checkbox" v-model="mirror" />
 	</label>
 	<label>
 		<b>blurStrength:</b>
-		<input type="range" min="0" max="1" step="0.01" v-model="blurStrength" /> {{ blurStrength }}
+		<input type="range" min="0" max="3" step="0.01" v-model="blurStrength" /> {{ blurStrength }}
 	</label>
 	<label>
 		<b>blurTurbulenceEnabled:</b>
@@ -77,6 +84,8 @@ let _dispose: (() => void) | null = null;
 const scale = ref(getUrlParam('scale', 'float') ?? 1.0);
 const turbulenceEnabled = ref(getUrlParam('turbulenceEnabled', 'bool') ?? true);
 const turbulenceScale = ref(getUrlParam('turbulenceScale', 'float') ?? 1.5);
+const pallette = ref(getUrlParam('pallette', 'string') ?? 'cider');
+const discardThreshold = ref(getUrlParam('discardThreshold', 'float') ?? -1.0);
 const channelAFactor = ref(getUrlParam('channelAFactor', 'float') ?? 4.0);
 const channelBFactor = ref(getUrlParam('channelBFactor', 'float') ?? 2.0);
 const channelCFactor = ref(getUrlParam('channelCFactor', 'float') ?? 6.0);
@@ -210,6 +219,8 @@ async function init() {
 				time: ctx.time,
 				turbulenceEnabled: turbulenceEnabled.value ? 1.0 : 0.0,
 				turbulenceScale: parseFloat(turbulenceScale.value),
+				pallette: pallette.value === 'cider' ? 0.0 : pallette.value === 'psyche' ? 1.0 : 0.0,
+				discardThreshold: parseFloat(discardThreshold.value),
 				channelAFactor: parseFloat(channelAFactor.value),
 				channelBFactor: parseFloat(channelBFactor.value),
 				channelCFactor: parseFloat(channelCFactor.value),

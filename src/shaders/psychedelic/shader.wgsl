@@ -213,6 +213,8 @@ struct Uniforms {
 	time: f32,
 	turbulenceEnabled: u32,
 	turbulenceScale: f32,
+	pallette: u32,
+	discardThreshold: f32,
 	channelAFactor: f32,
 	channelBFactor: f32,
 	channelCFactor: f32,
@@ -243,56 +245,64 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 
 	let turbulence = select(0.0, snoise(vec3f((warpedUv + seed + 6.0) * turbulenceScale, time * 0.5)), uniforms.turbulenceEnabled == 1);
 
+	let power = ((warpedUv.x - uv.x) + (warpedUv.y - uv.y) + turbulence) / 3.0; // 3つの成分を混ぜるので-1 ~ +1の範囲にするために3で割る
+
 	var noiseA = snoiseFractal(vec3f((warpedUv + seed + 1.0 + turbulence) * noiseScale, time * 0.5));
 	var noiseB = snoiseFractal(vec3f((warpedUv + seed + 2.0 + turbulence) * noiseScale, time * 0.4));
 	var noiseC = snoiseFractal(vec3f((warpedUv + seed + 3.0 + turbulence) * noiseScale, time * 0.3));
 
-	//if (noiseA > 1.0 || noiseB > 1.0 || noiseC > 1.0) {
-	//	return vec4f(1.0, 0.0, 0.0, 1.0);
-	//}
-	//if (noiseA < -1.0 || noiseB < -1.0 || noiseC < -1.0) {
-	//	return vec4f(0.0, 0.0, 1.0, 1.0);
-	//}
-	//if (noiseA > 0.9 || noiseB > 0.9 || noiseC > 0.9) {
-	//	return vec4f(1.0, 1.0, 1.0, 1.0);
-	//}
-	//if (noiseA < -0.9 || noiseB < -0.9 || noiseC < -0.9) {
-	//	return vec4f(1.0, 1.0, 1.0, 1.0);
-	//}
+	if (uniforms.pallette == 0) {
+		var c = vec3f(1.0, 1.0, 1.0);
 
-	var c = vec3f(0.0, 0.0, 0.6);
-	//c = mix(c, vec3f(1.0, 0.0, 1.0), remap(noiseA % 0.1, 0.0, 0.1, 0.0, 1.0));
-	//c = mix(c, vec3f(1.0, 0.7, 0.0), remap(noiseB % 0.1, 0.0, 0.1, 0.0, 1.0));
-	//c = mix(c, vec3f(0.0, 0.5, 0.0), remap(noiseC % 0.1, 0.0, 0.1, 0.0, 1.0));
+		if (uniforms.discardThreshold > -1.0 && power < uniforms.discardThreshold) {
+			return vec4f(c, 1.0);
+		}
 
-	if (noiseA < -0.35) {
-		c = blendNormalVec3f(c, mix(vec3f(0.0, 0.0, 1.0), vec3f(0.0, 0.0, 0.0), remap(noiseA % 0.1, 0.0, 0.1, 0.0, 1.0)));
-	}
-	if (noiseB < -0.35) {
-		c = blendOverlayVec3f(c, vec3f(0.0, 0.0, 0.0));
-	}
-	if (noiseC < -0.35) {
-		c = blendOverlayVec3f(c, vec3f(0.0, 0.0, 0.0));
-	}
+		if (noiseA < -0.35) {
+			c = blendNormalVec3f(c, mix(vec3f(0.0, 0.0, 1.0), vec3f(0.0, 0.0, 0.0), remap(noiseA % 0.1, 0.0, 0.1, 0.0, 1.0)));
+		}
+		if (noiseB < -0.35) {
+			c = blendOverlayVec3f(c, vec3f(1.0, 1.0, 1.0));
+		}
+		if (noiseC < -0.35) {
+			c = blendOverlayVec3f(c, vec3f(1.0, 1.0, 1.0));
+		}
 
-	if (uniforms.selfModulo == 1) {
+		c = mix(c, blendDarkenVec3f(c, mix(vec3f(0.0, 0.5, 1.0), vec3f(0.0, 0.7, 1.0), remap(noiseA % (1.0 - noiseA), 0.0, (1.0 - noiseA), 0.0, 1.0))), noiseA * uniforms.channelAFactor);
+		c = mix(c, blendLightenVec3f(c, mix(vec3f(1.0, 0.3, 0.0), vec3f(0.0, 0.0, 0.5), remap(noiseB % (1.0 - noiseB), 0.0, (1.0 - noiseB), 0.0, 1.0))), noiseB * uniforms.channelBFactor);
+		c = mix(c, blendLightenVec3f(c, mix(vec3f(0.5, 0.1, 0.3), vec3f(0.0, 1.0, 0.2), remap(noiseC % (1.0 - noiseC), 0.0, (1.0 - noiseC), 0.0, 1.0))), noiseC * uniforms.channelCFactor);
+
+		c = clamp(c, vec3f(0.0), vec3f(1.0));
+		return vec4f(c, 1.0);
+	} else {
+		var c = vec3f(0.0, 0.0, 0.6);
+
+		if (uniforms.discardThreshold > -1.0 && power < uniforms.discardThreshold) {
+			return vec4f(0.0, 0.0, 0.0, 1.0);
+		}
+
+		if (noiseA < -0.35) {
+			c = blendNormalVec3f(c, mix(vec3f(0.0, 0.0, 1.0), vec3f(0.0, 0.0, 0.0), remap(noiseA % 0.1, 0.0, 0.1, 0.0, 1.0)));
+		}
+		if (noiseB < -0.35) {
+			c = blendOverlayVec3f(c, vec3f(0.0, 0.0, 0.0));
+		}
+		if (noiseC < -0.35) {
+			c = blendOverlayVec3f(c, vec3f(0.0, 0.0, 0.0));
+		}
+
 		c = mix(c, blendLightenVec3f(c, mix(vec3f(1.0, 0.0, 1.0), vec3f(1.0, 0.3, 0.0), remap(noiseA % (1.0 - noiseA), 0.0, (1.0 - noiseA), 0.0, 1.0))), noiseA * uniforms.channelAFactor);
 		c = mix(c, blendLightenVec3f(c, mix(vec3f(0.3, 0.3, 0.0), vec3f(0.0, 0.5, 0.0), remap(noiseB % (1.0 - noiseB), 0.0, (1.0 - noiseB), 0.0, 1.0))), noiseB * uniforms.channelBFactor);
 		c = mix(c, blendLightenVec3f(c, mix(vec3f(0.8, 0.8, 0.0), vec3f(0.8, 0.4, 0.0), remap(noiseC % (1.0 - noiseC), 0.0, (1.0 - noiseC), 0.0, 1.0))), noiseC * uniforms.channelCFactor);
-	} else {
-		c = mix(c, blendLightenVec3f(c, mix(vec3f(1.0, 0.0, 1.0), vec3f(1.0, 0.3, 0.0), remap(noiseA % 0.1, 0.0, 0.1, 0.0, 1.0))), noiseA * uniforms.channelAFactor);
-		c = mix(c, blendLightenVec3f(c, mix(vec3f(0.3, 0.3, 0.0), vec3f(0.0, 0.5, 0.0), remap(noiseB % 0.1, 0.0, 0.1, 0.0, 1.0))), noiseB * uniforms.channelBFactor);
-		c = mix(c, blendLightenVec3f(c, mix(vec3f(0.8, 0.8, 0.0), vec3f(0.8, 0.4, 0.0), remap(noiseC % 0.1, 0.0, 0.1, 0.0, 1.0))), noiseC * uniforms.channelCFactor);
+
+		c = mix(c, normalize(c), snoise(vec3f((uv + seed + 4.0), time)));
+		//c = normalize(c);
+
+		c = blendSubtractVec3f(c, vec3f(0.5));
+
+		c = clamp(c, vec3f(0.0), vec3f(1.0));
+		return vec4f(c, 1.0);
 	}
-
-	c = mix(c, normalize(c), snoise(vec3f((uv + seed + 4.0), time)));
-	//c = normalize(c);
-
-	c = blendSubtractVec3f(c, vec3f(0.5));
-
-	c = clamp(c, vec3f(0.0), vec3f(1.0));
-
-	return vec4f(c, 1.0);
 }
 
 struct BlurUniforms {
@@ -325,7 +335,7 @@ fn getBlurRadius(_uv: vec2f) -> f32 {
 	let turbulenceScale = 0.75 * blurUniforms.turbulenceScale;
 	let turbulence = select(0.0, snoise(vec3f((warpedUv + seed + 6.0) * turbulenceScale, time * 0.5)), blurUniforms.turbulenceEnabled == 1);
 
-	var r = ((warpedUv.x - uv.x) + (warpedUv.y - uv.y) + turbulence) * blurUniforms.strength;
+	var r = (((warpedUv.x - uv.x) + (warpedUv.y - uv.y) + turbulence) / 3.0) * blurUniforms.strength;
 	r = max(r, 0.0);
 	r = min(r, 1.0);
 
