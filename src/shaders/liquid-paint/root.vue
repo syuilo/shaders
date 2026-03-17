@@ -17,6 +17,7 @@
 			<option value="colorful">colorful</option>
 			<option value="cider">cider</option>
 			<option value="psyche">psyche</option>
+			<option value="pastel">pastel</option>
 		</select>
 	</label>
 	<label>
@@ -25,15 +26,15 @@
 	</label>
 	<label>
 		<b>channelAFactor:</b>
-		<input type="range" min="-8" max="8" step="0.1" v-model="channelAFactor" /> {{ channelAFactor }}
+		<input type="range" min="-4" max="4" step="0.1" v-model="channelAFactor" /> {{ channelAFactor }}
 	</label>
 	<label>
 		<b>channelBFactor:</b>
-		<input type="range" min="-8" max="8" step="0.1" v-model="channelBFactor" /> {{ channelBFactor }}
+		<input type="range" min="-4" max="4" step="0.1" v-model="channelBFactor" /> {{ channelBFactor }}
 	</label>
 	<label>
 		<b>channelCFactor:</b>
-		<input type="range" min="-8" max="8" step="0.1" v-model="channelCFactor" /> {{ channelCFactor }}
+		<input type="range" min="-4" max="4" step="0.1" v-model="channelCFactor" /> {{ channelCFactor }}
 	</label>
 	<label>
 		<b>turbulenceEnabled:</b>
@@ -91,10 +92,10 @@ const timeFactor = ref(getUrlParam('timeFactor', 'float') ?? 1.0);
 const turbulenceEnabled = ref(getUrlParam('turbulenceEnabled', 'bool') ?? true);
 const turbulenceScale = ref(getUrlParam('turbulenceScale', 'float') ?? 1.5);
 const pallette = ref(getUrlParam('pallette', 'string') ?? 'colorful');
-const discardThreshold = ref(getUrlParam('discardThreshold', 'float') ?? -1.0);
-const channelAFactor = ref(getUrlParam('channelAFactor', 'float') ?? 4.0);
-const channelBFactor = ref(getUrlParam('channelBFactor', 'float') ?? 2.0);
-const channelCFactor = ref(getUrlParam('channelCFactor', 'float') ?? 6.0);
+const discardThreshold = ref(getUrlParam('discardThreshold', 'float') ?? -0.2);
+const channelAFactor = ref(getUrlParam('channelAFactor', 'float') ?? 1.0);
+const channelBFactor = ref(getUrlParam('channelBFactor', 'float') ?? 1.0);
+const channelCFactor = ref(getUrlParam('channelCFactor', 'float') ?? 1.0);
 const selfModulo = ref(getUrlParam('selfModulo', 'bool') ?? true);
 const mirror = ref(getUrlParam('mirror', 'bool') ?? false);
 const blurStrength = ref(getUrlParam('blurStrength', 'float') ?? 1.0);
@@ -225,7 +226,7 @@ async function init() {
 				time: ctx.time * parseFloat(timeFactor.value),
 				turbulenceEnabled: turbulenceEnabled.value ? 1.0 : 0.0,
 				turbulenceScale: parseFloat(turbulenceScale.value),
-				pallette: pallette.value === 'colorful' ? 0.0 : pallette.value === 'cider' ? 1.0 : pallette.value === 'psyche' ? 2.0 : 0.0,
+				pallette: pallette.value === 'colorful' ? 0.0 : pallette.value === 'cider' ? 1.0 : pallette.value === 'psyche' ? 2.0 : pallette.value === 'pastel' ? 3.0 : 0.0,
 				discardThreshold: parseFloat(discardThreshold.value),
 				channelAFactor: parseFloat(channelAFactor.value),
 				channelBFactor: parseFloat(channelBFactor.value),
