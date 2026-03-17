@@ -227,7 +227,7 @@ struct Uniforms {
 
 @fragment
 fn fs(fragData: VertexOut) -> @location(0) vec4f {
-	let time = uniforms.time * 0.0001;
+	let time = uniforms.time * 0.00005;
 	let seed = 1000.0;
 	let noiseScale = 0.75;
 	let turbulenceScale = 0.75 * uniforms.turbulenceScale;
@@ -362,7 +362,7 @@ struct BlurUniforms {
 const goldenAngle = 2.399963229728653; // radians
 
 fn getBlurRadius(_uv: vec2f) -> f32 {
-	let time = blurCommonUniforms.time * 0.0001;
+	let time = blurCommonUniforms.time * 0.00005;
 	let seed = 1000.0;
 	var uv = _uv / vec2f(1.0, blurCommonUniforms.aspectRatio);
 	uv *= blurCommonUniforms.scale;
