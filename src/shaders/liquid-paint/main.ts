@@ -1,0 +1,282 @@
+import code from './shader.wgsl?raw';
+import { makeShaderDataDefinitions, makeStructuredView } from 'webgpu-utils';
+import { definePlayground, isIos } from '@/utils.ts';
+
+export const playground = definePlayground({
+	title: 'Liquid Paint',
+	params: {
+		scale: { type: 'range', min: 0.1, max: 2, step: 0.1, label: 'Scale' },
+		timeFactor: { type: 'range', min: 0, max: 4, step: 0.1, label: 'Time Factor' },
+		turbulenceEnabled: { type: 'boolean', label: 'Turbulence Enabled' },
+		turbulenceScale: { type: 'range', min: 0, max: 32, step: 0.1, label: 'Turbulence Scale' },
+		pallette: { type: 'enum', label: 'Pallette', enum: [{
+			value: 'colorful', label: 'Colorful'
+		}, {
+			value: 'cider', label: 'Cider'
+		}, {
+			value: 'psyche', label: 'Psyche'
+		}, {
+			value: 'pastel', label: 'Pastel'
+		}] },
+		discardThreshold: { type: 'range', min: -1, max: 1, step: 0.1, label: 'Discard Threshold' },
+		channelAFactor: { type: 'range', min: -4, max: 4, step: 0.1, label: 'Channel A Factor' },
+		channelBFactor: { type: 'range', min: -4, max: 4, step: 0.1, label: 'Channel B Factor' },
+		channelCFactor: { type: 'range', min: -4, max: 4, step: 0.1, label: 'Channel C Factor' },
+		lowQualityBlur: { type: 'boolean', label: 'Low Quality Blur' },
+		blurTurbulenceEnabled: { type: 'boolean', label: 'Blur Turbulence Enabled' },
+		blurStrength: { type: 'range', min: 0, max: 3, step: 0.1, label: 'Blur Strength' },
+		blurQuality: { type: 'range', min: 16, max: 512, step: 1, label: 'Blur Quality' },
+	},
+	getDefaultParams: () => ({
+		scale: 1.0,
+		timeFactor: 1.0,
+		turbulenceEnabled: true,
+		turbulenceScale: 1.5,
+		pallette: 'colorful',
+		discardThreshold: -0.2,
+		channelAFactor: 1.0,
+		channelBFactor: 1.0,
+		channelCFactor: 1.0,
+		lowQualityBlur: isIos,
+		blurTurbulenceEnabled: true,
+		blurStrength: 1.0,
+		blurQuality: 64,
+	}),
+	init: ({ width, height, wgpu, params }) => {
+		const shaderModule = wgpu.device.createShaderModule({
+			code: code,
+		});
+
+		const pipeline = wgpu.device.createRenderPipeline({
+			vertex: {
+				module: shaderModule,
+				entryPoint: 'vs',
+			},
+			fragment: {
+				module: shaderModule,
+				entryPoint: 'fs',
+				targets: [{
+					format: navigator.gpu.getPreferredCanvasFormat(),
+				}],
+			},
+			primitive: {
+				topology: 'triangle-list',
+			},
+			layout: 'auto',
+		});
+
+		const defs = makeShaderDataDefinitions(code);
+		const uniformValues = makeStructuredView(defs.uniforms.uniforms);
+
+		const uniformBuffer = wgpu.device.createBuffer({
+			size: uniformValues.arrayBuffer.byteLength,
+			usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+		});
+
+		const bindGroup = wgpu.device.createBindGroup({
+			layout: pipeline.getBindGroupLayout(0),
+			entries: [
+				{ binding: 1, resource: { buffer: uniformBuffer }},
+			],
+		});
+
+		const buffer = wgpu.device.createTexture({
+			size: { width, height },
+			format: navigator.gpu.getPreferredCanvasFormat(),
+			usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
+		});
+
+		const buffer2 = wgpu.device.createTexture({
+			size: { width, height },
+			format: navigator.gpu.getPreferredCanvasFormat(),
+			usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
+		});
+
+		const blurPipeline = wgpu.device.createRenderPipeline({
+			vertex: {
+				module: shaderModule,
+				entryPoint: 'vs',
+			},
+			fragment: {
+				module: shaderModule,
+				entryPoint: 'fsBlur',
+				targets: [{
+					format: navigator.gpu.getPreferredCanvasFormat(),
+				}],
+			},
+			primitive: {
+				topology: 'triangle-list',
+			},
+			layout: 'auto',
+		});
+
+		const blurLqPipeline = wgpu.device.createRenderPipeline({
+			vertex: {
+				module: shaderModule,
+				entryPoint: 'vs',
+			},
+			fragment: {
+				module: shaderModule,
+				entryPoint: 'fsBlurLight',
+				targets: [{
+					format: navigator.gpu.getPreferredCanvasFormat(),
+				}],
+			},
+			primitive: {
+				topology: 'triangle-list',
+			},
+			layout: 'auto',
+		});
+
+		const blurUniformValues = makeStructuredView(defs.uniforms.blurUniforms);
+		const blurUniformBuffer = wgpu.device.createBuffer({
+			size: blurUniformValues.arrayBuffer.byteLength,
+			usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+		});
+
+		const blurHorizontalUniformValues = makeStructuredView(defs.uniforms.blurUniforms);
+		const blurHorizontalUniformBuffer = wgpu.device.createBuffer({
+			size: blurHorizontalUniformValues.arrayBuffer.byteLength,
+			usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+		});
+
+		const blurVerticalUniformValues = makeStructuredView(defs.uniforms.blurUniforms);
+		const blurVerticalUniformBuffer = wgpu.device.createBuffer({
+			size: blurVerticalUniformValues.arrayBuffer.byteLength,
+			usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+		});
+
+		return {
+			render: ctx => {
+				{
+					uniformValues.set({
+						scale: parseFloat(params.scale),
+						aspectRatio: width / height,
+						time: ctx.time * parseFloat(params.timeFactor),
+						turbulenceEnabled: params.turbulenceEnabled ? 1.0 : 0.0,
+						turbulenceScale: parseFloat(params.turbulenceScale),
+						pallette: params.pallette === 'colorful' ? 0.0 : params.pallette === 'cider' ? 1.0 : params.pallette === 'psyche' ? 2.0 : params.pallette === 'pastel' ? 3.0 : 0.0,
+						discardThreshold: parseFloat(params.discardThreshold),
+						channelAFactor: parseFloat(params.channelAFactor),
+						channelBFactor: parseFloat(params.channelBFactor),
+						channelCFactor: parseFloat(params.channelCFactor),
+					});
+					wgpu.device.queue.writeBuffer(uniformBuffer, 0, uniformValues.arrayBuffer);
+
+					const passEncoder = ctx.commandEncoder.beginRenderPass({
+						colorAttachments: [{
+							view: buffer.createView(),
+							clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+							loadOp: 'clear',
+							storeOp: 'store',
+						}],
+					});
+					passEncoder.setPipeline(pipeline);
+					passEncoder.setBindGroup(0, bindGroup);
+					passEncoder.draw(6);
+					passEncoder.end();
+				}
+
+				if (params.lowQualityBlur) {
+					{
+						blurHorizontalUniformValues.set({
+							isHorizontal: 1.0,
+							turbulenceEnabled: params.blurTurbulenceEnabled ? 1.0 : 0.0,
+							turbulenceScale: parseFloat(params.turbulenceScale),
+							strength: parseFloat(params.blurStrength),
+							quality: parseInt(params.blurQuality),
+							isIos: isIos ? 1.0 : 0.0,
+						});
+						wgpu.device.queue.writeBuffer(blurHorizontalUniformBuffer, 0, blurHorizontalUniformValues.arrayBuffer);
+
+						const passEncoder = ctx.commandEncoder.beginRenderPass({
+							colorAttachments: [{
+								view: buffer2.createView(),
+								clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+								loadOp: 'clear',
+								storeOp: 'store',
+							}],
+						});
+						passEncoder.setPipeline(blurLqPipeline);
+						passEncoder.setBindGroup(1, wgpu.device.createBindGroup({
+							layout: blurLqPipeline.getBindGroupLayout(1),
+							entries: [
+								{ binding: 1, resource: { buffer: uniformBuffer }},
+								{ binding: 2, resource: { buffer: blurHorizontalUniformBuffer }},
+								{ binding: 3, resource: wgpu.sampler },
+								{ binding: 4, resource: buffer.createView() }
+							],
+						}));
+						passEncoder.draw(6);
+						passEncoder.end();
+					}
+
+					{
+						blurVerticalUniformValues.set({
+							isHorizontal: 0.0,
+							turbulenceEnabled: params.blurTurbulenceEnabled ? 1.0 : 0.0,
+							turbulenceScale: parseFloat(params.turbulenceScale),
+							strength: parseFloat(params.blurStrength),
+							quality: parseInt(params.blurQuality),
+							isIos: isIos ? 1.0 : 0.0,
+						});
+						wgpu.device.queue.writeBuffer(blurVerticalUniformBuffer, 0, blurVerticalUniformValues.arrayBuffer);
+
+						const passEncoder = ctx.commandEncoder.beginRenderPass({
+							colorAttachments: [{
+								view: wgpu.context.getCurrentTexture().createView(),
+								clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+								loadOp: 'clear',
+								storeOp: 'store',
+							}],
+						});
+						passEncoder.setPipeline(blurLqPipeline);
+						passEncoder.setBindGroup(1, wgpu.device.createBindGroup({
+							layout: blurLqPipeline.getBindGroupLayout(1),
+							entries: [
+								{ binding: 1, resource: { buffer: uniformBuffer }},
+								{ binding: 2, resource: { buffer: blurVerticalUniformBuffer }},
+								{ binding: 3, resource: wgpu.sampler },
+								{ binding: 4, resource: buffer2.createView() }
+							],
+						}));
+						passEncoder.draw(6);
+						passEncoder.end();
+					}
+				} else {
+					{
+						blurUniformValues.set({
+							turbulenceEnabled: params.blurTurbulenceEnabled ? 1.0 : 0.0,
+							turbulenceScale: parseFloat(params.turbulenceScale),
+							strength: parseFloat(params.blurStrength),
+							quality: parseInt(params.blurQuality),
+							isIos: isIos ? 1.0 : 0.0,
+						});
+						wgpu.device.queue.writeBuffer(blurUniformBuffer, 0, blurUniformValues.arrayBuffer);
+
+						const passEncoder = ctx.commandEncoder.beginRenderPass({
+							colorAttachments: [{
+								view: wgpu.context.getCurrentTexture().createView(),
+								clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+								loadOp: 'clear',
+								storeOp: 'store',
+							}],
+						});
+						passEncoder.setPipeline(blurPipeline);
+						passEncoder.setBindGroup(1, wgpu.device.createBindGroup({
+							layout: blurPipeline.getBindGroupLayout(1),
+							entries: [
+								{ binding: 1, resource: { buffer: uniformBuffer }},
+								{ binding: 2, resource: { buffer: blurUniformBuffer }},
+								{ binding: 3, resource: wgpu.sampler },
+								{ binding: 4, resource: buffer.createView() }
+							],
+						}));
+						passEncoder.draw(6);
+						passEncoder.end();
+					}
+				}
+			},
+		}
+	},
+});

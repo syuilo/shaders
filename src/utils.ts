@@ -43,3 +43,85 @@ export function debouncePromise(fn, ms = 0) {
 }
 
 export const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+type NumberOptionSchema = {
+	type: 'number';
+	label: string;
+	min?: number;
+	max?: number;
+	step?: number;
+};
+
+type BooleanOptionSchema = {
+	type: 'boolean';
+	label: string;
+};
+
+type ColorOptionSchema = {
+	type: 'color';
+	label: string;
+};
+
+type EnumOptionSchema = {
+	type: 'enum';
+	label: string;
+	enum: {
+		value: string | number | null;
+		label: string;
+	}[];
+};
+
+type RangeOptionSchema = {
+	type: 'range';
+	label: string;
+	min: number;
+	max: number;
+	step?: number;
+};
+
+type ImageOptionSchema = {
+	type: 'image';
+	label: string;
+};
+
+type OptionsSchema = Record<string, NumberOptionSchema | BooleanOptionSchema | ColorOptionSchema | EnumOptionSchema | RangeOptionSchema | ImageOptionSchema>;
+
+type GetOptionsSchemaValues<T extends OptionsSchema> = {
+	[K in keyof T]:
+	T[K] extends NumberOptionSchema ? number :
+	T[K] extends BooleanOptionSchema ? boolean :
+	T[K] extends ColorOptionSchema ? [number, number, number] :
+	T[K] extends EnumOptionSchema ? T[K]['enum'][number]['value'] :
+	T[K] extends RangeOptionSchema ? number :
+	T[K] extends ImageOptionSchema ? string | null :
+	never;
+};
+
+export type PlaygroundInstance<Options = any> = {
+	render: (ctx: {
+		time: number;
+		commandEncoder: GPUCommandEncoder;
+	}) => void;
+	dispose?: () => void;
+};
+
+export type Playground<OpSc extends OptionsSchema = OptionsSchema> = {
+	title: string;
+	params: OpSc;
+	getDefaultParams: () => GetOptionsSchemaValues<OpSc>;
+	init: (args: {
+		canvas: HTMLCanvasElement;
+		width: number;
+		height: number;
+		wgpu: {
+			device: GPUDevice;
+			context: GPUCanvasContext;
+			sampler: GPUSampler;
+		};
+		params: Readonly<GetOptionsSchemaValues<OpSc>>;
+	}) => PlaygroundInstance<GetOptionsSchemaValues<OpSc>>;
+};
+
+export function definePlayground<const OpSc extends OptionsSchema>(def: Playground<OpSc>): Playground<OpSc> {
+	return def;
+}
