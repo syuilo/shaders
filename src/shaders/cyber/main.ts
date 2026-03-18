@@ -1,6 +1,6 @@
 import code from './shader.wgsl?raw';
 import { createTextureFromImages, createTextureFromSource, makeShaderDataDefinitions, makeStructuredView } from 'webgpu-utils';
-import { definePlayground, isIos, remap } from '@/utils.ts';
+import { definePlayground } from '@/utils.ts';
 
 export const playground = definePlayground({
 	title: 'Cyber',
