@@ -48,7 +48,7 @@ export const playground = definePlayground({
 		blurQuality: 0.25,
 		blurMethod: isIos ? 'twoPass' : 'standard',
 	}),
-	init: ({ width, height, wgpu, params }) => {
+	init: async ({ width, height, wgpu, params }) => {
 		const shaderModule = wgpu.device.createShaderModule({
 			code: code,
 		});
@@ -170,16 +170,16 @@ export const playground = definePlayground({
 
 				{
 					uniformValues.set({
-						scale: parseFloat(params.scale),
+						scale: params.scale,
 						aspectRatio: width / height,
 						time: ctx.time,
 						turbulenceEnabled: params.turbulenceEnabled ? 1.0 : 0.0,
-						turbulenceScale: parseFloat(params.turbulenceScale),
+						turbulenceScale: params.turbulenceScale,
 						pallette: params.pallette === 'colorful' ? 0.0 : params.pallette === 'cider' ? 1.0 : params.pallette === 'psyche' ? 2.0 : params.pallette === 'pastel' ? 3.0 : 0.0,
-						discardThreshold: parseFloat(params.discardThreshold),
-						channelAFactor: parseFloat(params.channelAFactor),
-						channelBFactor: parseFloat(params.channelBFactor),
-						channelCFactor: parseFloat(params.channelCFactor),
+						discardThreshold: params.discardThreshold,
+						channelAFactor: params.channelAFactor,
+						channelBFactor: params.channelBFactor,
+						channelCFactor: params.channelCFactor,
 						hasSource: params.source != null ? 1.0 : 0.0,
 						coverSource: 1.0,
 						sourceAspectRatio: sourceTexture.width / sourceTexture.height,
@@ -205,8 +205,8 @@ export const playground = definePlayground({
 						blurHorizontalUniformValues.set({
 							isHorizontal: 1.0,
 							turbulenceEnabled: params.blurTurbulenceEnabled ? 1.0 : 0.0,
-							turbulenceScale: parseFloat(params.turbulenceScale),
-							strength: parseFloat(params.blurStrength),
+							turbulenceScale: params.turbulenceScale,
+							strength: params.blurStrength,
 							quality: Math.round(remap(params.blurQuality, 0, 1, 1, 32)),
 							isIos: isIos ? 1.0 : 0.0,
 						});
@@ -238,8 +238,8 @@ export const playground = definePlayground({
 						blurVerticalUniformValues.set({
 							isHorizontal: 0.0,
 							turbulenceEnabled: params.blurTurbulenceEnabled ? 1.0 : 0.0,
-							turbulenceScale: parseFloat(params.turbulenceScale),
-							strength: parseFloat(params.blurStrength),
+							turbulenceScale: params.turbulenceScale,
+							strength: params.blurStrength,
 							quality: Math.round(remap(params.blurQuality, 0, 1, 1, 32)),
 							isIos: isIos ? 1.0 : 0.0,
 						});
@@ -270,8 +270,8 @@ export const playground = definePlayground({
 					{
 						blurUniformValues.set({
 							turbulenceEnabled: params.blurTurbulenceEnabled ? 1.0 : 0.0,
-							turbulenceScale: parseFloat(params.turbulenceScale),
-							strength: parseFloat(params.blurStrength),
+							turbulenceScale: params.turbulenceScale,
+							strength: params.blurStrength,
 							quality: Math.round(remap(params.blurQuality, 0, 1, 1, 512)),
 							isIos: isIos ? 1.0 : 0.0,
 							monteCarlo: params.blurMethod === 'monteCarlo' ? 1.0 : 0.0,

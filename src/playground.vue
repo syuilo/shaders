@@ -2,7 +2,7 @@
 <canvas ref="canvas" style="display: block; width: 100%; height: 100%;"></canvas>
 <button id="menuButton" :class="hideMenuButton ? 'hide' : null" @click="showMenu = !showMenu">MENU</button>
 <div v-if="playgroundDef != null" v-show="showMenu" id="menu">
-	<h1>WebGPU - {{ playgroundDef.title }} SHADER by syuilo</h1>
+	<h1>WebGPU - "{{ playgroundDef.title }}" shader by syuilo</h1>
 
 	<label v-for="[k, s] in Object.entries(playgroundDef.params)" :key="k">
 		<b>{{ s.label }}</b>
@@ -17,7 +17,7 @@
 			</select>
 		</template>
 		<template v-else-if="s.type === 'range'">
-			<input type="range" :min="s.min" :max="s.max" :step="s.step" v-model="params[k]" /> {{ params[k] }}
+			<input type="range" :min="s.min" :max="s.max" :step="s.step" v-model.number="params[k]" /> {{ params[k] }}
 		</template>
 		<template v-else-if="s.type === 'media'">
 			<XMedia @updated="params[k] = $event != null ? markRaw($event) : null" />
@@ -119,7 +119,7 @@ async function init() {
 	// ただそのままUNIX時間を入れると、秒数が大きすぎて浮動小数点数の関係で精度が落ちるため、1日間隔でループ
 	const initialTime = Date.now() % (1000 * 60 * 60 * 24);
 
-	const playgroundInstance = playgroundDef.value.init({
+	const playgroundInstance = await playgroundDef.value.init({
 		width: canvas.value.width,
 		height: canvas.value.height,
 		wgpu: { device, context, sampler },

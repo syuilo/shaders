@@ -172,14 +172,13 @@ fn premultiplyAlpha(color: vec4f) -> vec4f {
 struct Uniforms {
 	aspectRatio: f32,
 	time: f32,
-	timeFactor: f32,
 	divisions: f32,
 	margin: f32,
 	symbolTexturesCount: u32,
 	symbolTexturesRangeMin: f32,
 	symbolTexturesRangeMax: f32,
 	pointerPosition: vec2f,
-	useSource: u32,
+	hasSource: u32,
 	sourceTextureAspectRatio: f32,
 	discardBrightPixels: u32,
 	enableSampledCellJoining: u32,
@@ -247,10 +246,10 @@ fn getPointerForce(uv: vec2f) -> f32 {
 
 @fragment
 fn fs(fragData: VertexOut) -> @location(0) vec4f {
-	let time = uniforms.time * uniforms.timeFactor;
+	let time = uniforms.time;
 	let u_seed = 1000.0;
 	let scroll = vec2f(0.0, -time * 0.0001);
-	let useSource = uniforms.useSource == 1;
+	let hasSource = uniforms.hasSource == 1;
 
 	let uv = (fragData.uv - 0.5) / vec2f(1.0, uniforms.aspectRatio);
 
@@ -284,7 +283,7 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	let similar2 = !discardSourceColor(getSourceColor(cellUv2)) && isSimilar(sourceColorA2, sourceColorB2, sourceColorC2, sourceColorD2, 0.1);
 	let similar4 = !discardSourceColor(getSourceColor(cellUv4)) && isSimilar(sourceColorA4, sourceColorB4, sourceColorC4, sourceColorD4, 0.025);
 
-	if (useSource && uniforms.enableSampledCellJoining == 1) {
+	if (hasSource && uniforms.enableSampledCellJoining == 1) {
 		if (similar4) {
 			modUv = modVec2f(uv - 0.5, cellSize * 4.0);
 			cellSize = cellSize * 4.0;
@@ -318,14 +317,14 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	var threshold = 0.65;
 	//if (ripple > 0.5) threshold -= 0.1;
 	var visibility = select(0.0, 1.0, mix(visibilityNoiseA, visibilityNoiseB, 0.5) > threshold);
-	if (useSource) {
+	if (hasSource) {
 		visibility = select(0.0, 1.0, !discardSourceColor(sourceColor));
 	}
 
 	var texSelector = select(
 		snoise0to1(vec3f((cellUv * 3.0) + scroll, time * 0.00001)),
 		select(sourceColorLuminance, remap(sourceColorLuminance, 0.0, discardBrightPixelsThreshold, 0.0, 1.0), uniforms.discardBrightPixels == 1), // discardBrightPixelsでスキップした範囲の分だけ範囲を圧縮する
-		useSource);
+		hasSource);
 
 	//float ripple = getRipple(cellUv);
 	let pointerForce = getPointerForce(cellUv);
@@ -342,7 +341,7 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 
 	texSelector = remap(texSelector, 0.0, 1.0, uniforms.symbolTexturesRangeMin, uniforms.symbolTexturesRangeMax);
 
-	let scaleNoise = select(snoise0to1(vec3f(cellUv * 0.7, time * 0.0000125)), 1.0, useSource);
+	let scaleNoise = select(snoise0to1(vec3f(cellUv * 0.7, time * 0.0000125)), 1.0, hasSource);
 	var scale = select(0.4, 1.0, scaleNoise > 0.25);
 	scale = min(scale, 1.0 - border);
 	//if (ripple > 0.5) {
@@ -379,7 +378,7 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 		return premultiplyAlpha(vec4f(vec3f(0.0), 0.0));
 	}
 
-	if (useSource) {
+	if (hasSource) {
 		if ((sourceColor.r + sourceColor.g + sourceColor.b) / 3.0 > 0.7) {
 			out_color.r = 1.0;
 			out_color.g = 1.0;
