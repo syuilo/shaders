@@ -20,8 +20,7 @@
 
 <script lang="ts" setup>
 import { onMounted, ref, useTemplateRef, watch } from 'vue';
-import { setupWebcam } from '@/webgpu.ts';
-import { getUrlParam, Media } from '@/utils.ts';
+import { setupWebcam, Media } from '@/utils.ts';
 
 const emit = defineEmits<{
 	(ev: 'updated', v: Media | null): void;

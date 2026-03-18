@@ -137,3 +137,22 @@ export function definePlayground<const OpSc extends OptionsSchema>(def: Playgrou
 export function remap(value: number, fromMin: number, fromMax: number, toMin: number, toMax: number) {
 	return toMin + (toMax - toMin) * ((value - fromMin) / (fromMax - fromMin));
 }
+
+export function setupWebcam() {
+	return new Promise((resolve, reject) => {
+		navigator.mediaDevices.getUserMedia({
+			video: true,
+			audio: false
+		}).then(localMediaStream => {
+			resolve(localMediaStream);
+		}).catch(err => {
+			if (err.name === 'PermissionDeniedError'){
+				window.alert('denied permission');
+			} else {
+				window.alert(err.message);
+			}
+
+			reject(err);
+		});
+	});
+}
