@@ -1,7 +1,7 @@
 <template>
 <canvas ref="canvas" style="display: block; width: 100%; height: 100%;"></canvas>
 <button id="menuButton" :class="hideMenuButton ? 'hide' : null" @click="showMenu = !showMenu">MENU</button>
-<div v-if="showMenu && playgroundDef != null" id="menu">
+<div v-if="playgroundDef != null" v-show="showMenu" id="menu">
 	<h1>WebGPU - {{ playgroundDef.title }} SHADER by syuilo</h1>
 
 	<label v-for="[k, s] in Object.entries(playgroundDef.params)" :key="k">
