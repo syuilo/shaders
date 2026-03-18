@@ -208,7 +208,7 @@ fn remap(value: f32, inMin: f32, inMax: f32, outMin: f32, outMax: f32) -> f32 {
 }
 
 fn getPixelatedUv(uv: vec2f, cellSize: vec2f) -> vec2f {
-	return (cellSize * floor((uv - 0.5) / cellSize)) + (cellSize / 2.0);
+	return (cellSize * floor(uv / cellSize)) + (cellSize / 2.0);
 }
 
 fn getSourceColor(uv: vec2f) -> vec4f {
@@ -269,10 +269,10 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 
 	var border = uniforms.margin;
 
-	var modUv = modVec2f(uv - 0.5, cellSize);
+	var modUv = modVec2f(uv, cellSize);
 
-	let cellUv2 = getPixelatedUv(uv, cellSize * 2.0) + 0.5;
-	let cellUv4 = getPixelatedUv(uv, cellSize * 4.0) + 0.5;
+	let cellUv2 = getPixelatedUv(uv, cellSize * 2.0);
+	let cellUv4 = getPixelatedUv(uv, cellSize * 4.0);
 
 	let a2 = cellUv2 + vec2f(-(cellUv2.x / 2.0 / 2.0), -(cellUv2.y / 2.0 / 2.0));
 	let b2 = cellUv2 + vec2f((cellUv2.x / 2.0 / 2.0), -(cellUv2.y / 2.0 / 2.0));
@@ -297,11 +297,11 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 
 	if (hasSource && uniforms.enableSampledCellJoining == 1) {
 		if (similar4) {
-			modUv = modVec2f(uv - 0.5, cellSize * 4.0);
+			modUv = modVec2f(uv, cellSize * 4.0);
 			cellSize = cellSize * 4.0;
 			border /= 4.0;
 		} else if (similar2) {
-			modUv = modVec2f(uv - 0.5, cellSize * 2.0);
+			modUv = modVec2f(uv, cellSize * 2.0);
 			cellSize = cellSize * 2.0;
 			border /= 2.0;
 		}
@@ -309,17 +309,17 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 		let cellMultiplier2Noise = snoise0to1(vec3f(cellUv2.x * 3.0, cellUv2.y * 3.0, time * 0.000025));
 		let cellMultiplier4Noise = snoise0to1(vec3f(cellUv4.x * 3.0, cellUv4.y * 3.0, time * 0.000025));
 		if (cellMultiplier4Noise > 0.9) {
-			modUv = modVec2f(uv - 0.5, cellSize * 4.0);
+			modUv = modVec2f(uv, cellSize * 4.0);
 			cellSize = cellSize * 4.0;
 			border /= 4.0;
 		} else if (cellMultiplier2Noise > 0.75) {
-			modUv = modVec2f(uv - 0.5, cellSize * 2.0);
+			modUv = modVec2f(uv, cellSize * 2.0);
 			cellSize = cellSize * 2.0;
 			border /= 2.0;
 		}
 	}
 
-	let cellUv = getPixelatedUv(uv, cellSize) + 0.5;
+	let cellUv = getPixelatedUv(uv, cellSize);
 
 	let sourceColor = getSourceColor(cellUv);
 	let sourceColorLuminance = (sourceColor.r + sourceColor.g + sourceColor.b) / 3.0;
