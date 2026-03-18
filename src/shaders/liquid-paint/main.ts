@@ -1,13 +1,12 @@
 import code from './shader.wgsl?raw';
-import { makeShaderDataDefinitions, makeStructuredView } from 'webgpu-utils';
+import { createTextureFromSource, makeShaderDataDefinitions, makeStructuredView } from 'webgpu-utils';
 import { definePlayground, isIos } from '@/utils.ts';
 
 export const playground = definePlayground({
 	title: 'Liquid Paint',
 	params: {
+		source: { type: 'media', needReinit: true, label: 'Source' },
 		scale: { type: 'range', min: 0.1, max: 2, step: 0.1, label: 'Scale' },
-		turbulenceEnabled: { type: 'boolean', label: 'Turbulence Enabled' },
-		turbulenceScale: { type: 'range', min: 0, max: 32, step: 0.1, label: 'Turbulence Scale' },
 		pallette: { type: 'enum', label: 'Pallette', enum: [{
 			value: 'colorful', label: 'Colorful'
 		}, {
@@ -21,12 +20,15 @@ export const playground = definePlayground({
 		channelAFactor: { type: 'range', min: -4, max: 4, step: 0.1, label: 'Channel A Factor' },
 		channelBFactor: { type: 'range', min: -4, max: 4, step: 0.1, label: 'Channel B Factor' },
 		channelCFactor: { type: 'range', min: -4, max: 4, step: 0.1, label: 'Channel C Factor' },
+		turbulenceEnabled: { type: 'boolean', label: 'Turbulence Enabled' },
+		turbulenceScale: { type: 'range', min: 0, max: 32, step: 0.1, label: 'Turbulence Scale' },
 		lowQualityBlur: { type: 'boolean', label: 'Low Quality Blur' },
 		blurTurbulenceEnabled: { type: 'boolean', label: 'Blur Turbulence Enabled' },
 		blurStrength: { type: 'range', min: 0, max: 3, step: 0.1, label: 'Blur Strength' },
 		blurQuality: { type: 'range', min: 16, max: 512, step: 1, label: 'Blur Quality' },
 	},
 	getDefaultParams: () => ({
+		source: null,
 		scale: 1.0,
 		turbulenceEnabled: true,
 		turbulenceScale: 1.5,
@@ -43,6 +45,10 @@ export const playground = definePlayground({
 	init: ({ width, height, wgpu, params }) => {
 		const shaderModule = wgpu.device.createShaderModule({
 			code: code,
+		});
+
+		const sourceTexture = createTextureFromSource(wgpu.device, params.source?.element ?? [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], {
+			mips: params.source != null && params.source.type === 'video' ? false : true,
 		});
 
 		const pipeline = wgpu.device.createRenderPipeline({
@@ -75,6 +81,8 @@ export const playground = definePlayground({
 			layout: pipeline.getBindGroupLayout(0),
 			entries: [
 				{ binding: 1, resource: { buffer: uniformBuffer }},
+				{ binding: 2, resource: wgpu.sampler },
+				{ binding: 3, resource: sourceTexture.createView() }
 			],
 		});
 
@@ -146,6 +154,14 @@ export const playground = definePlayground({
 
 		return {
 			render: ctx => {
+				if (params.source != null && params.source.type === 'video' && params.source.element.readyState >= 4) {
+					wgpu.device.queue.copyExternalImageToTexture(
+						{ source: params.source.element },
+						{ texture: sourceTexture },
+						{ width: sourceTexture.width, height: sourceTexture.height },
+					);
+				}
+
 				{
 					uniformValues.set({
 						scale: parseFloat(params.scale),
@@ -158,6 +174,9 @@ export const playground = definePlayground({
 						channelAFactor: parseFloat(params.channelAFactor),
 						channelBFactor: parseFloat(params.channelBFactor),
 						channelCFactor: parseFloat(params.channelCFactor),
+						hasSource: params.source != null ? 1.0 : 0.0,
+						coverSource: 1.0,
+						sourceAspectRatio: sourceTexture.width / sourceTexture.height,
 					});
 					wgpu.device.queue.writeBuffer(uniformBuffer, 0, uniformValues.arrayBuffer);
 

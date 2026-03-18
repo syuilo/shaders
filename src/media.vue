@@ -14,10 +14,7 @@
 		<button @click="videoElement.pause()">pause</button>
 		<input type="range" min="0" :max="videoDuration" step="0.01" :value="videoCurrentTime" @input="seekVideoTo($event.target.value)" />
 	</label>
-	<label>
-		<b>cover source:</b>
-		<input type="checkbox" v-model="coverSource" />
-	</label>
+	<button @click="clear">x</button>
 </div>
 </template>
 
@@ -27,7 +24,7 @@ import { setupWebcam } from '@/webgpu.ts';
 import { getUrlParam, Media } from '@/utils.ts';
 
 const emit = defineEmits<{
-	(ev: 'updated', v: Media): void;
+	(ev: 'updated', v: Media | null): void;
 }>();
 
 const imageElement = document.createElement('img');
@@ -42,6 +39,8 @@ function sourceUpdated() {
 		emit('updated', { type: 'image', element: imageElement });
 	} else if (sorceType.value === 'video') {
 		emit('updated', { type: 'video', element: videoElement });
+	} else {
+		emit('updated', null);
 	}
 }
 
@@ -62,8 +61,6 @@ videoElement.addEventListener('timeupdate', () => {
 function seekVideoTo(v: number) {
 	videoElement.currentTime = v;
 }
-
-const coverSource = ref(getUrlParam('coverSource', 'bool') ?? true);
 
 async function onFileSelected(ev: Event) {
 	const input = ev.target as HTMLInputElement;
@@ -86,6 +83,14 @@ async function useWebcam() {
 	videoElement.srcObject = camera;
 	await videoElement.play();
 	sorceType.value = 'video';
+	sourceUpdated()
+}
+
+function clear() {
+	videoElement.pause();
+	videoElement.src = '';
+	imageElement.src = '';
+	sorceType.value = null;
 	sourceUpdated()
 }
 </script>

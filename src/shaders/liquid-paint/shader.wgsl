@@ -218,12 +218,24 @@ struct Uniforms {
 	channelAFactor: f32,
 	channelBFactor: f32,
 	channelCFactor: f32,
-	selfModulo: u32,
-	mirror: u32,
 	test: u32,
+	hasSource: u32,
+	coverSource: u32,
+	sourceAspectRatio: f32,
 };
 
 @group(0) @binding(1) var<uniform> uniforms: Uniforms;
+@group(0) @binding(2) var sourceSampler: sampler;
+@group(0) @binding(3) var sourceTexture: texture_2d<f32>;
+
+fn getSourceColor(uv: vec2f) -> vec4f {
+	let sourceScale = select(
+		select(1.0, uniforms.sourceAspectRatio / uniforms.aspectRatio, uniforms.sourceAspectRatio < uniforms.aspectRatio),
+		select(1.0, uniforms.sourceAspectRatio / uniforms.aspectRatio, uniforms.sourceAspectRatio > uniforms.aspectRatio),
+		uniforms.coverSource == 1);
+	let sourceUv = uv * vec2f(1.0, uniforms.sourceAspectRatio) / sourceScale;
+	return textureSample(sourceTexture, sourceSampler, convertTexCoords(sourceUv ));
+}
 
 @fragment
 fn fs(fragData: VertexOut) -> @location(0) vec4f {
@@ -232,12 +244,8 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	let noiseScale = 0.75;
 	let turbulenceScale = 0.75 * uniforms.turbulenceScale;
 
-	var uv = fragData.uv / vec2f(1.0, uniforms.aspectRatio);
-	uv *= uniforms.scale;
-
-	if (uniforms.mirror == 1 && uv.x > 0.0) {
-		uv = vec2f(-uv.x, uv.y);
-	}
+	let aspectUv = fragData.uv / vec2f(1.0, uniforms.aspectRatio);
+	var uv = aspectUv * uniforms.scale;
 
 	let warpedUv = uv + (vec2f(
 		snoise(vec3f((uv + seed + 4.0), time)),
@@ -247,15 +255,18 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 
 	let power = ((warpedUv.x - uv.x) + (warpedUv.y - uv.y) + turbulence) / 3.0; // 3つの成分を混ぜるので-1 ~ +1の範囲にするために3で割る
 
+	let sourceColor = select(vec4f(0.0), getSourceColor((aspectUv)), uniforms.hasSource == 1);
+	let sourceColorWarped = select(vec4f(0.0), getSourceColor((aspectUv + ((warpedUv + turbulence) * 0.125))), uniforms.hasSource == 1);
+
 	var noiseA = snoiseFractal(vec3f((warpedUv + seed + 1.0 + turbulence) * noiseScale, time * 0.5));
 	var noiseB = snoiseFractal(vec3f((warpedUv + seed + 2.0 + turbulence) * noiseScale, time * 0.4));
 	var noiseC = snoiseFractal(vec3f((warpedUv + seed + 3.0 + turbulence) * noiseScale, time * 0.3));
 
 	if (uniforms.pallette == 0) {
-		var c = vec3f(1.0, 1.0, 1.0);
+		var c = select(vec3f(1.0, 1.0, 1.0), vec3f(sourceColorWarped.r, sourceColorWarped.g, sourceColorWarped.b), uniforms.hasSource == 1);
 
 		if (uniforms.discardThreshold > -1.0 && power < uniforms.discardThreshold) {
-			return vec4f(1.0, 1.0, 1.0, 1.0);
+			return select(vec4f(1.0, 1.0, 1.0, 1.0), sourceColor, uniforms.hasSource == 1);
 		}
 
 		if (noiseA < -0.35) {
@@ -279,10 +290,10 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 		c = clamp(c, vec3f(0.0), vec3f(1.0));
 		return vec4f(c, 1.0);
 	} else if (uniforms.pallette == 1) {
-		var c = vec3f(1.0, 1.0, 1.0);
+		var c = select(vec3f(1.0, 1.0, 1.0), vec3f(sourceColorWarped.r, sourceColorWarped.g, sourceColorWarped.b), uniforms.hasSource == 1);
 
 		if (uniforms.discardThreshold > -1.0 && power < uniforms.discardThreshold) {
-			return vec4f(c, 1.0);
+			return select(vec4f(c, 1.0), sourceColor, uniforms.hasSource == 1);
 		}
 
 		if (noiseA < -0.35) {
@@ -302,10 +313,10 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 		c = clamp(c, vec3f(0.0), vec3f(1.0));
 		return vec4f(c, 1.0);
 	} else if (uniforms.pallette == 2) {
-		var c = vec3f(0.0, 0.0, 0.6);
+		var c = select(vec3f(0.0, 0.0, 0.6), vec3f(sourceColorWarped.r, sourceColorWarped.g, sourceColorWarped.b), uniforms.hasSource == 1);
 
 		if (uniforms.discardThreshold > -1.0 && power < uniforms.discardThreshold) {
-			return vec4f(0.0, 0.0, 0.0, 1.0);
+			return select(vec4f(0.0, 0.0, 0.0, 1.0), sourceColor, uniforms.hasSource == 1);
 		}
 
 		if (noiseA < -0.35) {
@@ -330,10 +341,10 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 		c = clamp(c, vec3f(0.0), vec3f(1.0));
 		return vec4f(c, 1.0);
 	} else {
-		var c = vec3f(1.0, 1.0, 1.0);
+		var c = select(vec3f(1.0, 1.0, 1.0), vec3f(sourceColorWarped.r, sourceColorWarped.g, sourceColorWarped.b), uniforms.hasSource == 1);
 
 		if (uniforms.discardThreshold > -1.0 && power < uniforms.discardThreshold) {
-			return vec4f(1.0, 1.0, 1.0, 1.0);
+			return select(vec4f(1.0, 1.0, 1.0, 1.0), sourceColor, uniforms.hasSource == 1);
 		}
 
 		c = blendAddVec3f(c, vec3f(1.0, 0.0, 0.0) * noiseA * uniforms.channelAFactor);

@@ -20,7 +20,7 @@
 			<input type="range" :min="s.min" :max="s.max" :step="s.step" v-model="params[k]" /> {{ params[k] }}
 		</template>
 		<template v-else-if="s.type === 'media'">
-			<XMedia @updated="params[k] = markRaw($event)" />
+			<XMedia @updated="params[k] = $event != null ? markRaw($event) : null" />
 		</template>
 	</label>
 
