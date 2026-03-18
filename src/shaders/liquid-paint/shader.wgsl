@@ -194,6 +194,7 @@ fn remap(value: f32, inMin: f32, inMax: f32, outMin: f32, outMax: f32) -> f32 {
 	return (value - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
 }
 
+// 0.0 ~ 1.0
 fn rand(seed: vec2f) -> f32 {
 	return fract(sin(dot(seed, vec2f(12.9898, 78.233))) * 43758.5453);
 }
@@ -362,6 +363,7 @@ struct BlurUniforms {
 	quality: i32,
 	isIos: u32,
 	isHorizontal: u32,
+	monteCarlo: u32,
 	test: u32,
 };
 
@@ -400,31 +402,41 @@ fn fsBlur(fragData: VertexOut) -> @location(0) vec4f {
 
 	let r = getBlurRadius(fragData.uv);
 
-	///*
-	var result = vec4f(0.0);
-	var totalSamples = 0.0;
-	//let sampleCount = 256;
-	let sampleCount = blurUniforms.quality;
-	let jitter = rand(fragData.uv / vec2f(1.0, blurCommonUniforms.aspectRatio)) * 4.0;
-
-	for (var i = 0; i < sampleCount; i++) {
-		let radius = sqrt((f32(i) + 0.5) / f32(sampleCount));
-		let theta = (f32(i) + jitter) * goldenAngle;
-		let direction = vec2f(cos(theta), sin(theta));
-		let offset = direction * (r * radius);
-		let weight = exp(-radius * radius * 4.0);
-		var sampleUv = fragData.uv + (offset * vec2f(1.0, blurCommonUniforms.aspectRatio));
-		if (blurUniforms.isIos == 1) { // iOSではなぜか範囲外のサンプリングが異様に重いのでクランプ
-			sampleUv.x = clamp(sampleUv.x, -1.0, 1.0);
-			sampleUv.y = clamp(sampleUv.y, -1.0, 1.0);
+	if (blurUniforms.monteCarlo == 1) {
+		let sampleCount = blurUniforms.quality;
+		var result = vec4f(0.0);
+		for (var i = 0; i < sampleCount; i++) {
+			let x = remap(rand(vec2f(fragData.uv.x + f32(i), fragData.uv.y + f32(i))), 0.0, 1.0, -1.0, 1.0);
+			let y = remap(rand(vec2f(fragData.uv.y + f32(i), fragData.uv.x + f32(i))), 0.0, 1.0, -1.0, 1.0);
+			result += textureSample(targetTexture, targetSampler, convertTexCoordsClamp(vec2f(fragData.uv.x + (x * r), fragData.uv.y + (y * r))));
 		}
-		result += textureSample(targetTexture, targetSampler, convertTexCoords(sampleUv)) * weight;
-		//result += vec3f(snoiseFractal(vec3f((uv + offset + seed + 1.0) * 0.75, time * 0.5))) * weight;
-		totalSamples += weight;
-	}
 
-	return result / totalSamples;
-	// */
+		return result / f32(sampleCount);
+	} else {
+		var result = vec4f(0.0);
+		var totalSamples = 0.0;
+		//let sampleCount = 256;
+		let sampleCount = blurUniforms.quality;
+		let jitter = rand(fragData.uv / vec2f(1.0, blurCommonUniforms.aspectRatio)) * 4.0;
+
+		for (var i = 0; i < sampleCount; i++) {
+			let radius = sqrt((f32(i) + 0.5) / f32(sampleCount));
+			let theta = (f32(i) + jitter) * goldenAngle;
+			let direction = vec2f(cos(theta), sin(theta));
+			let offset = direction * (r * radius);
+			let weight = exp(-radius * radius * 4.0);
+			var sampleUv = fragData.uv + (offset * vec2f(1.0, blurCommonUniforms.aspectRatio));
+			if (blurUniforms.isIos == 1) { // iOSではなぜか範囲外のサンプリングが異様に重いのでクランプ
+				sampleUv.x = clamp(sampleUv.x, -1.0, 1.0);
+				sampleUv.y = clamp(sampleUv.y, -1.0, 1.0);
+			}
+			result += textureSample(targetTexture, targetSampler, convertTexCoords(sampleUv)) * weight;
+			//result += vec3f(snoiseFractal(vec3f((uv + offset + seed + 1.0) * 0.75, time * 0.5))) * weight;
+			totalSamples += weight;
+		}
+
+		return result / totalSamples;
+	}
 
 	/*
 	var result = vec4f(0.0);
@@ -450,7 +462,7 @@ fn fsBlurLight(fragData: VertexOut) -> @location(0) vec4f {
 
 	let r = getBlurRadius(fragData.uv);
 
-	let sampleCount = 8;
+	let sampleCount = blurUniforms.quality;
 	var result = textureSample(targetTexture, targetSampler, convertTexCoords(fragData.uv));
 	var totalWeight = 1.0;
 

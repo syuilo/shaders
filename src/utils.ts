@@ -133,3 +133,7 @@ export type Playground<OpSc extends OptionsSchema = OptionsSchema> = {
 export function definePlayground<const OpSc extends OptionsSchema>(def: Playground<OpSc>): Playground<OpSc> {
 	return def;
 }
+
+export function remap(value: number, fromMin: number, fromMax: number, toMin: number, toMax: number) {
+	return toMin + (toMax - toMin) * ((value - fromMin) / (fromMax - fromMin));
+}

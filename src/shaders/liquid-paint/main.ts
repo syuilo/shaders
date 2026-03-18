@@ -1,6 +1,6 @@
 import code from './shader.wgsl?raw';
 import { createTextureFromSource, makeShaderDataDefinitions, makeStructuredView } from 'webgpu-utils';
-import { definePlayground, isIos } from '@/utils.ts';
+import { definePlayground, isIos, remap } from '@/utils.ts';
 
 export const playground = definePlayground({
 	title: 'Liquid Paint',
@@ -22,10 +22,16 @@ export const playground = definePlayground({
 		channelCFactor: { type: 'range', min: -4, max: 4, step: 0.1, label: 'Channel C Factor' },
 		turbulenceEnabled: { type: 'boolean', label: 'Turbulence Enabled' },
 		turbulenceScale: { type: 'range', min: 0, max: 32, step: 0.1, label: 'Turbulence Scale' },
-		lowQualityBlur: { type: 'boolean', label: 'Low Quality Blur' },
 		blurTurbulenceEnabled: { type: 'boolean', label: 'Blur Turbulence Enabled' },
 		blurStrength: { type: 'range', min: 0, max: 3, step: 0.1, label: 'Blur Strength' },
-		blurQuality: { type: 'range', min: 16, max: 512, step: 1, label: 'Blur Quality' },
+		blurQuality: { type: 'range', min: 0, max: 1, step: 0.01, label: 'Blur Quality' },
+		blurMethod: { type: 'enum', label: 'Blur Method', enum: [{
+			value: 'standard', label: 'Standard'
+		}, {
+			value: 'monteCarlo', label: 'Monte Carlo'
+		}, {
+			value: 'twoPass', label: 'Two Pass'
+		}]},
 	},
 	getDefaultParams: () => ({
 		source: null,
@@ -37,10 +43,10 @@ export const playground = definePlayground({
 		channelAFactor: 1.0,
 		channelBFactor: 1.0,
 		channelCFactor: 1.0,
-		lowQualityBlur: isIos,
 		blurTurbulenceEnabled: true,
 		blurStrength: 1.0,
-		blurQuality: 64,
+		blurQuality: 0.25,
+		blurMethod: isIos ? 'monteCarlo' : 'standard',
 	}),
 	init: ({ width, height, wgpu, params }) => {
 		const shaderModule = wgpu.device.createShaderModule({
@@ -194,14 +200,14 @@ export const playground = definePlayground({
 					passEncoder.end();
 				}
 
-				if (params.lowQualityBlur) {
+				if (params.blurMethod === 'twoPass') {
 					{
 						blurHorizontalUniformValues.set({
 							isHorizontal: 1.0,
 							turbulenceEnabled: params.blurTurbulenceEnabled ? 1.0 : 0.0,
 							turbulenceScale: parseFloat(params.turbulenceScale),
 							strength: parseFloat(params.blurStrength),
-							quality: parseInt(params.blurQuality),
+							quality: Math.round(remap(params.blurQuality, 0, 1, 1, 32)),
 							isIos: isIos ? 1.0 : 0.0,
 						});
 						wgpu.device.queue.writeBuffer(blurHorizontalUniformBuffer, 0, blurHorizontalUniformValues.arrayBuffer);
@@ -234,7 +240,7 @@ export const playground = definePlayground({
 							turbulenceEnabled: params.blurTurbulenceEnabled ? 1.0 : 0.0,
 							turbulenceScale: parseFloat(params.turbulenceScale),
 							strength: parseFloat(params.blurStrength),
-							quality: parseInt(params.blurQuality),
+							quality: Math.round(remap(params.blurQuality, 0, 1, 1, 32)),
 							isIos: isIos ? 1.0 : 0.0,
 						});
 						wgpu.device.queue.writeBuffer(blurVerticalUniformBuffer, 0, blurVerticalUniformValues.arrayBuffer);
@@ -266,8 +272,9 @@ export const playground = definePlayground({
 							turbulenceEnabled: params.blurTurbulenceEnabled ? 1.0 : 0.0,
 							turbulenceScale: parseFloat(params.turbulenceScale),
 							strength: parseFloat(params.blurStrength),
-							quality: parseInt(params.blurQuality),
+							quality: Math.round(remap(params.blurQuality, 0, 1, 1, 512)),
 							isIos: isIos ? 1.0 : 0.0,
+							monteCarlo: params.blurMethod === 'monteCarlo' ? 1.0 : 0.0,
 						});
 						wgpu.device.queue.writeBuffer(blurUniformBuffer, 0, blurUniformValues.arrayBuffer);
 
