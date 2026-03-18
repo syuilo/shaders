@@ -194,6 +194,10 @@ struct Uniforms {
 	discardBrightPixels: u32,
 	enableSampledCellJoining: u32,
 	coverSource: u32,
+	bgColor: vec3f,
+	colorA: vec3f,
+	colorB: vec3f,
+	colorC: vec3f,
 	test: u32,
 };
 
@@ -371,10 +375,10 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 		//return sourceColor;
 		let n = mix(visibilityNoiseA, visibilityNoiseB, 0.2);
 		if (n > 0.75) {
-			return premultiplyAlpha(vec4f(1.0, 1.0, 1.0, 0.05));
+			return premultiplyAlpha(vec4f(mix(uniforms.bgColor, uniforms.colorA, 0.05), 1.0));
 		} else if (n > 0.5) {
 			if (distance(modUv / cellSize, vec2(0.5, 0.5)) < 0.05) {
-				return premultiplyAlpha(vec4f(1.0, 1.0, 1.0, 0.25));
+				return premultiplyAlpha(vec4f(mix(uniforms.bgColor, uniforms.colorA, 0.25), 1.0));
 			}
 		}
 	}
@@ -387,49 +391,49 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	);
 
 	if (!isIn) {
-		return premultiplyAlpha(vec4f(vec3f(0.0), 0.0));
+		return premultiplyAlpha(vec4f(vec3f(uniforms.bgColor), 1.0));
 	}
 
 	if (hasSource) {
-		if ((sourceColor.r + sourceColor.g + sourceColor.b) / 3.0 > 0.7) {
-			out_color.r = 1.0;
-			out_color.g = 1.0;
-			out_color.b = 1.0;
-		} else if (sourceColor.r > 0.75) {
-			out_color.g *= 0.4;
-			out_color.b = 0.0;
-		//} else if (colorNoise > 0.85) {
-		//	out_color.b = 0.0;
-		} else if (sourceColor.g > 0.4) {
-			out_color.r /= 1.25;
-			out_color.b = 0.0;
-		} else if ((sourceColor.r + sourceColor.g + sourceColor.b) / 3.0 < 0.2) {
-			out_color.r = 1.0;
-			out_color.g = 1.0;
-			out_color.b = 1.0;
+		if ((sourceColor.r + sourceColor.g + sourceColor.b) / 3.0 > 0.7) { // apply colorA
+			out_color.r = uniforms.colorA.r;
+			out_color.g = uniforms.colorA.g;
+			out_color.b = uniforms.colorA.b;
+		} else if (sourceColor.r > 0.75) { // apply colorC
+			out_color.r = uniforms.colorC.r;
+			out_color.g = uniforms.colorC.g;
+			out_color.b = uniforms.colorC.b;
+		} else if (sourceColor.g > 0.4) { // apply colorB
+			out_color.r = uniforms.colorB.r;
+			out_color.g = uniforms.colorB.g;
+			out_color.b = uniforms.colorB.b;
+		} else if ((sourceColor.r + sourceColor.g + sourceColor.b) / 3.0 < 0.2) { // apply colorA with lower opacity
+			out_color.r = uniforms.colorA.r;
+			out_color.g = uniforms.colorA.g;
+			out_color.b = uniforms.colorA.b;
 			out_color.a *= 0.7;
-		} else {
-			out_color.r = 1.0;
-			out_color.g = 1.0;
-			out_color.b = 1.0;
+		} else { // apply colorA
+			out_color.r = uniforms.colorA.r;
+			out_color.g = uniforms.colorA.g;
+			out_color.b = uniforms.colorA.b;
 		}
 	} else {
-		if (colorNoise > 0.9) {
-			out_color.g *= 0.4;
-			out_color.b = 0.0;
-		//} else if (colorNoise > 0.85) {
-		//	out_color.b = 0.0;
-		} else if (colorNoise > 0.7) {
-			out_color.r /= 1.25;
-			out_color.b = 0.0;
-		} else if (colorNoise > 0.35) {
-			out_color.r = 1.0;
-			out_color.g = 1.0;
-			out_color.b = 1.0;
-		} else {
-			out_color.r = 1.0;
-			out_color.g = 1.0;
-			out_color.b = 1.0;
+		if (colorNoise > 0.9) { // apply colorC
+			out_color.r = uniforms.colorC.r;
+			out_color.g = uniforms.colorC.g;
+			out_color.b = uniforms.colorC.b;
+		} else if (colorNoise > 0.7) { // apply colorB
+			out_color.r = uniforms.colorB.r;
+			out_color.g = uniforms.colorB.g;
+			out_color.b = uniforms.colorB.b;
+		} else if (colorNoise > 0.35) { // apply colorA
+			out_color.r = uniforms.colorA.r;
+			out_color.g = uniforms.colorA.g;
+			out_color.b = uniforms.colorA.b;
+		} else { // apply colorA with lower opacity
+			out_color.r = uniforms.colorA.r;
+			out_color.g = uniforms.colorA.g;
+			out_color.b = uniforms.colorA.b;
 			out_color.a *= 0.3;
 		}
 	}
@@ -437,6 +441,11 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	if (visibility == 0.0) {
 		out_color = vec4f(1.0, 1.0, 1.0, 0.0);
 	}
+
+	out_color.r = mix(uniforms.bgColor.r, out_color.r, out_color.a);
+	out_color.g = mix(uniforms.bgColor.g, out_color.g, out_color.a);
+	out_color.b = mix(uniforms.bgColor.b, out_color.b, out_color.a);
+	out_color.a = 1.0;
 
 	return premultiplyAlpha(out_color);
 }

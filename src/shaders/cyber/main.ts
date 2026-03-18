@@ -14,6 +14,10 @@ export const playground = definePlayground({
 		withNumbers: { type: 'boolean', needReinit: true, label: 'With Numbers' },
 		symbolTexturesRangeMin: { type: 'range', min: 0, max: 1, step: 0.01, label: 'Symbol Textures Range Min' },
 		symbolTexturesRangeMax: { type: 'range', min: 0, max: 1, step: 0.01, label: 'Symbol Textures Range Max' },
+		bgColor: { type: 'color', label: 'Background Color' },
+		colorA: { type: 'color', label: 'Color A' },
+		colorB: { type: 'color', label: 'Color B' },
+		colorC: { type: 'color', label: 'Color C' },
 		test: { type: 'boolean', label: 'Test' },
 	},
 	getDefaultParams: () => ({
@@ -26,6 +30,10 @@ export const playground = definePlayground({
 		withNumbers: false,
 		symbolTexturesRangeMin: 0.0,
 		symbolTexturesRangeMax: 1.0,
+		bgColor: [0, 0, 0],
+		colorA: [1, 1, 1],
+		colorB: [0.8, 1, 0],
+		colorC: [1, 0.3, 0],
 		test: false,
 	}),
 	init: async ({ width, height, wgpu, params }) => {
@@ -186,6 +194,10 @@ export const playground = definePlayground({
 					symbolTexturesCount: symbolTextureUrls.length,
 					symbolTexturesRangeMin: params.symbolTexturesRangeMin,
 					symbolTexturesRangeMax: params.symbolTexturesRangeMax,
+					bgColor: params.bgColor,
+					colorA: params.colorA,
+					colorB: params.colorB,
+					colorC: params.colorC,
 					pointerPosition: [pointerX, -pointerY],
 					test: params.test ? 1 : 0,
 				});
@@ -194,7 +206,7 @@ export const playground = definePlayground({
 				const passEncoder = ctx.commandEncoder.beginRenderPass({
 					colorAttachments: [{
 						view: wgpu.context.getCurrentTexture().createView(),
-						clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+						clearValue: { r: params.bgColor[0], g: params.bgColor[1], b: params.bgColor[2], a: 1.0 },
 						loadOp: 'clear',
 						storeOp: 'store',
 					}],

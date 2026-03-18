@@ -7,6 +7,7 @@
 	<label v-for="[k, s] in Object.entries(playgroundDef.params)" :key="k">
 		<b>{{ s.label }}</b>
 		<template v-if="s.type === 'color'">
+			<input type="color" :value="getHex(params[k])" @input="v => { params[k] = getRgb(v.target.value); }" />
 		</template>
 		<template v-else-if="s.type === 'boolean'">
 			<input type="checkbox" v-model="params[k]" />
@@ -60,7 +61,7 @@
 
 <script lang="ts" setup>
 import { markRaw, onMounted, onUnmounted, reactive, ref, shallowRef, useTemplateRef, watch } from 'vue';
-import { debouncePromise, Playground } from '@/utils.ts';
+import { debouncePromise, Playground, getHex, getRgb } from '@/utils.ts';
 import XMedia from './media.vue';
 
 const props = defineProps<{
