@@ -445,23 +445,20 @@ fn fsBlurLight(fragData: VertexOut) -> @location(0) vec4f {
 
 	if (blurUniforms.isHorizontal == 1) {
 		for (var i = 1; i <= sampleCount; i++) {
-			let jitter = rand(fragData.uv + f32(i)) * 0.25;
 			let v = (cos((f32(i) / f32(sampleCount + 1)) * PI) + 1.0) * 0.5;
-			var sampleUv = fragData.uv;
+			let jitter = rand(fragData.uv + f32(i)) * 0.25;
 			let offset = (f32(i) / f32(sampleCount)) + jitter;
-			result += textureSample(targetTexture, targetSampler, convertTexCoordsClamp(vec2(sampleUv.x + (offset * r), sampleUv.y + (jitter * r)))) * v;
-			result += textureSample(targetTexture, targetSampler, convertTexCoordsClamp(vec2(sampleUv.x - (offset * r), sampleUv.y + (jitter * r)))) * v;
+			result += textureSample(targetTexture, targetSampler, convertTexCoordsClamp(vec2(fragData.uv.x + (offset * r), fragData.uv.y + (jitter * r)))) * v;
+			result += textureSample(targetTexture, targetSampler, convertTexCoordsClamp(vec2(fragData.uv.x - (offset * r), fragData.uv.y + (jitter * r)))) * v;
 			totalWeight += v * 2.0;
 		}
 	} else {
-		//return textureSample(targetTexture, targetSampler, convertTexCoords(fragData.uv));
 		for (var i = 1; i <= sampleCount; i++) {
-			let jitter = rand(fragData.uv + f32(i)) * 0.25;
 			let v = (cos((f32(i) / f32(sampleCount + 1)) * PI) + 1.0) * 0.5;
-			var sampleUv = fragData.uv;
+			let jitter = rand(fragData.uv + f32(i)) * 0.25;
 			let offset = (f32(i) / f32(sampleCount)) + jitter;
-			result += textureSample(targetTexture, targetSampler, convertTexCoordsClamp(vec2(sampleUv.x + (jitter * r), sampleUv.y + (offset * r)))) * v;
-			result += textureSample(targetTexture, targetSampler, convertTexCoordsClamp(vec2(sampleUv.x + (jitter * r), sampleUv.y - (offset * r)))) * v;
+			result += textureSample(targetTexture, targetSampler, convertTexCoordsClamp(vec2(fragData.uv.x + (jitter * r), fragData.uv.y + (offset * r)))) * v;
+			result += textureSample(targetTexture, targetSampler, convertTexCoordsClamp(vec2(fragData.uv.x + (jitter * r), fragData.uv.y - (offset * r)))) * v;
 			totalWeight += v * 2.0;
 		}
 	}
