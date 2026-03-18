@@ -19,7 +19,8 @@
 		<template v-else-if="s.type === 'range'">
 			<input type="range" :min="s.min" :max="s.max" :step="s.step" v-model="params[k]" /> {{ params[k] }}
 		</template>
-		<template v-else-if="s.type === 'image'">
+		<template v-else-if="s.type === 'media'">
+			<XMedia @updated="params[k] = markRaw($event)" />
 		</template>
 	</label>
 
@@ -57,8 +58,9 @@
 </template>
 
 <script lang="ts" setup>
-import { onMounted, onUnmounted, reactive, ref, shallowRef, useTemplateRef, watch } from 'vue';
+import { markRaw, onMounted, onUnmounted, reactive, ref, shallowRef, useTemplateRef, watch } from 'vue';
 import { debouncePromise, getUrlParam, isIos, Playground } from '@/utils.ts';
+import XMedia from './media.vue';
 
 const props = defineProps<{
 	name: string;
@@ -177,6 +179,14 @@ watch(
 				if (v != '') {
 					params[k] = JSON.parse(v);
 				}
+			}
+		}
+
+		for (const [k, v] of Object.entries(playgroundDef.value.params)) {
+			if (v.needReinit) {
+				watch(() => params[k], () => {
+					debouncedInit();
+				});
 			}
 		}
 

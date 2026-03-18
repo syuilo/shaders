@@ -24,10 +24,10 @@
 <script lang="ts" setup>
 import { onMounted, ref, useTemplateRef, watch } from 'vue';
 import { setupWebcam } from '@/webgpu.ts';
-import { getUrlParam } from '@/utils.ts';
+import { getUrlParam, Media } from '@/utils.ts';
 
 const emit = defineEmits<{
-	(ev: 'updated', v: any): void;
+	(ev: 'updated', v: Media): void;
 }>();
 
 const imageElement = document.createElement('img');
@@ -37,9 +37,13 @@ videoElement.preload = 'auto';
 
 const sorceType = ref<'image' | 'video' | null>(null);
 
-watch(sorceType, (v) => {
-	emit('updated', v === 'image' ? imageElement : videoElement);
-});
+function sourceUpdated() {
+	if (sorceType.value === 'image') {
+		emit('updated', { type: 'image', element: imageElement });
+	} else if (sorceType.value === 'video') {
+		emit('updated', { type: 'video', element: videoElement });
+	}
+}
 
 const videoAudioVolume = ref(0.3);
 watch(videoAudioVolume, (v) => {
@@ -74,6 +78,7 @@ async function onFileSelected(ev: Event) {
 		await videoElement.play();
 		sorceType.value = 'video';
 	}
+	sourceUpdated()
 }
 
 async function useWebcam() {
@@ -81,6 +86,7 @@ async function useWebcam() {
 	videoElement.srcObject = camera;
 	await videoElement.play();
 	sorceType.value = 'video';
+	sourceUpdated()
 }
 </script>
 

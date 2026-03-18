@@ -79,12 +79,20 @@ type RangeOptionSchema = {
 	step?: number;
 };
 
-type ImageOptionSchema = {
-	type: 'image';
+type MediaOptionSchema = {
+	type: 'media';
 	label: string;
 };
 
-type OptionsSchema = Record<string, NumberOptionSchema | BooleanOptionSchema | ColorOptionSchema | EnumOptionSchema | RangeOptionSchema | ImageOptionSchema>;
+export type Media = {
+	type: 'image';
+	element: HTMLImageElement;
+} | {
+	type: 'video';
+	element: HTMLVideoElement;
+};
+
+type OptionsSchema = Record<string, NumberOptionSchema | BooleanOptionSchema | ColorOptionSchema | EnumOptionSchema | RangeOptionSchema | MediaOptionSchema>;
 
 type GetOptionsSchemaValues<T extends OptionsSchema> = {
 	[K in keyof T]:
@@ -93,7 +101,7 @@ type GetOptionsSchemaValues<T extends OptionsSchema> = {
 	T[K] extends ColorOptionSchema ? [number, number, number] :
 	T[K] extends EnumOptionSchema ? T[K]['enum'][number]['value'] :
 	T[K] extends RangeOptionSchema ? number :
-	T[K] extends ImageOptionSchema ? string | null :
+	T[K] extends MediaOptionSchema ? Media | null :
 	never;
 };
 
