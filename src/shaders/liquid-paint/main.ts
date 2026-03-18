@@ -38,7 +38,7 @@ export const playground = definePlayground({
 		scale: 1.0,
 		turbulenceEnabled: true,
 		turbulenceScale: 1.5,
-		pallette: 'colorful',
+		pallette: 'cider',
 		discardThreshold: -0.2,
 		channelAFactor: 1.0,
 		channelBFactor: 1.0,
@@ -46,7 +46,7 @@ export const playground = definePlayground({
 		blurTurbulenceEnabled: true,
 		blurStrength: 1.0,
 		blurQuality: 0.25,
-		blurMethod: isIos ? 'monteCarlo' : 'standard',
+		blurMethod: isIos ? 'twoPass' : 'standard',
 	}),
 	init: ({ width, height, wgpu, params }) => {
 		const shaderModule = wgpu.device.createShaderModule({

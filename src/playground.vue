@@ -27,23 +27,24 @@
 	<hr>
 
 	<label>
-		<b>timeFactor:</b>
+		<b>Time factor:</b>
 		<input type="range" min="0" max="4" step="0.1" v-model="timeFactor" /> {{ timeFactor }}
 	</label>
 	<label>
-		<b>pixelRatioFactor:</b>
-		<select v-model="pixelRatioFactor">
+		<b>Pixel ratio:</b>
+		<select v-model="pixelRatio">
+			<option :value="null">native</option>
 			<option :value="0.25">0.25</option>
 			<option :value="0.5">0.5</option>
-			<option :value="1.0">1.0</option>
-			<option :value="2.0">2.0</option>
-			<option :value="4.0">4.0</option>
+			<option :value="1">1</option>
+			<option :value="2">2</option>
+			<option :value="4">4</option>
 		</select>
 	</label>
 	<label>
-		<b>fps:</b>
+		<b>FPS:</b>
 		<select v-model="fps">
-			<option :value="null">device default</option>
+			<option :value="null">native</option>
 			<option :value="15">(up to) 15 FPS</option>
 			<option :value="30">(up to) 30 FPS</option>
 			<option :value="60">(up to) 60 FPS</option>
@@ -59,7 +60,7 @@
 
 <script lang="ts" setup>
 import { markRaw, onMounted, onUnmounted, reactive, ref, shallowRef, useTemplateRef, watch } from 'vue';
-import { debouncePromise, getUrlParam, isIos, Playground } from '@/utils.ts';
+import { debouncePromise, Playground } from '@/utils.ts';
 import XMedia from './media.vue';
 
 const props = defineProps<{
@@ -78,8 +79,6 @@ async function init() {
 	if (canvas.value == null) return;
 	if (playgroundDef.value == null) return;
 
-	const pixelRatio = window.devicePixelRatio * pixelRatioFactor.value;
-
 	const adapter = await navigator.gpu?.requestAdapter({
 		powerPreference: 'low-power',
 	});
@@ -97,8 +96,8 @@ async function init() {
 	}
 	const context = _context as GPUCanvasContext;
 
-	canvas.value.width = Math.max(1, Math.min(canvas.value.offsetWidth * pixelRatio, device.limits.maxTextureDimension2D));
-	canvas.value.height = Math.max(1, Math.min(canvas.value.offsetHeight * pixelRatio, device.limits.maxTextureDimension2D));
+	canvas.value.width = Math.max(1, Math.min(canvas.value.offsetWidth * (pixelRatio.value ?? window.devicePixelRatio), device.limits.maxTextureDimension2D));
+	canvas.value.height = Math.max(1, Math.min(canvas.value.offsetHeight * (pixelRatio.value ?? window.devicePixelRatio), device.limits.maxTextureDimension2D));
 
 	context.configure({
 		device,
@@ -197,11 +196,16 @@ watch(
 
 const showMenu = ref(false);
 
-const timeFactor = ref(getUrlParam('_timeFactor', 'float') ?? 1.0);
-const pixelRatioFactor = ref(getUrlParam('_pixelRatioFactor', 'number') ?? (isIos ? 0.5 : 1.0));
-const fps = ref(getUrlParam('_fps', 'float') ?? null);
+const tryParseJson = (value: string | null, defa: any) => {
+	if (value == null) return defa;
+	return JSON.parse(value);
+};
 
-const hideMenuButton = ref(false);
+const urlParams = new URLSearchParams(window.location.search);
+const hideMenuButton = ref(tryParseJson(urlParams.get('_hideMenuButton'), false));
+const timeFactor = ref(tryParseJson(urlParams.get('_timeFactor'), 1.0));
+const pixelRatio = ref(tryParseJson(urlParams.get('_pixelRatio'), 1.0));
+const fps = ref(tryParseJson(urlParams.get('_fps'), null));
 
 onMounted(async () => {
 	const observer = new ResizeObserver(entries => {
@@ -214,7 +218,7 @@ onMounted(async () => {
 	observer.observe(canvas.value!);
 });
 
-watch([pixelRatioFactor, fps], () => {
+watch([pixelRatio, fps], () => {
 	debouncedInit();
 });
 
