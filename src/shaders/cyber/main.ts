@@ -14,6 +14,7 @@ export const playground = definePlayground({
 		withNumbers: { type: 'boolean', needReinit: true, label: 'With Numbers' },
 		symbolTexturesRangeMin: { type: 'range', min: 0, max: 1, step: 0.01, label: 'Symbol Textures Range Min' },
 		symbolTexturesRangeMax: { type: 'range', min: 0, max: 1, step: 0.01, label: 'Symbol Textures Range Max' },
+		test: { type: 'boolean', label: 'Test' },
 	},
 	getDefaultParams: () => ({
 		source: null,
@@ -25,6 +26,7 @@ export const playground = definePlayground({
 		withNumbers: false,
 		symbolTexturesRangeMin: 0.0,
 		symbolTexturesRangeMax: 1.0,
+		test: false,
 	}),
 	init: async ({ width, height, wgpu, params }) => {
 		const shaderModule = wgpu.device.createShaderModule({
@@ -88,13 +90,11 @@ export const playground = definePlayground({
 		];
 
 		const symbolTextures = await createTextureFromImages(wgpu.device, symbolTextureUrls, {
-			mips: true,
-			flipY: true,
+			mips: false, // 有効にすると綺麗になるしパフォーマンス上も益があるけど特定条件下(marginが0)で画像の端に線が入ってしまう
 		});
 
 		const sourceTexture = createTextureFromSource(wgpu.device, params.source?.element ?? [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], {
 			mips: params.source != null && params.source.type === 'video' ? false : true,
-			flipY: true,
 		});
 
 		const defs = makeShaderDataDefinitions(code);
@@ -162,7 +162,7 @@ export const playground = definePlayground({
 			render: ctx => {
 				if (params.source != null && params.source.type === 'video' && params.source.element.readyState >= 4) {
 					wgpu.device.queue.copyExternalImageToTexture(
-						{ source: params.source.element, flipY: true },
+						{ source: params.source.element },
 						{ texture: sourceTexture },
 						{ width: sourceTexture.width, height: sourceTexture.height },
 					);
@@ -177,7 +177,7 @@ export const playground = definePlayground({
 					aspectRatio: width / height,
 					time: ctx.time,
 					hasSource: params.source != null ? 1.0 : 0.0,
-					sourceTextureAspectRatio: sourceTexture.width / sourceTexture.height,
+					sourceAspectRatio: sourceTexture.width / sourceTexture.height,
 					coverSource: params.coverSource ? 1 : 0,
 					discardBrightPixels: params.discardBrightPixels ? 1 : 0,
 					enableSampledCellJoining: params.enableSampledCellJoining ? 1 : 0,
@@ -187,6 +187,7 @@ export const playground = definePlayground({
 					symbolTexturesRangeMin: params.symbolTexturesRangeMin,
 					symbolTexturesRangeMax: params.symbolTexturesRangeMax,
 					pointerPosition: [pointerX, -pointerY],
+					test: params.test ? 1 : 0,
 				});
 				wgpu.device.queue.writeBuffer(uniformBuffer, 0, uniformValues.arrayBuffer);
 

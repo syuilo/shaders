@@ -235,7 +235,7 @@ fn getSourceColor(uv: vec2f) -> vec4f {
 		select(1.0, uniforms.sourceAspectRatio / uniforms.aspectRatio, uniforms.sourceAspectRatio > uniforms.aspectRatio),
 		uniforms.coverSource == 1);
 	let sourceUv = uv * vec2f(1.0, uniforms.sourceAspectRatio) / sourceScale;
-	return textureSample(sourceTexture, sourceSampler, convertTexCoords(sourceUv ));
+	return textureSample(sourceTexture, sourceSampler, convertTexCoords(sourceUv));
 }
 
 @fragment

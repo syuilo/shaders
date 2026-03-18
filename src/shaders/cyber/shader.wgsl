@@ -4,17 +4,23 @@ struct VertexOut {
 };
 
 const vertices = array(
-	vec2f(-1, -1),
-	vec2f( 3, -1),
-	vec2f(-1,  3),
+	// 1st triangle
+	vec2f(-1.0, -1.0),  // center
+	vec2f( 1.0, -1.0),  // right, center
+	vec2f(-1.0,  1.0),  // center, top
+
+	// 2st triangle
+	vec2f(-1.0,  1.0),  // center, top
+	vec2f( 1.0, -1.0),  // right, center
+	vec2f( 1.0,  1.0),  // right, top
 );
 
 @vertex
 fn vs(@builtin(vertex_index) vertexIndex: u32) -> VertexOut {
 	let pos = vertices[vertexIndex];
 	var output: VertexOut;
-	output.position = vec4f(pos, 0, 1);
-	output.uv = (pos.xy + 1.0) / 2.0; // -1 ~ +1 -> 0 ~ 1
+	output.position = vec4f(pos, 0.0, 1.0);
+	output.uv = pos.xy;
 	return output;
 }
 
@@ -169,6 +175,11 @@ fn premultiplyAlpha(color: vec4f) -> vec4f {
 	return vec4f(color.rgb * color.a, color.a);
 }
 
+// テクスチャ座標(0~1、+Yが下)に変換
+fn convertTexCoords(uv: vec2f) -> vec2f {
+	return vec2f(uv.x, -uv.y) * 0.5 + vec2f(0.5);
+}
+
 struct Uniforms {
 	aspectRatio: f32,
 	time: f32,
@@ -179,14 +190,15 @@ struct Uniforms {
 	symbolTexturesRangeMax: f32,
 	pointerPosition: vec2f,
 	hasSource: u32,
-	sourceTextureAspectRatio: f32,
+	sourceAspectRatio: f32,
 	discardBrightPixels: u32,
 	enableSampledCellJoining: u32,
 	coverSource: u32,
+	test: u32,
 };
 
 @group(0) @binding(1) var<uniform> uniforms: Uniforms;
-@group(0) @binding(2) var symbolSampler: sampler;
+@group(0) @binding(2) var mySampler: sampler;
 @group(0) @binding(3) var symbolTextures: texture_2d_array<f32>;
 @group(0) @binding(4) var sourceTexture: texture_2d<f32>;
 
@@ -201,11 +213,11 @@ fn getPixelatedUv(uv: vec2f, cellSize: vec2f) -> vec2f {
 
 fn getSourceColor(uv: vec2f) -> vec4f {
 	let sourceScale = select(
-		select(1.0, uniforms.sourceTextureAspectRatio / uniforms.aspectRatio, uniforms.sourceTextureAspectRatio < uniforms.aspectRatio),
-		select(1.0, uniforms.sourceTextureAspectRatio / uniforms.aspectRatio, uniforms.sourceTextureAspectRatio > uniforms.aspectRatio),
+		select(1.0, uniforms.sourceAspectRatio / uniforms.aspectRatio, uniforms.sourceAspectRatio < uniforms.aspectRatio),
+		select(1.0, uniforms.sourceAspectRatio / uniforms.aspectRatio, uniforms.sourceAspectRatio > uniforms.aspectRatio),
 		uniforms.coverSource == 1);
-	let sourceUv = uv * vec2f(1.0, uniforms.sourceTextureAspectRatio) / sourceScale;
-	return textureSample(sourceTexture, symbolSampler, sourceUv + 0.5);
+	let sourceUv = uv * vec2f(1.0, uniforms.sourceAspectRatio) / sourceScale;
+	return textureSample(sourceTexture, mySampler, convertTexCoords(sourceUv));
 }
 
 const discardBrightPixelsThreshold = 0.7;
@@ -251,9 +263,9 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	let scroll = vec2f(0.0, -time * 0.0001);
 	let hasSource = uniforms.hasSource == 1;
 
-	let uv = (fragData.uv - 0.5) / vec2f(1.0, uniforms.aspectRatio);
+	let uv = fragData.uv / vec2f(1.0, uniforms.aspectRatio);
 
-	var cellSize = vec2f(1.0 / uniforms.divisions);
+	var cellSize = vec2f(1.0 / (uniforms.divisions * 0.5));
 
 	var border = uniforms.margin;
 
@@ -348,9 +360,9 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	//	scale = 1.0;
 	//}
 
-	let margin = (1.0 - (0.5 + (scale / 2.0))) * cellSize;
+	let margin = (1.0 - (0.5 + (scale * 0.5))) * cellSize;
 	let transformedCoords = (modUv - margin) / (cellSize - (margin * 2.0));
-	var out_color = textureSample(symbolTextures, symbolSampler, transformedCoords, u32(texSelector * f32(uniforms.symbolTexturesCount)));
+	var out_color = textureSample(symbolTextures, mySampler, transformedCoords, u32(texSelector * f32(uniforms.symbolTexturesCount)));
 
 	let colorNoise = snoise0to1(vec3f((cellUv * 8.0) + scroll, time * 0.000025));
 
