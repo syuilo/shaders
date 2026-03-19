@@ -108,7 +108,7 @@ export const playground = definePlayground({
 		let pointerY = -99999.0;
 		let lastPointerMovedAt = 0;
 
-		window.addEventListener('pointermove', (ev: PointerEvent) => {
+		const onPointerMove = (ev: PointerEvent) => {
 			const rect = canvas.getBoundingClientRect();
 			const w = rect.width;
 			const h = rect.height;
@@ -118,7 +118,9 @@ export const playground = definePlayground({
 			pointerX = x * 2 - 1;
 			pointerY = y * 2 - 1;
 			lastPointerMovedAt = performance.now();
-		});
+		};
+
+		window.addEventListener('pointermove', onPointerMove);
 
 		const pipeline = wgpu.device.createRenderPipeline({
 			vertex: {
@@ -396,6 +398,9 @@ export const playground = definePlayground({
 						passEncoder.end();
 					}
 				}
+			},
+			dispose() {
+				window.removeEventListener('pointermove', onPointerMove);
 			},
 		}
 	},
