@@ -24,6 +24,7 @@ export const playground = definePlayground({
 		turbulenceScale: { type: 'range', min: 0, max: 32, step: 0.1, label: 'Turbulence Scale' },
 		blurTurbulenceEnabled: { type: 'boolean', label: 'Blur Turbulence Enabled' },
 		blurStrength: { type: 'range', min: 0, max: 3, step: 0.1, label: 'Blur Strength' },
+		blurExtend: { type: 'range', min: -1, max: 1, step: 0.01, label: 'Blur Extend' },
 		blurQuality: { type: 'range', min: 0, max: 1, step: 0.01, label: 'Blur Quality' },
 		blurMethod: { type: 'enum', label: 'Blur Method', enum: [{
 			value: 'standard', label: 'Standard'
@@ -45,6 +46,7 @@ export const playground = definePlayground({
 		channelCFactor: 1.0,
 		blurTurbulenceEnabled: true,
 		blurStrength: 1.0,
+		blurExtend: 0.0,
 		blurQuality: 0.25,
 		blurMethod: isIos ? 'twoPass' : 'standard',
 	}),
@@ -311,6 +313,7 @@ export const playground = definePlayground({
 							turbulenceEnabled: params.blurTurbulenceEnabled ? 1.0 : 0.0,
 							turbulenceScale: params.turbulenceScale,
 							strength: params.blurStrength,
+							extend: params.blurExtend,
 							quality: Math.round(remap(params.blurQuality, 0, 1, 1, 32)),
 							isIos: isIos ? 1.0 : 0.0,
 						});
@@ -345,6 +348,7 @@ export const playground = definePlayground({
 							turbulenceEnabled: params.blurTurbulenceEnabled ? 1.0 : 0.0,
 							turbulenceScale: params.turbulenceScale,
 							strength: params.blurStrength,
+							extend: params.blurExtend,
 							quality: Math.round(remap(params.blurQuality, 0, 1, 1, 32)),
 							isIos: isIos ? 1.0 : 0.0,
 						});
@@ -378,6 +382,7 @@ export const playground = definePlayground({
 							turbulenceEnabled: params.blurTurbulenceEnabled ? 1.0 : 0.0,
 							turbulenceScale: params.turbulenceScale,
 							strength: params.blurStrength,
+							extend: params.blurExtend,
 							quality: Math.round(remap(params.blurQuality, 0, 1, 1, 512)),
 							isIos: isIos ? 1.0 : 0.0,
 							monteCarlo: params.blurMethod === 'monteCarlo' ? 1.0 : 0.0,

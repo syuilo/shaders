@@ -369,6 +369,7 @@ struct BlurUniforms {
 	turbulenceEnabled: u32,
 	turbulenceScale: f32,
 	strength: f32,
+	extend: f32,
 	quality: i32,
 	isIos: u32,
 	isHorizontal: u32,
@@ -404,7 +405,9 @@ fn getBlurRadius(_uv: vec2f) -> f32 {
 	let turbulenceScale = 0.75 * blurUniforms.turbulenceScale;
 	let turbulence = select(0.0, snoise(vec3f((warpedUv + seed + 6.0) * turbulenceScale, time * 0.5)), blurUniforms.turbulenceEnabled == 1);
 
-	var r = (((warpedUv.x - uv.x) + (warpedUv.y - uv.y) + turbulence) / 3.0) * blurUniforms.strength;
+	var r = ((warpedUv.x - uv.x) + (warpedUv.y - uv.y) + turbulence) / 3.0; // 3つの成分を混ぜるので-1 ~ +1の範囲にするために3で割る
+	r += blurUniforms.extend;
+	r *= blurUniforms.strength;
 	r = min(max(r, 0.0), 1.0);
 
 	let pointerForce = (pointerTrailColor.r + pointerTrailColor.g + pointerTrailColor.b + pointerTrailColor.a) / 4.0;
