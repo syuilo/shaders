@@ -217,9 +217,9 @@ fn unscaleUvToCoverGivenAspectRatio(uv: vec2f, aspectRatio: f32) -> vec2f {
 }
 
 fn hslToRgb(hsl: vec3f) -> vec3f {
-	let c = (1.0 - abs((hsl.z * 2.0) - 1.0)) * hsl.y;
-	let x = c * (1.0 - abs(modf32(hsl.x * 6.0, 2.0) - 1.0));
-	let m = hsl.z - (c / 2.0);
+	let c = (1.0 - abs((hsl.x * 6.0) % 2.0 - 1.0)) * hsl.y;
+	let x = c * (1.0 - abs((hsl.x * 6.0) % 2.0 - 1.0));
+	let m = hsl.z - c * 0.5;
 
 	var rgb = vec3f(0.0);
 	if (hsl.x < 1.0 / 6.0) {

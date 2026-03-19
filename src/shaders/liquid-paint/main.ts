@@ -37,6 +37,7 @@ export const playground = definePlayground({
 		}, {
 			value: 'twoPass', label: 'Two Pass'
 		}]},
+		test: { type: 'boolean', label: 'Test' },
 	},
 	getDefaultParams: () => ({
 		source: null,
@@ -53,6 +54,7 @@ export const playground = definePlayground({
 		blurExtend: 0.0,
 		blurQuality: 0.25,
 		blurMethod: isIos ? 'twoPass' : 'standard',
+		test: false,
 	}),
 	init: async ({ width, height, wgpu, params, canvas }) => {
 		const shaderModule = wgpu.device.createShaderModule({
@@ -293,6 +295,7 @@ export const playground = definePlayground({
 						hasSource: params.source != null ? 1.0 : 0.0,
 						coverSource: 1.0,
 						sourceAspectRatio: sourceTexture.width / sourceTexture.height,
+						test: params.test ? 1.0 : 0.0,
 					});
 					wgpu.device.queue.writeBuffer(uniformBuffer, 0, uniformValues.arrayBuffer);
 
