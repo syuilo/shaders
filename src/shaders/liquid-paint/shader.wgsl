@@ -408,7 +408,7 @@ fn getBlurRadius(_uv: vec2f) -> f32 {
 	r = min(max(r, 0.0), 1.0);
 
 	let pointerForce = (pointerTrailColor.r + pointerTrailColor.g + pointerTrailColor.b + pointerTrailColor.a) / 4.0;
-	r += max(pointerForce, 0.0) * blurUniforms.strength;
+	r += max(pointerForce - 0.3, 0.0) * blurUniforms.strength * 0.7;
 
 	return min(max(r, 0.0), 1.0);
 }
@@ -531,10 +531,10 @@ fn getPointerForceColor(uv: vec2f) -> vec4f {
 	let d = distance(uv, pos);
 	if (d < radius) {
 		let gradate = 1.0 - (d / radius);
-		v.r = (gradate * gradate) * (pointerTrailUniforms.pointerVector.x * 16.0);
-		v.g = (gradate * gradate) * (pointerTrailUniforms.pointerVector.y * 16.0);
-		v.b = (gradate * gradate) * (-pointerTrailUniforms.pointerVector.x * 16.0);
-		v.a = (gradate * gradate) * (-pointerTrailUniforms.pointerVector.y * 16.0);
+		v.r = (gradate * gradate) * (pointerTrailUniforms.pointerVector.x * 32.0);
+		v.g = (gradate * gradate) * (pointerTrailUniforms.pointerVector.y * 32.0);
+		v.b = (gradate * gradate) * (-pointerTrailUniforms.pointerVector.x * 32.0);
+		v.a = (gradate * gradate) * (-pointerTrailUniforms.pointerVector.y * 32.0);
 	}
 
 	v.r = max(v.r, 0.0);
