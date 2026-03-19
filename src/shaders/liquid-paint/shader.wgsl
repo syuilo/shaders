@@ -411,7 +411,7 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 		//}
 
 		//let _a = snoise0to1(vec3f((uv + seed + 4.0), time)) + (power * 0.7);
-		let _a = 0.3 + (power * 0.8);
+		let _a = max(0.03, 0.3 + (power * 0.8));
 		let _b = 0.4 + (power * 0.8);
 		let _c = 0.5 + (power * 0.8);
 
