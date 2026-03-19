@@ -106,6 +106,8 @@ export const playground = definePlayground({
 
 		let pointerX = -99999.0;
 		let pointerY = -99999.0;
+		let pointerXPrev = pointerX;
+		let pointerYPrev = pointerY;
 		let lastPointerMovedAt = 0;
 
 		const onPointerMove = (ev: PointerEvent) => {
@@ -238,6 +240,12 @@ export const playground = definePlayground({
 					pointerY = -99999.0;
 				}
 
+				const pointerVectorX = pointerXPrev === -99999.0 ? 0 : pointerX - pointerXPrev;
+				const pointerVectorY = pointerYPrev === -99999.0 ? 0 : pointerY - pointerYPrev;
+
+				pointerXPrev = pointerX;
+				pointerYPrev = pointerY;
+
 				{ // pointer trail pass
 					ctx.commandEncoder.copyTextureToTexture({ texture: pointerTrailBufferAfter }, { texture: pointerTrailBufferBefore }, { width, height });
 
@@ -246,6 +254,7 @@ export const playground = definePlayground({
 						aspectRatio: width / height,
 						timeDelta: ctx.timeDelta,
 						pointerPosition: [pointerX, -pointerY],
+						pointerVector: [pointerVectorX, -pointerVectorY],
 					});
 					wgpu.device.queue.writeBuffer(pointerTrailUniformBuffer, 0, pointerTrailUniformValues.arrayBuffer);
 
