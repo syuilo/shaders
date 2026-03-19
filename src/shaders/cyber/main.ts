@@ -36,17 +36,86 @@ export const playground = definePlayground({
 		colorC: [1, 0.3, 0],
 		test: false,
 	}),
-	init: async ({ width, height, wgpu, params }) => {
+	init: async ({ width, height, wgpu, params, canvas }) => {
 		const shaderModule = wgpu.device.createShaderModule({
 			code: code,
 		});
 
-		const pipeline = wgpu.device.createRenderPipeline({
+		const shaderDataDefinitions = makeShaderDataDefinitions(code);
+
+		const pointerTrailPipeline = wgpu.device.createRenderPipeline({
 			vertex: {
 				module: shaderModule,
+				entryPoint: 'vs',
 			},
 			fragment: {
 				module: shaderModule,
+				entryPoint: 'fsPointerTrail',
+				targets: [{
+					format: navigator.gpu.getPreferredCanvasFormat(),
+				}],
+			},
+			primitive: {
+				topology: 'triangle-list',
+			},
+			layout: 'auto',
+		});
+
+		const pointerTrailBufferBefore = wgpu.device.createTexture({
+			size: { width, height },
+			format: navigator.gpu.getPreferredCanvasFormat(),
+			usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC | GPUTextureUsage.COPY_DST,
+		});
+
+		const pointerTrailBufferAfter = wgpu.device.createTexture({
+			size: { width, height },
+			format: navigator.gpu.getPreferredCanvasFormat(),
+			usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC | GPUTextureUsage.COPY_DST,
+		});
+
+		const pointerTrailUniformValues = makeStructuredView(shaderDataDefinitions.uniforms.pointerTrailUniforms);
+		const pointerTrailUniformBuffer = wgpu.device.createBuffer({
+			size: pointerTrailUniformValues.arrayBuffer.byteLength,
+			usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+		});
+
+		const pointerTrailBindGroup = wgpu.device.createBindGroup({
+			layout: pointerTrailPipeline.getBindGroupLayout(1),
+			entries: [
+				{ binding: 1, resource: { buffer: pointerTrailUniformBuffer }},
+				{ binding: 2, resource: wgpu.sampler },
+				{ binding: 3, resource: pointerTrailBufferBefore.createView() }
+			],
+		});
+
+		let pointerX = -99999.0;
+		let pointerY = -99999.0;
+		let pointerXPrev = pointerX;
+		let pointerYPrev = pointerY;
+		let lastPointerMovedAt = 0;
+
+		const onPointerMove = (ev: PointerEvent) => {
+			const rect = canvas.getBoundingClientRect();
+			const w = rect.width;
+			const h = rect.height;
+			const x = (ev.clientX - rect.left) / w;
+			const y = (ev.clientY - rect.top) / h;
+			// 0~1 -> -1~1
+			pointerX = x * 2 - 1;
+			pointerY = y * 2 - 1;
+			lastPointerMovedAt = performance.now();
+		};
+
+		window.addEventListener('pointermove', onPointerMove);
+
+		const pipeline = wgpu.device.createRenderPipeline({
+			vertex: {
+				module: shaderModule,
+				entryPoint: 'vs',
+			},
+			fragment: {
+				module: shaderModule,
+				entryPoint: 'fs',
 				targets: [{
 					format: navigator.gpu.getPreferredCanvasFormat(),
 				}],
@@ -106,8 +175,7 @@ export const playground = definePlayground({
 			mips: params.source != null && params.source.type === 'video' ? false : true,
 		});
 
-		const defs = makeShaderDataDefinitions(code);
-		const uniformValues = makeStructuredView(defs.uniforms.uniforms);
+		const uniformValues = makeStructuredView(shaderDataDefinitions.uniforms.uniforms);
 
 		const uniformBuffer = wgpu.device.createBuffer({
 			size: uniformValues.arrayBuffer.byteLength,
@@ -121,25 +189,11 @@ export const playground = definePlayground({
 				{ binding: 2, resource: wgpu.sampler },
 				{ binding: 3, resource: symbolTextures.createView({ dimension: '2d-array' }) },
 				{ binding: 4, resource: sourceTexture.createView() },
+				{ binding: 5, resource: pointerTrailBufferAfter.createView() },
 			],
 		});
 
-		let pointerX = -1.0;
-		let pointerY = -1.0;
-		let lastPointerMovedAt = 0;
-
 		/*
-		window.addEventListener('pointermove', (ev: PointerEvent) => {
-			if (!canvas.value) return;
-			const rect = canvas.value.getBoundingClientRect();
-			const w = rect.width;
-			const h = rect.height;
-			const x = (ev.clientX - rect.left) / w;
-			const y = (ev.clientY - rect.top) / h;
-			pointerX = x;
-			pointerY = y;
-			lastPointerMovedAt = performance.now();
-		});
 
 		window.addEventListener('keydown', (ev: KeyboardEvent) => {
 			if (ev.key === 'Escape') {
@@ -178,8 +232,40 @@ export const playground = definePlayground({
 				}
 
 				if (lastPointerMovedAt + 30 < performance.now()) {
-					pointerX = -1.0;
-					pointerY = -1.0;
+					pointerX = -99999.0;
+					pointerY = -99999.0;
+				}
+
+				const pointerVectorX = pointerXPrev === -99999.0 ? 0 : pointerX - pointerXPrev;
+				const pointerVectorY = pointerYPrev === -99999.0 ? 0 : pointerY - pointerYPrev;
+
+				pointerXPrev = pointerX;
+				pointerYPrev = pointerY;
+
+				{ // pointer trail pass
+					ctx.commandEncoder.copyTextureToTexture({ texture: pointerTrailBufferAfter }, { texture: pointerTrailBufferBefore }, { width, height });
+
+					pointerTrailUniformValues.set({
+						//scale: params.scale,
+						aspectRatio: width / height,
+						timeDelta: ctx.timeDelta,
+						pointerPosition: [pointerX, -pointerY],
+						pointerVector: [pointerVectorX, -pointerVectorY],
+					});
+					wgpu.device.queue.writeBuffer(pointerTrailUniformBuffer, 0, pointerTrailUniformValues.arrayBuffer);
+
+					const passEncoder = ctx.commandEncoder.beginRenderPass({
+						colorAttachments: [{
+							view: pointerTrailBufferAfter.createView(),
+							clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+							loadOp: 'clear',
+							storeOp: 'store',
+						}],
+					});
+					passEncoder.setPipeline(pointerTrailPipeline);
+					passEncoder.setBindGroup(1, pointerTrailBindGroup);
+					passEncoder.draw(6);
+					passEncoder.end();
 				}
 
 				uniformValues.set({

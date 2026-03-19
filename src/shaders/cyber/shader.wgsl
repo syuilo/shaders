@@ -205,6 +205,7 @@ struct Uniforms {
 @group(0) @binding(2) var mySampler: sampler;
 @group(0) @binding(3) var symbolTextures: texture_2d_array<f32>;
 @group(0) @binding(4) var sourceTexture: texture_2d<f32>;
+@group(0) @binding(5) var pointerTrailTexture: texture_2d<f32>;
 
 // https://docs.arduino.cc/language-reference/en/functions/math/map/
 fn remap(value: f32, inMin: f32, inMax: f32, outMin: f32, outMax: f32) -> f32 {
@@ -222,6 +223,10 @@ fn getSourceColor(uv: vec2f) -> vec4f {
 		uniforms.coverSource == 1);
 	let sourceUv = uv * vec2f(1.0, uniforms.sourceAspectRatio) / sourceScale;
 	return textureSample(sourceTexture, mySampler, convertTexCoords(sourceUv));
+}
+
+fn getPointerTrailColor(uv: vec2f) -> vec4f {
+	return textureSample(pointerTrailTexture, mySampler, convertTexCoords(unscaleUvToCoverGivenAspectRatio(uv, uniforms.aspectRatio)));
 }
 
 const discardBrightPixelsThreshold = 0.7;
@@ -242,22 +247,12 @@ fn isSimilar(a: vec4f, b: vec4f, c: vec4f, d: vec4f, threshold: f32) -> bool {
 	);
 }
 
-fn getPointerForce(uv: vec2f) -> f32 {
-	if (uniforms.pointerPosition.x == -1.0 && uniforms.pointerPosition.y == -1.0) {
-		return 0.0;
-	}
+fn scaleUvToCoverGivenAspectRatio(uv: vec2f, aspectRatio: f32) -> vec2f {
+	return uv / vec2f(1.0, aspectRatio) * select(1.0, aspectRatio, 1.0 > aspectRatio);
+}
 
-	var v = 0.0;
-	let thickness = 0.05;
-	let radius = 0.1;
-
-	let d = distance(uv, (uniforms.pointerPosition + vec2f(-0.5, 0.5)) / vec2f(1.0, uniforms.aspectRatio));
-	if (d < radius + thickness && d > radius - thickness) {
-		let gradate = abs(d - radius + thickness) / thickness;
-		v += ((1.0 - radius) * gradate);
-	}
-
-	return v;
+fn unscaleUvToCoverGivenAspectRatio(uv: vec2f, aspectRatio: f32) -> vec2f {
+	return uv * vec2f(1.0, aspectRatio) / select(1.0, aspectRatio, 1.0 > aspectRatio);
 }
 
 @fragment
@@ -267,7 +262,7 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	let scroll = vec2f(0.0, -time * 0.0001);
 	let hasSource = uniforms.hasSource == 1;
 
-	let uv = fragData.uv / vec2f(1.0, uniforms.aspectRatio) * select(1.0, uniforms.aspectRatio, 1.0 > uniforms.aspectRatio);
+	let uv = scaleUvToCoverGivenAspectRatio(fragData.uv, uniforms.aspectRatio);
 
 	var cellSize = vec2f(1.0 / (uniforms.divisions * 0.5));
 
@@ -328,6 +323,11 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	let sourceColor = getSourceColor(cellUv);
 	let sourceColorLuminance = (sourceColor.r + sourceColor.g + sourceColor.b) / 3.0;
 
+	let pointerTrailColor = getPointerTrailColor(cellUv);
+	let pointerForce = (pointerTrailColor.r + pointerTrailColor.g + pointerTrailColor.b + pointerTrailColor.a) / 4.0;
+
+	//return vec4f(vec3f(pointerForce), 1.0);
+
 	let visibilityNoiseA = snoise0to1(vec3f(cellUv + scroll, time * 0.00000625));
 	let visibilityNoiseB = snoise0to1(vec3f(cellUv * 8.0, time * 0.00000625));
 	var threshold = 0.65;
@@ -343,7 +343,6 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 		hasSource);
 
 	//float ripple = getRipple(cellUv);
-	let pointerForce = getPointerForce(cellUv);
 
 	//if (ripple > 0.5) {
 	//	texSelector += 0.25;
@@ -448,4 +447,51 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	out_color.a = 1.0;
 
 	return premultiplyAlpha(out_color);
+}
+
+struct PointerTrailUniforms {
+	aspectRatio: f32,
+	timeDelta: f32,
+	pointerPosition: vec2f,
+	pointerVector: vec2f,
+};
+
+@group(1) @binding(1) var<uniform> pointerTrailUniforms: PointerTrailUniforms;
+@group(1) @binding(2) var pointerTrailSampler: sampler;
+@group(1) @binding(3) var pointerTrailBeforeTexture: texture_2d<f32>;
+
+fn getPointerForceColor(uv: vec2f) -> vec4f {
+	if (pointerTrailUniforms.pointerPosition.x <= -999.0 && pointerTrailUniforms.pointerPosition.y <= -999.0) {
+		return vec4f(0.0);
+	}
+
+	var v = vec4f(0.0);
+	let radius = 0.3;
+
+	let pos = scaleUvToCoverGivenAspectRatio(pointerTrailUniforms.pointerPosition, pointerTrailUniforms.aspectRatio);
+	let d = distance(uv, pos);
+	if (d < radius) {
+		let gradate = 1.0 - (d / radius);
+		v.r = (gradate * gradate) * (pointerTrailUniforms.pointerVector.x * 32.0);
+		v.g = (gradate * gradate) * (pointerTrailUniforms.pointerVector.y * 32.0);
+		v.b = (gradate * gradate) * (-pointerTrailUniforms.pointerVector.x * 32.0);
+		v.a = (gradate * gradate) * (-pointerTrailUniforms.pointerVector.y * 32.0);
+	}
+
+	v.r = max(v.r, 0.0);
+	v.g = max(v.g, 0.0);
+	v.b = max(v.b, 0.0);
+	v.a = max(v.a, 0.0);
+
+	return v;
+}
+
+@fragment
+fn fsPointerTrail(fragData: VertexOut) -> @location(0) vec4f {
+	var uv = scaleUvToCoverGivenAspectRatio(fragData.uv, pointerTrailUniforms.aspectRatio);
+	var before = textureSample(pointerTrailBeforeTexture, pointerTrailSampler, convertTexCoords(fragData.uv));
+	before -= 1.0 * (pointerTrailUniforms.timeDelta / 2000.0); // 2000msで1.0減る
+	before = max(before, vec4f(0.0));
+	let v = getPointerForceColor(uv) * 0.3;
+	return vec4f(before.r + v.r, before.g + v.g, before.b + v.b, before.a + v.a);
 }
