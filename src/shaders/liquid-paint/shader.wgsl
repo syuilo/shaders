@@ -410,17 +410,20 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 		//	c = blendNormalVec3f(c, mix(vec3f(0.0, 0.0, 1.0), vec3f(0.0, 0.0, 0.0), remap(noiseC % 0.1, 0.0, 0.1, 0.0, 1.0)));
 		//}
 
+		//let _a = snoise0to1(vec3f((uv + seed + 4.0), time)) + (power * 0.7);
 		let _a = 0.3 + (power * 0.8);
 		let _b = 0.4 + (power * 0.8);
 		let _c = 0.5 + (power * 0.8);
 
-		c = mix(c, blendLightenVec3f(c, hslToRgb(vec3f((noiseA % _a) / _a, 1.0, 0.75))), noiseA * uniforms.channelAFactor);
-		c = mix(c, blendLightenVec3f(c, hslToRgb(vec3f(((noiseB % _b) / _b) + 0.25, 1.0, 0.75))), noiseB * uniforms.channelBFactor);
-		c = mix(c, blendLightenVec3f(c, hslToRgb(vec3f(((noiseC % _c) / _c) + 0.3, 1.0, 0.75))), noiseC * uniforms.channelCFactor);
+		c = mix(c, blendLightenVec3f(c, hslToRgb(vec3f(((remap(noiseA, -1.0, 1.0, 0.0, 1.0) % _a) / _a), 0.5, 0.2))), noiseA * uniforms.channelAFactor);
+		//c = mix(c, blendLightenVec3f(c, hslToRgb(vec3f(((remap(noiseB, -1.0, 1.0, 0.0, 1.0) % _b) / _b), 1.0, 0.75))), noiseB * uniforms.channelBFactor);
+		//c = mix(c, blendLightenVec3f(c, hslToRgb(vec3f(((remap(noiseC, -1.0, 1.0, 0.0, 1.0) % _c) / _c), 1.0, 0.75))), noiseC * uniforms.channelCFactor);
 
 		//c = normalize(c);
 
-		c = mix(c, normalize(c), power * 2.0);
+		//c = mix(c, normalize(c), 0.5);
+
+		c = mix(c, normalize(c), power * 3.0);
 
 		//c = blendSubtractVec3f(c, vec3f(0.5));
 
