@@ -208,6 +208,14 @@ fn convertTexCoordsClamp(uv: vec2f) -> vec2f {
 	return clamp(convertTexCoords(uv), vec2f(0.0), vec2f(1.0));
 }
 
+fn scaleUvToCoverGivenAspectRatio(uv: vec2f, aspectRatio: f32) -> vec2f {
+	return uv / vec2f(1.0, aspectRatio) * select(1.0, aspectRatio, 1.0 > aspectRatio);
+}
+
+fn unscaleUvToCoverGivenAspectRatio(uv: vec2f, aspectRatio: f32) -> vec2f {
+	return uv * vec2f(1.0, aspectRatio) / select(1.0, aspectRatio, 1.0 > aspectRatio);
+}
+
 struct Uniforms {
 	scale: f32,
 	aspectRatio: f32,
@@ -246,7 +254,7 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	let noiseScale = 0.75;
 	let turbulenceScale = 0.75 * uniforms.turbulenceScale;
 
-	let aspectUv = fragData.uv / vec2f(1.0, uniforms.aspectRatio) * select(1.0, uniforms.aspectRatio, 1.0 > uniforms.aspectRatio);
+	let aspectUv = scaleUvToCoverGivenAspectRatio(fragData.uv, uniforms.aspectRatio);
 	var uv = aspectUv * uniforms.scale;
 
 	let pointerTrailColor = textureSample(pointerTrailTexture, sourceSampler, convertTexCoords(fragData.uv));
@@ -388,7 +396,7 @@ const goldenAngle = 2.399963229728653; // radians
 fn getBlurRadius(_uv: vec2f) -> f32 {
 	let time = blurCommonUniforms.time * 0.00005;
 	let seed = 1000.0;
-	var uv = _uv / vec2f(1.0, blurCommonUniforms.aspectRatio) * select(1.0, blurCommonUniforms.aspectRatio, 1.0 > blurCommonUniforms.aspectRatio);
+	var uv = scaleUvToCoverGivenAspectRatio(_uv, blurCommonUniforms.aspectRatio);
 	uv *= blurCommonUniforms.scale;
 
 	var pointerTrailColor = textureSample(pointerTrailTextureForBlur, targetSampler, convertTexCoords(_uv));
@@ -530,7 +538,7 @@ fn getPointerForceColor(uv: vec2f) -> vec4f {
 	var v = vec4f(0.0);
 	let radius = 0.3;
 
-	let pos = pointerTrailUniforms.pointerPosition / vec2f(1.0, pointerTrailUniforms.aspectRatio) * select(1.0, pointerTrailUniforms.aspectRatio, 1.0 > pointerTrailUniforms.aspectRatio);
+	let pos = scaleUvToCoverGivenAspectRatio(pointerTrailUniforms.pointerPosition, pointerTrailUniforms.aspectRatio);
 	let d = distance(uv, pos);
 	if (d < radius) {
 		let gradate = 1.0 - (d / radius);
@@ -550,7 +558,7 @@ fn getPointerForceColor(uv: vec2f) -> vec4f {
 
 @fragment
 fn fsPointerTrail(fragData: VertexOut) -> @location(0) vec4f {
-	var uv = fragData.uv / vec2f(1.0, pointerTrailUniforms.aspectRatio) * select(1.0, pointerTrailUniforms.aspectRatio, 1.0 > pointerTrailUniforms.aspectRatio);
+	var uv = scaleUvToCoverGivenAspectRatio(fragData.uv, pointerTrailUniforms.aspectRatio);
 	var before = textureSample(pointerTrailBeforeTexture, pointerTrailSampler, convertTexCoords(fragData.uv));
 	before -= 1.0 * (pointerTrailUniforms.timeDelta / 2000.0); // 2000msで1.0減る
 	before = max(before, vec4f(0.0));
