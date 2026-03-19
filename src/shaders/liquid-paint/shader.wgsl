@@ -228,6 +228,7 @@ struct Uniforms {
 @group(0) @binding(1) var<uniform> uniforms: Uniforms;
 @group(0) @binding(2) var sourceSampler: sampler;
 @group(0) @binding(3) var sourceTexture: texture_2d<f32>;
+@group(0) @binding(4) var pointerTrailTexture: texture_2d<f32>;
 
 fn getSourceColor(uv: vec2f) -> vec4f {
 	let sourceScale = select(
@@ -248,9 +249,16 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	let aspectUv = fragData.uv / vec2f(1.0, uniforms.aspectRatio) * select(1.0, uniforms.aspectRatio, 1.0 > uniforms.aspectRatio);
 	var uv = aspectUv * uniforms.scale;
 
-	let warpedUv = uv + (vec2f(
+	let pointerTrailColor = textureSample(pointerTrailTexture, sourceSampler, convertTexCoords(fragData.uv));
+	let pointerTrailForce = pointerTrailColor.r; // 0.0 ~ 1.0
+	//return pointerTrailColor;
+	//uv *= 1.0 + (pointerTrailForce * 0.5);
+
+	var warpedUv = uv + (vec2f(
 		snoise(vec3f((uv + seed + 4.0), time)),
 		snoise(vec3f((uv + seed + 5.0), time))) * 2.0);
+
+	warpedUv += pointerTrailForce * 0.5;
 
 	let turbulence = select(0.0, snoise(vec3f((warpedUv + seed + 6.0) * turbulenceScale, time * 0.5)), uniforms.turbulenceEnabled == 1);
 
@@ -371,6 +379,7 @@ struct BlurUniforms {
 @group(1) @binding(2) var<uniform> blurUniforms: BlurUniforms;
 @group(1) @binding(3) var targetSampler: sampler;
 @group(1) @binding(4) var targetTexture: texture_2d<f32>;
+@group(1) @binding(5) var pointerTrailTextureForBlur: texture_2d<f32>;
 
 const goldenAngle = 2.399963229728653; // radians
 
@@ -380,18 +389,23 @@ fn getBlurRadius(_uv: vec2f) -> f32 {
 	var uv = _uv / vec2f(1.0, blurCommonUniforms.aspectRatio) * select(1.0, blurCommonUniforms.aspectRatio, 1.0 > blurCommonUniforms.aspectRatio);
 	uv *= blurCommonUniforms.scale;
 
-	let warpedUv = uv + (vec2f(
+	var pointerForce = textureSample(pointerTrailTextureForBlur, targetSampler, convertTexCoords(_uv)).r; // 0.0 ~ 1.0
+
+	var warpedUv = uv + (vec2f(
 		snoise(vec3f((uv + seed + 4.0), time)),
 		snoise(vec3f((uv + seed + 5.0), time))) * 2.0);
+
+	warpedUv += pointerForce * 0.5;
 
 	let turbulenceScale = 0.75 * blurUniforms.turbulenceScale;
 	let turbulence = select(0.0, snoise(vec3f((warpedUv + seed + 6.0) * turbulenceScale, time * 0.5)), blurUniforms.turbulenceEnabled == 1);
 
 	var r = (((warpedUv.x - uv.x) + (warpedUv.y - uv.y) + turbulence) / 3.0) * blurUniforms.strength;
-	r = max(r, 0.0);
-	r = min(r, 1.0);
+	r = min(max(r, 0.0), 1.0);
 
-	return r;
+	r += max(pointerForce - 0.5, 0.0) * blurUniforms.strength * 0.3;
+
+	return min(max(r, 0.0), 1.0);
 }
 
 @fragment
@@ -487,4 +501,42 @@ fn fsBlurLight(fragData: VertexOut) -> @location(0) vec4f {
 	}
 
 	return result / totalWeight;
+}
+
+struct PointerTrailUniforms {
+	aspectRatio: f32,
+	timeDelta: f32,
+	pointerPosition: vec2f,
+};
+
+@group(2) @binding(1) var<uniform> pointerTrailUniforms: PointerTrailUniforms;
+@group(2) @binding(2) var pointerTrailSampler: sampler;
+@group(2) @binding(3) var pointerTrailBeforeTexture: texture_2d<f32>;
+
+fn getPointerForce(uv: vec2f) -> f32 {
+	if (pointerTrailUniforms.pointerPosition.x <= -999.0 && pointerTrailUniforms.pointerPosition.y <= -999.0) {
+		return 0.0;
+	}
+
+	var v = 0.0;
+	let radius = 0.2;
+
+	let pos = pointerTrailUniforms.pointerPosition / vec2f(1.0, pointerTrailUniforms.aspectRatio) * select(1.0, pointerTrailUniforms.aspectRatio, 1.0 > pointerTrailUniforms.aspectRatio);
+	let d = distance(uv, pos);
+	if (d < radius) {
+		let gradate = 1.0 - (d / radius);
+		v = gradate * gradate;
+	}
+
+	return v;
+}
+
+@fragment
+fn fsPointerTrail(fragData: VertexOut) -> @location(0) vec4f {
+	var uv = fragData.uv / vec2f(1.0, pointerTrailUniforms.aspectRatio) * select(1.0, pointerTrailUniforms.aspectRatio, 1.0 > pointerTrailUniforms.aspectRatio);
+	var before = textureSample(pointerTrailBeforeTexture, pointerTrailSampler, convertTexCoords(fragData.uv));
+	before -= 1.0 * (pointerTrailUniforms.timeDelta / 2000.0); // 2000msで1.0減る
+	before = max(before, vec4f(0.0));
+	let v = getPointerForce(uv) * 0.3;
+	return vec4f(before.r + v, before.g + v, before.b + v, 1.0);
 }

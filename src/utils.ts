@@ -132,6 +132,7 @@ type GetOptionsSchemaValues<T extends OptionsSchema> = {
 export type PlaygroundInstance<Options = any> = {
 	render: (ctx: {
 		time: number;
+		timeDelta: number;
 		commandEncoder: GPUCommandEncoder;
 	}) => void;
 	dispose?: () => void;

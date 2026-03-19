@@ -81,7 +81,7 @@ async function init() {
 	if (playgroundDef.value == null) return;
 
 	const adapter = await navigator.gpu?.requestAdapter({
-		powerPreference: 'low-power',
+		//powerPreference: 'low-power',
 	});
 	const _device = await adapter?.requestDevice();
 	if (!_device) {
@@ -125,16 +125,19 @@ async function init() {
 		height: canvas.value.height,
 		wgpu: { device, context, sampler },
 		params: params,
+		canvas: canvas.value,
 	});
 
 	let disposed = false;
+	let latestTimestamp = Date.now();
 
 	function render(timeStamp: number) {
 		if (disposed) return;
 		const time = (initialTime + Math.floor(timeStamp)) * timeFactor.value;
 		const commandEncoder = device.createCommandEncoder();
-		playgroundInstance.render({ commandEncoder, time });
+		playgroundInstance.render({ commandEncoder, time, timeDelta: Math.max(0, timeStamp - latestTimestamp) });
 		device.queue.submit([commandEncoder.finish()]);
+		latestTimestamp = timeStamp;
 	}
 
 	let then = 0;
