@@ -267,7 +267,7 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	let scroll = vec2f(0.0, -time * 0.0001);
 	let hasSource = uniforms.hasSource == 1;
 
-	let uv = fragData.uv / vec2f(1.0, uniforms.aspectRatio);
+	let uv = fragData.uv / vec2f(1.0, uniforms.aspectRatio) * select(1.0, uniforms.aspectRatio, 1.0 > uniforms.aspectRatio);
 
 	var cellSize = vec2f(1.0 / (uniforms.divisions * 0.5));
 
