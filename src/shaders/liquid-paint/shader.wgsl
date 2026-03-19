@@ -216,6 +216,29 @@ fn unscaleUvToCoverGivenAspectRatio(uv: vec2f, aspectRatio: f32) -> vec2f {
 	return uv * vec2f(1.0, aspectRatio) / select(1.0, aspectRatio, 1.0 > aspectRatio);
 }
 
+fn hslToRgb(hsl: vec3f) -> vec3f {
+	let c = (1.0 - abs((hsl.z * 2.0) - 1.0)) * hsl.y;
+	let x = c * (1.0 - abs(modf32(hsl.x * 6.0, 2.0) - 1.0));
+	let m = hsl.z - (c / 2.0);
+
+	var rgb = vec3f(0.0);
+	if (hsl.x < 1.0 / 6.0) {
+		rgb = vec3f(c, x, 0.0);
+	} else if (hsl.x < 2.0 / 6.0) {
+		rgb = vec3f(x, c, 0.0);
+	} else if (hsl.x < 3.0 / 6.0) {
+		rgb = vec3f(0.0, c, x);
+	} else if (hsl.x < 4.0 / 6.0) {
+		rgb = vec3f(0.0, x, c);
+	} else if (hsl.x < 5.0 / 6.0) {
+		rgb = vec3f(x, 0.0, c);
+	} else {
+		rgb = vec3f(c, 0.0, x);
+	}
+
+	return rgb + vec3f(m);
+}
+
 struct Uniforms {
 	scale: f32,
 	aspectRatio: f32,
@@ -358,7 +381,7 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 
 		c = clamp(c, vec3f(0.0), vec3f(1.0));
 		return vec4f(c, 1.0);
-	} else {
+	} else if (uniforms.pallette == 3) {
 		var c = select(vec3f(1.0, 1.0, 1.0), vec3f(sourceColorWarped.r, sourceColorWarped.g, sourceColorWarped.b), uniforms.hasSource == 1);
 
 		if (uniforms.discardThreshold > -1.0 && power < uniforms.discardThreshold) {
@@ -368,6 +391,67 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 		c = blendAddVec3f(c, vec3f(1.0, 0.0, 0.0) * noiseA * uniforms.channelAFactor);
 		c = blendAddVec3f(c, vec3f(0.0, 1.0, 0.0) * noiseB * uniforms.channelBFactor);
 		c = blendAddVec3f(c, vec3f(0.0, 0.0, 1.0) * noiseC * uniforms.channelCFactor);
+		c = clamp(c, vec3f(0.0), vec3f(1.0));
+		return vec4f(c, 1.0);
+	} else if (uniforms.pallette == 4) {
+		var c = select(vec3f(0.0, 0.0, 0.0), vec3f(sourceColorWarped.r, sourceColorWarped.g, sourceColorWarped.b), uniforms.hasSource == 1);
+
+		if (uniforms.discardThreshold > -1.0 && power < uniforms.discardThreshold) {
+			return select(vec4f(0.0, 0.0, 0.0, 1.0), sourceColor, uniforms.hasSource == 1);
+		}
+
+		//if (noiseA < -0.35) {
+		//	c = blendNormalVec3f(c, mix(vec3f(1.0, 0.0, 0.0), vec3f(0.0, 0.0, 0.0), remap(noiseA % 0.1, 0.0, 0.1, 0.0, 1.0)));
+		//}
+		//if (noiseB < -0.35) {
+		//	c = blendNormalVec3f(c, mix(vec3f(0.0, 1.0, 0.0), vec3f(0.0, 0.0, 0.0), remap(noiseB % 0.1, 0.0, 0.1, 0.0, 1.0)));
+		//}
+		//if (noiseC < -0.35) {
+		//	c = blendNormalVec3f(c, mix(vec3f(0.0, 0.0, 1.0), vec3f(0.0, 0.0, 0.0), remap(noiseC % 0.1, 0.0, 0.1, 0.0, 1.0)));
+		//}
+
+		let _a = 0.3 + (power * 0.8);
+		let _b = 0.4 + (power * 0.8);
+		let _c = 0.5 + (power * 0.8);
+
+		c = mix(c, blendLightenVec3f(c, hslToRgb(vec3f((noiseA % _a) / _a, 1.0, 0.75))), noiseA * uniforms.channelAFactor);
+		c = mix(c, blendLightenVec3f(c, hslToRgb(vec3f(((noiseB % _b) / _b) + 0.25, 1.0, 0.75))), noiseB * uniforms.channelBFactor);
+		c = mix(c, blendLightenVec3f(c, hslToRgb(vec3f(((noiseC % _c) / _c) + 0.3, 1.0, 0.75))), noiseC * uniforms.channelCFactor);
+
+		//c = normalize(c);
+
+		c = mix(c, normalize(c), power * 2.0);
+
+		//c = blendSubtractVec3f(c, vec3f(0.5));
+
+		c = clamp(c, vec3f(0.0), vec3f(1.0));
+		return vec4f(c, 1.0);
+	} else {
+		var c = select(vec3f(0.0, 0.0, 0.6), vec3f(sourceColorWarped.r, sourceColorWarped.g, sourceColorWarped.b), uniforms.hasSource == 1);
+
+		if (uniforms.discardThreshold > -1.0 && power < uniforms.discardThreshold) {
+			return select(vec4f(0.0, 0.0, 0.0, 1.0), sourceColor, uniforms.hasSource == 1);
+		}
+
+		if (noiseA < -0.35) {
+			c = blendNormalVec3f(c, mix(vec3f(1.0, 0.5, 0.0), vec3f(0.0, 0.0, 0.0), remap(noiseA % 0.1, 0.0, 0.1, 0.0, 1.0)));
+		}
+		//if (noiseB < -0.35) {
+		//	c = blendOverlayVec3f(c, vec3f(0.0, 0.0, 0.0));
+		//}
+		//if (noiseC < -0.35) {
+		//	c = blendOverlayVec3f(c, vec3f(0.0, 0.0, 0.0));
+		//}
+
+		c = mix(c, hslToRgb(vec3f(0.1, 1.0, 0.5)), noiseA * 4.0 * uniforms.channelAFactor);
+		//c = mix(c, blendLightenVec3f(c, mix(vec3f(0.3, 0.3, 0.0), vec3f(0.0, 0.5, 0.0), remap(noiseB % (1.0 - noiseB), 0.0, (1.0 - noiseB), 0.0, 1.0))), noiseB * 2.0 * uniforms.channelBFactor);
+		//c = mix(c, blendLightenVec3f(c, mix(vec3f(0.8, 0.8, 0.0), vec3f(0.8, 0.4, 0.0), remap(noiseC % (1.0 - noiseC), 0.0, (1.0 - noiseC), 0.0, 1.0))), noiseC * 6.0 * uniforms.channelCFactor);
+
+		//c = mix(c, normalize(c), snoise(vec3f((uv + seed + 4.0), time)));
+		//c = normalize(c);
+
+		c = blendSubtractVec3f(c, vec3f(0.5));
+
 		c = clamp(c, vec3f(0.0), vec3f(1.0));
 		return vec4f(c, 1.0);
 	}
