@@ -75,6 +75,7 @@ export const playground = definePlayground({
 			'./assets/symbols/slash1.png',
 			'./assets/symbols/slash2.png',
 			'./assets/symbols/corner.png',
+			'./assets/symbols/circle-slash.png',
 			'./assets/symbols/square-slash.png',
 
 			...(params.withNumbers ? [
