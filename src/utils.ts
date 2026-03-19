@@ -42,6 +42,30 @@ export function debouncePromise(fn, ms = 0) {
 	});
 }
 
+export function throttlePromise(fn, ms = 0) {
+	let lastExecuted = 0;
+	let pendingPromise: Promise<any> | null = null;
+	return (...args) => {
+		const now = Date.now();
+		if (pendingPromise) {
+			return pendingPromise;
+		}
+		if (now - lastExecuted >= ms) {
+			lastExecuted = now;
+			return Promise.resolve(fn.apply(this, args));
+		} else {
+			pendingPromise = new Promise((res, rej) => {
+				setTimeout(() => {
+					lastExecuted = Date.now();
+					pendingPromise = null;
+					Promise.resolve(fn.apply(this, args)).then(res, rej);
+				}, ms - (now - lastExecuted));
+			});
+			return pendingPromise;
+		}
+	};
+}
+
 export const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
 type NumberOptionSchema = {
