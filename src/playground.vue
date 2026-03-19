@@ -1,5 +1,5 @@
 <template>
-<canvas ref="canvas" style="display: block; width: 100%; height: 100%;"></canvas>
+<canvas ref="canvas" style="display: block; width: 100%; height: 100%; touch-action: none;"></canvas>
 <button id="menuButton" :class="hideMenuButton ? 'hide' : null" @click="showMenu = !showMenu">MENU</button>
 <div v-if="playgroundDef != null" v-show="showMenu" id="menu">
 	<h1>WebGPU - "{{ playgroundDef.title }}" shader by syuilo</h1>
