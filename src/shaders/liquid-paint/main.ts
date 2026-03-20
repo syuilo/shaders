@@ -19,6 +19,8 @@ export const playground = definePlayground({
 			value: 'iridescence', label: 'Iridescence'
 		}, {
 			value: 'lava', label: 'Lava'
+		}, {
+			value: 'melon', label: 'Melon'
 		}] },
 		discardThreshold: { type: 'range', min: -1, max: 1, step: 0.1, label: 'Discard Threshold' },
 		channelAFactor: { type: 'range', min: -4, max: 4, step: 0.1, label: 'Channel A Factor' },
@@ -297,7 +299,15 @@ export const playground = definePlayground({
 						time: ctx.time,
 						turbulenceEnabled: params.turbulenceEnabled ? 1.0 : 0.0,
 						turbulenceScale: params.turbulenceScale,
-						pallette: params.pallette === 'colorful' ? 0.0 : params.pallette === 'cider' ? 1.0 : params.pallette === 'psyche' ? 2.0 : params.pallette === 'pastel' ? 3.0 : params.pallette === 'iridescence' ? 4.0 : params.pallette === 'lava' ? 5.0 : 0.0,
+						pallette:
+							params.pallette === 'colorful' ? 0.0 :
+							params.pallette === 'cider' ? 1.0 :
+							params.pallette === 'psyche' ? 2.0 :
+							params.pallette === 'pastel' ? 3.0 :
+							params.pallette === 'iridescence' ? 4.0 :
+							params.pallette === 'lava' ? 5.0 :
+							params.pallette === 'melon' ? 6.0 :
+							0.0,
 						discardThreshold: params.discardThreshold,
 						channelAFactor: params.channelAFactor,
 						channelBFactor: params.channelBFactor,
