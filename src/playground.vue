@@ -118,7 +118,8 @@ async function init() {
 
 	// 誰が見ても同じレンダリング結果になるように、開いた時間を基準にする
 	// ただそのままUNIX時間を入れると、秒数が大きすぎて浮動小数点数の関係で精度が落ちるため、1日間隔でループ
-	const initialTime = Date.now() % (1000 * 60 * 60 * 24);
+	// また、re-initされたときもrequestAnimationFrameのtimeStampはリセットされず、そのままではズレが生じるため、あらかじめ現在のtimeStampを引いておく
+	const initialTime = (Date.now() % (1000 * 60 * 60 * 24)) - Math.floor(performance.now());
 
 	const playgroundInstance = await playgroundDef.value.init({
 		width: canvas.value.width,
@@ -129,7 +130,7 @@ async function init() {
 	});
 
 	let disposed = false;
-	let latestTimestamp = Date.now();
+	let latestTimestamp = performance.now();
 
 	function render(timeStamp: number) {
 		if (disposed) return;
