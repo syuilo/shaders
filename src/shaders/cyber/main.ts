@@ -108,6 +108,17 @@ export const playground = definePlayground({
 
 		window.addEventListener('pointermove', onPointerMove);
 
+		const onWheel = (ev: WheelEvent) => {
+			if (ev.deltaY > 0) {
+				params.divisions = Math.floor(params.divisions * 1.2);
+			} else if (ev.deltaY < 0) {
+				params.divisions = Math.floor(params.divisions / 1.2);
+			}
+			params.divisions = Math.min(512, Math.max(8, params.divisions));
+		};
+
+		canvas.addEventListener('wheel', onWheel);
+
 		const pipeline = wgpu.device.createRenderPipeline({
 			vertex: {
 				module: shaderModule,
@@ -210,16 +221,7 @@ export const playground = definePlayground({
 				ev.preventDefault();
 			}
 		});
-
-		function onWheel(ev: WheelEvent) {
-			if (ev.deltaY > 0) {
-				divisions.value = Math.floor(divisions.value * 1.2);
-			} else if (ev.deltaY < 0) {
-				divisions.value = Math.floor(divisions.value / 1.2);
-			}
-			divisions.value = Math.min(512, Math.max(8, divisions.value));
-		}
-			*/
+	*/
 
 		return {
 			render: ctx => {
@@ -302,6 +304,15 @@ export const playground = definePlayground({
 				passEncoder.setBindGroup(0, bindGroup);
 				passEncoder.draw(6);
 				passEncoder.end();
+			},
+			dispose() {
+				window.removeEventListener('pointermove', onPointerMove);
+				canvas.removeEventListener('wheel', onWheel);
+				pointerTrailBufferBefore.destroy();
+				pointerTrailBufferAfter.destroy();
+				uniformBuffer.destroy();
+				sourceTexture.destroy();
+				symbolTextures.destroy();
 			},
 		};
 	},

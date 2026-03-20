@@ -422,6 +422,15 @@ export const playground = definePlayground({
 			},
 			dispose() {
 				window.removeEventListener('pointermove', onPointerMove);
+				pointerTrailBufferBefore.destroy();
+				pointerTrailBufferAfter.destroy();
+				uniformBuffer.destroy();
+				sourceTexture.destroy();
+				buffer.destroy();
+				buffer2.destroy();
+				blurUniformBuffer.destroy();
+				blurHorizontalUniformBuffer.destroy();
+				blurVerticalUniformBuffer.destroy();
 			},
 		}
 	},
