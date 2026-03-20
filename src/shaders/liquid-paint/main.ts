@@ -132,6 +132,16 @@ export const playground = definePlayground({
 
 		window.addEventListener('pointermove', onPointerMove);
 
+		const onWheel = (ev: WheelEvent) => {
+			if (ev.deltaY < 0) {
+				params.scale = Math.max(0.1, params.scale - 0.1);
+			} else if (ev.deltaY > 0) {
+				params.scale = Math.min(2.0, params.scale + 0.1);
+			}
+		};
+
+		canvas.addEventListener('wheel', onWheel);
+
 		const pipeline = wgpu.device.createRenderPipeline({
 			vertex: {
 				module: shaderModule,
@@ -422,6 +432,7 @@ export const playground = definePlayground({
 			},
 			dispose() {
 				window.removeEventListener('pointermove', onPointerMove);
+				canvas.removeEventListener('wheel', onWheel);
 				pointerTrailBufferBefore.destroy();
 				pointerTrailBufferAfter.destroy();
 				uniformBuffer.destroy();

@@ -151,7 +151,7 @@ export type Playground<OpSc extends OptionsSchema = OptionsSchema> = {
 			context: GPUCanvasContext;
 			sampler: GPUSampler;
 		};
-		params: Readonly<GetOptionsSchemaValues<OpSc>>;
+		params: GetOptionsSchemaValues<OpSc>;
 	}) => Promise<PlaygroundInstance<GetOptionsSchemaValues<OpSc>>>;
 };
 
