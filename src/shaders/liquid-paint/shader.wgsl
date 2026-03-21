@@ -487,10 +487,10 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 			return select(vec4f(c, 1.0), sourceColor, uniforms.hasSource == 1);
 		}
 
-		if (noiseA < -0.35) {
+		if (noiseA < -0.4) {
 			c = blendNormalVec3f(c, vec3f(1.0, 0.6, 0.2));
 		}
-		if (noiseB < -0.35) {
+		if (noiseB < -0.3) {
 			c = blendNormalVec3f(c, vec3f(0.0, 0.4, 0.6));
 		}
 		if (noiseC < -0.35) {
@@ -501,11 +501,11 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 		let _noiseB = remap(noiseB, -1.0, 1.0, 0.5, 1.0);
 		let _noiseC = remap(noiseC, -1.0, 1.0, 0.5, 1.0);
 
-		c = mix(c, blendLightenVec3f(c, mix(vec3f(1.0, 0.6, 0.0), vec3f(1.0, 0.7, 0.0), _noiseA % 0.2)), noiseA * 2.0 * uniforms.channelAFactor);
-		c = mix(c, blendLightenVec3f(c, mix(vec3f(0.0, 0.7, 1.0), vec3f(0.3, 0.8, 1.0), _noiseB % 0.2)), noiseB * uniforms.channelBFactor);
-		c = mix(c, blendLightenVec3f(c, mix(vec3f(1.0, 0.5, 1.0), vec3f(1.0, 0.7, 1.0), _noiseC % 0.2)), noiseC * 0.5 * uniforms.channelCFactor);
+		c = mix(c, blendLightenVec3f(c, mix(vec3f(1.0, 0.6, 0.0), vec3f(1.0, 0.7, 0.0), _noiseA % (1.0 - _noiseA))), noiseA * 2.0 * uniforms.channelAFactor);
+		c = mix(c, blendLightenVec3f(c, mix(vec3f(0.0, 0.7, 1.0), vec3f(0.3, 0.8, 1.0), _noiseB % (1.0 - _noiseA))), noiseB * uniforms.channelBFactor);
+		c = mix(c, blendLightenVec3f(c, mix(vec3f(1.0, 0.5, 1.0), vec3f(1.0, 0.7, 1.0), _noiseC % (1.0 - _noiseA))), noiseC * 0.5 * uniforms.channelCFactor);
 
-		c = mix(c, normalize(c), power * 3.0);
+		//c = mix(c, normalize(c), power * 3.0);
 		c = clamp(c, vec3f(0.0), vec3f(1.0));
 		return vec4f(c, 1.0);
 	}
