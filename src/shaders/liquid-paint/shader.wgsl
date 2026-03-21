@@ -481,7 +481,7 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 		c = clamp(c, vec3f(0.0), vec3f(1.0));
 		return vec4f(c, 1.0);
 	} else {
-		var c = select(vec3f(0.1, 0.1, 0.1), vec3f(sourceColorWarped.r, sourceColorWarped.g, sourceColorWarped.b), uniforms.hasSource == 1);
+		var c = select(vec3f(0.0, 0.03, 0.1), vec3f(sourceColorWarped.r, sourceColorWarped.g, sourceColorWarped.b), uniforms.hasSource == 1);
 
 		if (uniforms.discardThreshold > -1.0 && power < uniforms.discardThreshold) {
 			return select(vec4f(c, 1.0), sourceColor, uniforms.hasSource == 1);
