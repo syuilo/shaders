@@ -21,6 +21,8 @@ export const playground = definePlayground({
 			value: 'lava', label: 'Lava'
 		}, {
 			value: 'melon', label: 'Melon'
+		}, {
+			value: 'dawn', label: 'Dawn'
 		}] },
 		discardThreshold: { type: 'range', min: -1, max: 1, step: 0.1, label: 'Discard Threshold' },
 		channelAFactor: { type: 'range', min: -4, max: 4, step: 0.1, label: 'Channel A Factor' },
@@ -307,6 +309,7 @@ export const playground = definePlayground({
 							params.pallette === 'iridescence' ? 4.0 :
 							params.pallette === 'lava' ? 5.0 :
 							params.pallette === 'melon' ? 6.0 :
+							params.pallette === 'dawn' ? 7.0 :
 							0.0,
 						discardThreshold: params.discardThreshold,
 						channelAFactor: params.channelAFactor,
