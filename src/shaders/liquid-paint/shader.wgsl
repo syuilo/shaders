@@ -309,22 +309,18 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 		}
 
 		if (noiseA < -0.35) {
-			c = blendOverlayVec3f(c, vec3f(1.0, 0.0, 0.0));
+			c = blendNormalVec3f(c, vec3f(1.0, 0.0, 0.0));
 		}
 		if (noiseB < -0.35) {
-			c = blendOverlayVec3f(c, vec3f(0.0, 1.0, 0.0));
+			c = blendNormalVec3f(c, vec3f(0.0, 1.0, 0.0));
 		}
 		if (noiseC < -0.35) {
-			c = blendOverlayVec3f(c, vec3f(0.0, 0.0, 1.0));
+			c = blendNormalVec3f(c, vec3f(0.0, 0.0, 1.0));
 		}
 
 		c = mix(c, blendNormalVec3f(c, vec3f(1.0, 0.0, 0.0)), noiseA * uniforms.channelAFactor);
 		c = mix(c, blendNormalVec3f(c, vec3f(0.0, 1.0, 0.0)), noiseB * uniforms.channelBFactor);
 		c = mix(c, blendNormalVec3f(c, vec3f(0.0, 0.0, 1.0)), noiseC * uniforms.channelCFactor);
-
-		if (c.r < 0.25 && c.g < 0.25 && c.b < 0.25) {
-			c = vec3f(1.0, 1.0, 1.0);
-		}
 
 		c = clamp(c, vec3f(0.0), vec3f(1.0));
 		return vec4f(c, 1.0);
