@@ -272,7 +272,6 @@ fn getSourceColor(uv: vec2f) -> vec4f {
 @fragment
 fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	let time = uniforms.time * 0.00005;
-	let seed = 1000.0;
 	let noiseScale = 0.75;
 	let turbulenceScale = 0.75 * uniforms.turbulenceScale;
 
@@ -283,24 +282,24 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	//return pointerTrailColor;
 
 	var warpedUv = uv + (vec2f(
-		snoise(vec3f((uv + seed + 4.0), time)),
-		snoise(vec3f((uv + seed + 5.0), time))) * 2.0);
+		snoise(vec3f((uv + 4.0), time)),
+		snoise(vec3f((uv + 5.0), time))) * 2.0);
 
 	warpedUv.x -= pointerTrailColor.r;
 	warpedUv.y -= pointerTrailColor.g;
 	warpedUv.x += pointerTrailColor.b;
 	warpedUv.y += pointerTrailColor.a;
 
-	let turbulence = snoise(vec3f((warpedUv + seed + 6.0) * turbulenceScale, time * 0.5));
+	let turbulence = snoise(vec3f((warpedUv + 6.0) * turbulenceScale, time * 0.5));
 
 	let power = ((warpedUv.x - uv.x) + (warpedUv.y - uv.y) + turbulence) / 3.0; // 3つの成分を混ぜるので-1 ~ +1の範囲にするために3で割る
 
 	let sourceColor = select(vec4f(0.0), getSourceColor((aspectUv)), uniforms.hasSource == 1);
 	let sourceColorWarped = select(vec4f(0.0), getSourceColor((aspectUv + ((warpedUv + turbulence) * 0.125))), uniforms.hasSource == 1);
 
-	var noiseA = snoiseFractal(vec3f((warpedUv + seed + 1.0 + turbulence) * noiseScale, time * 0.5));
-	var noiseB = snoiseFractal(vec3f((warpedUv + seed + 2.0 + turbulence) * noiseScale, time * 0.4));
-	var noiseC = snoiseFractal(vec3f((warpedUv + seed + 3.0 + turbulence) * noiseScale, time * 0.3));
+	var noiseA = snoiseFractal(vec3f((warpedUv + 1.0 + turbulence) * noiseScale, time * 0.5));
+	var noiseB = snoiseFractal(vec3f((warpedUv + 2.0 + turbulence) * noiseScale, time * 0.4));
+	var noiseC = snoiseFractal(vec3f((warpedUv + 3.0 + turbulence) * noiseScale, time * 0.3));
 
 	if (uniforms.pallette == 0) {
 		var c = select(vec3f(1.0, 1.0, 1.0), vec3f(sourceColorWarped.r, sourceColorWarped.g, sourceColorWarped.b), uniforms.hasSource == 1);
@@ -373,7 +372,7 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 		c = mix(c, blendLightenVec3f(c, mix(vec3f(0.3, 0.3, 0.0), vec3f(0.0, 0.5, 0.0), remap(noiseB % (1.0 - noiseB), 0.0, (1.0 - noiseB), 0.0, 1.0))), noiseB * 2.0 * uniforms.channelBFactor);
 		c = mix(c, blendLightenVec3f(c, mix(vec3f(0.8, 0.8, 0.0), vec3f(0.8, 0.4, 0.0), remap(noiseC % (1.0 - noiseC), 0.0, (1.0 - noiseC), 0.0, 1.0))), noiseC * 6.0 * uniforms.channelCFactor);
 
-		c = mix(c, normalize(c), snoise(vec3f((uv + seed + 4.0), time)));
+		c = mix(c, normalize(c), snoise(vec3f((uv + 4.0), time)));
 		//c = normalize(c);
 
 		c = blendSubtractVec3f(c, vec3f(0.5));
@@ -409,7 +408,7 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 		//	c = blendNormalVec3f(c, mix(vec3f(0.0, 0.0, 1.0), vec3f(0.0, 0.0, 0.0), remap(noiseC % 0.1, 0.0, 0.1, 0.0, 1.0)));
 		//}
 
-		//let _a = snoise0to1(vec3f((uv + seed + 4.0), time)) + (power * 0.7);
+		//let _a = snoise0to1(vec3f((uv + 4.0), time)) + (power * 0.7);
 		let _a = max(0.03, 0.3 + (power * 0.8));
 		let _b = 0.4 + (power * 0.8);
 		let _c = 0.5 + (power * 0.8);
@@ -449,7 +448,7 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 		//c = mix(c, blendLightenVec3f(c, mix(vec3f(0.3, 0.3, 0.0), vec3f(0.0, 0.5, 0.0), remap(noiseB % (1.0 - noiseB), 0.0, (1.0 - noiseB), 0.0, 1.0))), noiseB * 2.0 * uniforms.channelBFactor);
 		//c = mix(c, blendLightenVec3f(c, mix(vec3f(0.8, 0.8, 0.0), vec3f(0.8, 0.4, 0.0), remap(noiseC % (1.0 - noiseC), 0.0, (1.0 - noiseC), 0.0, 1.0))), noiseC * 6.0 * uniforms.channelCFactor);
 
-		//c = mix(c, normalize(c), snoise(vec3f((uv + seed + 4.0), time)));
+		//c = mix(c, normalize(c), snoise(vec3f((uv + 4.0), time)));
 		//c = normalize(c);
 
 		c = blendSubtractVec3f(c, vec3f(0.5));
@@ -531,15 +530,14 @@ const goldenAngle = 2.399963229728653; // radians
 
 fn getBlurRadius(_uv: vec2f) -> f32 {
 	let time = blurCommonUniforms.time * 0.00005;
-	let seed = 1000.0;
 	var uv = scaleUvToCoverGivenAspectRatio(_uv, blurCommonUniforms.aspectRatio);
 	uv *= blurCommonUniforms.scale;
 
 	var pointerTrailColor = textureSample(pointerTrailTextureForBlur, targetSampler, convertTexCoords(_uv));
 
 	var warpedUv = uv + (vec2f(
-		snoise(vec3f((uv + seed + 4.0), time)),
-		snoise(vec3f((uv + seed + 5.0), time))) * 2.0);
+		snoise(vec3f((uv + 4.0), time)),
+		snoise(vec3f((uv + 5.0), time))) * 2.0);
 
 	warpedUv.x -= pointerTrailColor.r;
 	warpedUv.y -= pointerTrailColor.g;
@@ -547,7 +545,7 @@ fn getBlurRadius(_uv: vec2f) -> f32 {
 	warpedUv.y += pointerTrailColor.a;
 
 	let turbulenceScale = 0.75 * blurUniforms.turbulenceScale;
-	let turbulence = snoise(vec3f((warpedUv + seed + 6.0) * turbulenceScale, time * 0.5));
+	let turbulence = snoise(vec3f((warpedUv + 6.0) * turbulenceScale, time * 0.5));
 
 	var r = ((warpedUv.x - uv.x) + (warpedUv.y - uv.y) + turbulence) / 3.0; // 3つの成分を混ぜるので-1 ~ +1の範囲にするために3で割る
 	r += blurUniforms.extend;
@@ -597,7 +595,7 @@ fn fsBlur(fragData: VertexOut) -> @location(0) vec4f {
 				sampleUv.y = clamp(sampleUv.y, -1.0, 1.0);
 			}
 			result += textureSample(targetTexture, targetSampler, convertTexCoords(sampleUv)) * weight;
-			//result += vec3f(snoiseFractal(vec3f((uv + offset + seed + 1.0) * 0.75, time * 0.5))) * weight;
+			//result += vec3f(snoiseFractal(vec3f((uv + offset + 1.0) * 0.75, time * 0.5))) * weight;
 			totalSamples += weight;
 		}
 
