@@ -28,8 +28,8 @@
 	<hr>
 
 	<label>
-		<b>Time factor:</b>
-		<input type="range" min="0" max="4" step="0.1" v-model="timeFactor" /> {{ timeFactor }}
+		<b>Time speed:</b>
+		<input type="range" min="-4" max="4" step="0.1" v-model="timeFactor" /> {{ timeFactor }}
 	</label>
 	<label>
 		<b>Pixel ratio:</b>
@@ -131,12 +131,14 @@ async function init() {
 
 	let disposed = false;
 	let latestTimestamp = performance.now();
+	let time = initialTime;
 
 	function render(timeStamp: number) {
 		if (disposed) return;
-		const time = (initialTime + Math.floor(timeStamp)) * timeFactor.value;
+		const timeDelta = timeStamp - latestTimestamp;
+		time += (timeDelta * timeFactor.value);
 		const commandEncoder = device.createCommandEncoder();
-		playgroundInstance.render({ commandEncoder, time, timeDelta: Math.max(0, timeStamp - latestTimestamp) });
+		playgroundInstance.render({ commandEncoder, time, timeDelta });
 		device.queue.submit([commandEncoder.finish()]);
 		latestTimestamp = timeStamp;
 	}
