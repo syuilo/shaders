@@ -28,9 +28,7 @@ export const playground = definePlayground({
 		channelAFactor: { type: 'range', min: -4, max: 4, step: 0.1, label: 'Channel A Factor' },
 		channelBFactor: { type: 'range', min: -4, max: 4, step: 0.1, label: 'Channel B Factor' },
 		channelCFactor: { type: 'range', min: -4, max: 4, step: 0.1, label: 'Channel C Factor' },
-		turbulenceEnabled: { type: 'boolean', label: 'Turbulence Enabled' },
 		turbulenceScale: { type: 'range', min: 0, max: 32, step: 0.1, label: 'Turbulence Scale' },
-		blurTurbulenceEnabled: { type: 'boolean', label: 'Blur Turbulence Enabled' },
 		blurStrength: { type: 'range', min: 0, max: 3, step: 0.1, label: 'Blur Strength' },
 		blurExtend: { type: 'range', min: -1, max: 1, step: 0.01, label: 'Blur Extend' },
 		blurQuality: { type: 'range', min: 0, max: 1, step: 0.01, label: 'Blur Quality' },
@@ -46,14 +44,12 @@ export const playground = definePlayground({
 	getDefaultParams: () => ({
 		source: null,
 		scale: 1.0,
-		turbulenceEnabled: true,
 		turbulenceScale: 1.5,
 		pallette: 'cider',
 		discardThreshold: -0.2,
 		channelAFactor: 1.0,
 		channelBFactor: 1.0,
 		channelCFactor: 1.0,
-		blurTurbulenceEnabled: true,
 		blurStrength: 1.0,
 		blurExtend: 0.0,
 		blurQuality: 0.25,
@@ -299,7 +295,6 @@ export const playground = definePlayground({
 						scale: params.scale,
 						aspectRatio: width / height,
 						time: ctx.time,
-						turbulenceEnabled: params.turbulenceEnabled ? 1.0 : 0.0,
 						turbulenceScale: params.turbulenceScale,
 						pallette:
 							params.pallette === 'colorful' ? 0.0 :
@@ -340,7 +335,6 @@ export const playground = definePlayground({
 					{ // two-pass blur pass - horizontal
 						blurHorizontalUniformValues.set({
 							isHorizontal: 1.0,
-							turbulenceEnabled: params.blurTurbulenceEnabled ? 1.0 : 0.0,
 							turbulenceScale: params.turbulenceScale,
 							strength: params.blurStrength,
 							extend: params.blurExtend,
@@ -375,7 +369,6 @@ export const playground = definePlayground({
 					{ // two-pass blur pass - vertical
 						blurVerticalUniformValues.set({
 							isHorizontal: 0.0,
-							turbulenceEnabled: params.blurTurbulenceEnabled ? 1.0 : 0.0,
 							turbulenceScale: params.turbulenceScale,
 							strength: params.blurStrength,
 							extend: params.blurExtend,
@@ -409,7 +402,6 @@ export const playground = definePlayground({
 				} else {
 					{ // blur pass
 						blurUniformValues.set({
-							turbulenceEnabled: params.blurTurbulenceEnabled ? 1.0 : 0.0,
 							turbulenceScale: params.turbulenceScale,
 							strength: params.blurStrength,
 							extend: params.blurExtend,

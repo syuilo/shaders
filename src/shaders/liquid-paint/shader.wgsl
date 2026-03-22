@@ -243,7 +243,6 @@ struct Uniforms {
 	scale: f32,
 	aspectRatio: f32,
 	time: f32,
-	turbulenceEnabled: u32,
 	turbulenceScale: f32,
 	pallette: u32,
 	discardThreshold: f32,
@@ -292,7 +291,7 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	warpedUv.x += pointerTrailColor.b;
 	warpedUv.y += pointerTrailColor.a;
 
-	let turbulence = select(0.0, snoise(vec3f((warpedUv + seed + 6.0) * turbulenceScale, time * 0.5)), uniforms.turbulenceEnabled == 1);
+	let turbulence = snoise(vec3f((warpedUv + seed + 6.0) * turbulenceScale, time * 0.5));
 
 	let power = ((warpedUv.x - uv.x) + (warpedUv.y - uv.y) + turbulence) / 3.0; // 3つの成分を混ぜるので-1 ~ +1の範囲にするために3で割る
 
@@ -512,7 +511,6 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 }
 
 struct BlurUniforms {
-	turbulenceEnabled: u32,
 	turbulenceScale: f32,
 	strength: f32,
 	extend: f32,
@@ -549,7 +547,7 @@ fn getBlurRadius(_uv: vec2f) -> f32 {
 	warpedUv.y += pointerTrailColor.a;
 
 	let turbulenceScale = 0.75 * blurUniforms.turbulenceScale;
-	let turbulence = select(0.0, snoise(vec3f((warpedUv + seed + 6.0) * turbulenceScale, time * 0.5)), blurUniforms.turbulenceEnabled == 1);
+	let turbulence = snoise(vec3f((warpedUv + seed + 6.0) * turbulenceScale, time * 0.5));
 
 	var r = ((warpedUv.x - uv.x) + (warpedUv.y - uv.y) + turbulence) / 3.0; // 3つの成分を混ぜるので-1 ~ +1の範囲にするために3で割る
 	r += blurUniforms.extend;
