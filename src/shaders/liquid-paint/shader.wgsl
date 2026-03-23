@@ -243,6 +243,7 @@ struct Uniforms {
 	scale: f32,
 	aspectRatio: f32,
 	time: f32,
+	scrollFactor: f32,
 	turbulenceScale: f32,
 	pallette: u32,
 	discardThreshold: f32,
@@ -272,6 +273,7 @@ fn getSourceColor(uv: vec2f) -> vec4f {
 @fragment
 fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	let time = uniforms.time * 0.00005;
+	let scroll = vec2f(0.0, uniforms.time * 0.0001 * uniforms.scrollFactor);
 	let noiseScale = 0.75;
 	let turbulenceScale = 0.75 * uniforms.turbulenceScale;
 
@@ -282,8 +284,8 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	//return pointerTrailColor;
 
 	var warpedUv = uv + (vec2f(
-		snoise(vec3f((uv + 4.0), time)),
-		snoise(vec3f((uv + 5.0), time))) * 2.0);
+		snoise(vec3f((uv + scroll + 4.0), time)),
+		snoise(vec3f((uv + scroll + 5.0), time))) * 2.0);
 
 	warpedUv.x -= pointerTrailColor.r;
 	warpedUv.y -= pointerTrailColor.g;
@@ -526,14 +528,15 @@ const goldenAngle = 2.399963229728653; // radians
 
 fn getBlurRadius(_uv: vec2f) -> f32 {
 	let time = blurCommonUniforms.time * 0.00005;
+	let scroll = vec2f(0.0, blurCommonUniforms.time * 0.0001 * blurCommonUniforms.scrollFactor);
 	var uv = scaleUvToCoverGivenAspectRatio(_uv, blurCommonUniforms.aspectRatio);
 	uv *= blurCommonUniforms.scale;
 
 	var pointerTrailColor = textureSample(pointerTrailTextureForBlur, targetSampler, convertTexCoords(_uv));
 
 	var warpedUv = uv + (vec2f(
-		snoise(vec3f((uv + 4.0), time)),
-		snoise(vec3f((uv + 5.0), time))) * 2.0);
+		snoise(vec3f((uv + scroll + 4.0), time)),
+		snoise(vec3f((uv + scroll + 5.0), time))) * 2.0);
 
 	warpedUv.x -= pointerTrailColor.r;
 	warpedUv.y -= pointerTrailColor.g;

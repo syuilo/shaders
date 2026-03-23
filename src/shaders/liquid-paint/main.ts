@@ -39,6 +39,7 @@ export const playground = definePlayground({
 		}, {
 			value: 'twoPass', label: 'Two Pass'
 		}]},
+		scrollFactor: { type: 'range', min: -2, max: 2, step: 0.1, label: 'Scroll Factor' },
 		test: { type: 'boolean', label: 'Test' },
 	},
 	getDefaultParams: () => ({
@@ -54,6 +55,7 @@ export const playground = definePlayground({
 		blurExtend: 0.0,
 		blurQuality: 0.25,
 		blurMethod: isIos ? 'twoPass' : 'standard',
+		scrollFactor: 0.0,
 		test: false,
 	}),
 	init: async ({ width, height, wgpu, params, canvas }) => {
@@ -295,6 +297,7 @@ export const playground = definePlayground({
 						scale: params.scale,
 						aspectRatio: width / height,
 						time: ctx.time,
+						scrollFactor: params.scrollFactor,
 						turbulenceScale: params.turbulenceScale,
 						pallette:
 							params.pallette === 'colorful' ? 0.0 :
