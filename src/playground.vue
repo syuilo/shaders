@@ -118,8 +118,7 @@ async function init() {
 
 	// 誰が見ても同じレンダリング結果になるように、開いた時間を基準にする
 	// ただそのままUNIX時間を入れると、秒数が大きすぎて浮動小数点数の関係で精度が落ちるため、1日間隔でループ
-	// また、re-initされたときもrequestAnimationFrameのtimeStampはリセットされず、そのままではズレが生じるため、あらかじめ現在のtimeStampを引いておく
-	const initialTime = (Date.now() % (1000 * 60 * 60 * 24)) - Math.floor(performance.now());
+	const initialTime = (Date.now() % (1000 * 60 * 60 * 24));
 
 	const playgroundInstance = await playgroundDef.value.init({
 		width: canvas.value.width,
@@ -136,7 +135,7 @@ async function init() {
 	function render(timeStamp: number) {
 		if (disposed) return;
 		const timeDelta = timeStamp - latestTimestamp;
-		time += (timeDelta * timeFactor.value);
+		time += Math.floor(timeDelta * timeFactor.value);
 		const commandEncoder = device.createCommandEncoder();
 		playgroundInstance.render({ commandEncoder, time, timeDelta });
 		device.queue.submit([commandEncoder.finish()]);
@@ -170,7 +169,7 @@ async function init() {
 	};
 }
 
-const debouncedInit = debouncePromise(init, 500);
+const debouncedInit = debouncePromise(init, 100);
 
 watch(
 	() => props.name,
