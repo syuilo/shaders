@@ -331,7 +331,6 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	let visibilityNoiseA = snoise0to1(vec3f(cellUv + scroll, time * 0.00000625));
 	let visibilityNoiseB = snoise0to1(vec3f(cellUv * 8.0, time * 0.00000625));
 	var threshold = 0.65;
-	//if (ripple > 0.5) threshold -= 0.1;
 	var visibility = select(0.0, 1.0, mix(visibilityNoiseA, visibilityNoiseB, 0.5) > threshold);
 	if (hasSource) {
 		visibility = select(0.0, 1.0, !discardSourceColor(sourceColor));
@@ -342,13 +341,6 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 		select(sourceColorLuminance, remap(sourceColorLuminance, 0.0, discardBrightPixelsThreshold, 0.0, 1.0), uniforms.discardBrightPixels == 1), // discardBrightPixelsでスキップした範囲の分だけ範囲を圧縮する
 		hasSource);
 
-	//float ripple = getRipple(cellUv);
-
-	//if (ripple > 0.5) {
-	//	texSelector += 0.25;
-	//	//texSelector *= 1.5;
-	//	texSelector = min(texSelector, 1.0);
-	//}
 	if (pointerForce > 0.0) {
 		texSelector += pointerForce * 0.25;
 		texSelector = min(texSelector, 1.0);
@@ -359,9 +351,6 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	let scaleNoise = select(snoise0to1(vec3f(cellUv * 0.7, time * 0.0000125)), 1.0, hasSource);
 	var scale = select(0.4, 1.0, scaleNoise > 0.25);
 	scale = min(scale, 1.0 - border);
-	//if (ripple > 0.5) {
-	//	scale = 1.0;
-	//}
 
 	let margin = (1.0 - (0.5 + (scale * 0.5))) * cellSize;
 	let transformedCoords = (modUv - margin) / (cellSize - (margin * 2.0));
