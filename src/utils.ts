@@ -122,7 +122,7 @@ type GetOptionsSchemaValues<T extends OptionsSchema> = {
 	[K in keyof T]:
 	T[K] extends NumberOptionSchema ? number :
 	T[K] extends BooleanOptionSchema ? boolean :
-	T[K] extends ColorOptionSchema ? [number, number, number] :
+	T[K] extends ColorOptionSchema ? Readonly<[number, number, number]> :
 	T[K] extends EnumOptionSchema ? T[K]['enum'][number]['value'] :
 	T[K] extends RangeOptionSchema ? number :
 	T[K] extends MediaOptionSchema ? Media | null :
