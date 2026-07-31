@@ -2,5 +2,5 @@ import type { PlaygroundMetadata } from '@/utils.ts';
 
 export const metadata = {
 	title: 'Colors',
-	isPublic: true,
+	isPublic: false,
 } satisfies PlaygroundMetadata;
