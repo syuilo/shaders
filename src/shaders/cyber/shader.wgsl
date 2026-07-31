@@ -189,10 +189,8 @@ struct Uniforms {
 	symbolTexturesRangeMin: f32,
 	symbolTexturesRangeMax: f32,
 	pointerPosition: vec2f,
-	hasSource: u32,
 	sourceAspectRatio: f32,
 	discardBrightPixels: u32,
-	enableSampledCellJoining: u32,
 	coverSource: u32,
 	bgColor: vec3f,
 	colorA: vec3f,
@@ -260,7 +258,6 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	let time = uniforms.time;
 	let u_seed = 1000.0;
 	let scroll = vec2f(0.0, -time * 0.0001);
-	let hasSource = uniforms.hasSource == 1;
 
 	let uv = scaleUvToCoverGivenAspectRatio(fragData.uv, uniforms.aspectRatio);
 
@@ -294,28 +291,14 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	let similar2 = !discardSourceColor(getSourceColor(cellUv2)) && isSimilar(sourceColorA2, sourceColorB2, sourceColorC2, sourceColorD2, 0.1);
 	let similar4 = !discardSourceColor(getSourceColor(cellUv4)) && isSimilar(sourceColorA4, sourceColorB4, sourceColorC4, sourceColorD4, 0.025);
 
-	if (hasSource && uniforms.enableSampledCellJoining == 1) {
-		if (similar4) {
-			modUv = modVec2f(uv, cellSize * 4.0);
-			cellSize = cellSize * 4.0;
-			border /= 4.0;
-		} else if (similar2) {
-			modUv = modVec2f(uv, cellSize * 2.0);
-			cellSize = cellSize * 2.0;
-			border /= 2.0;
-		}
-	} else {
-		let cellMultiplier2Noise = snoise0to1(vec3f(cellUv2.x * 3.0, cellUv2.y * 3.0, time * 0.000025));
-		let cellMultiplier4Noise = snoise0to1(vec3f(cellUv4.x * 3.0, cellUv4.y * 3.0, time * 0.000025));
-		if (cellMultiplier4Noise > 0.9) {
-			modUv = modVec2f(uv, cellSize * 4.0);
-			cellSize = cellSize * 4.0;
-			border /= 4.0;
-		} else if (cellMultiplier2Noise > 0.75) {
-			modUv = modVec2f(uv, cellSize * 2.0);
-			cellSize = cellSize * 2.0;
-			border /= 2.0;
-		}
+	if (similar4) {
+		modUv = modVec2f(uv, cellSize * 4.0);
+		cellSize = cellSize * 4.0;
+		border /= 4.0;
+	} else if (similar2) {
+		modUv = modVec2f(uv, cellSize * 2.0);
+		cellSize = cellSize * 2.0;
+		border /= 2.0;
 	}
 
 	let cellUv = getPixelatedUv(uv, cellSize);
@@ -332,14 +315,9 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	let visibilityNoiseB = snoise0to1(vec3f(cellUv * 8.0, time * 0.00000625));
 	var threshold = 0.65;
 	var visibility = select(0.0, 1.0, mix(visibilityNoiseA, visibilityNoiseB, 0.5) > threshold);
-	if (hasSource) {
-		visibility = select(0.0, 1.0, !discardSourceColor(sourceColor));
-	}
+	visibility = select(0.0, 1.0, !discardSourceColor(sourceColor));
 
-	var texSelector = select(
-		snoise0to1(vec3f((cellUv * 3.0) + scroll, time * 0.00001)),
-		select(sourceColorLuminance, remap(sourceColorLuminance, 0.0, discardBrightPixelsThreshold, 0.0, 1.0), uniforms.discardBrightPixels == 1), // discardBrightPixelsでスキップした範囲の分だけ範囲を圧縮する
-		hasSource);
+	var texSelector = select(sourceColorLuminance, remap(sourceColorLuminance, 0.0, discardBrightPixelsThreshold, 0.0, 1.0), uniforms.discardBrightPixels == 1); // discardBrightPixelsでスキップした範囲の分だけ範囲を圧縮する
 
 	if (pointerForce > 0.0) {
 		texSelector += pointerForce * 0.25;
@@ -348,15 +326,11 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 
 	texSelector = remap(texSelector, 0.0, 1.0, uniforms.symbolTexturesRangeMin, uniforms.symbolTexturesRangeMax);
 
-	let scaleNoise = select(snoise0to1(vec3f(cellUv * 0.7, time * 0.0000125)), 1.0, hasSource);
-	var scale = select(0.4, 1.0, scaleNoise > 0.25);
-	scale = min(scale, 1.0 - border);
+	var scale = min(1.0, 1.0 - border);
 
 	let margin = (1.0 - (0.5 + (scale * 0.5))) * cellSize;
 	let transformedCoords = (modUv - margin) / (cellSize - (margin * 2.0));
 	var out_color = textureSample(symbolTextures, mySampler, transformedCoords, u32(texSelector * f32(uniforms.symbolTexturesCount)));
-
-	let colorNoise = snoise0to1(vec3f((cellUv * 8.0) + scroll, time * 0.000025));
 
 	// background dots and blocks
 	if (visibility == 0.0) {
@@ -382,48 +356,27 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 		return premultiplyAlpha(vec4f(vec3f(uniforms.bgColor), 1.0));
 	}
 
-	if (hasSource) {
-		if ((sourceColor.r + sourceColor.g + sourceColor.b) / 3.0 > 0.7) { // apply colorA
-			out_color.r = uniforms.colorA.r;
-			out_color.g = uniforms.colorA.g;
-			out_color.b = uniforms.colorA.b;
-		} else if (sourceColor.r > 0.75) { // apply colorC
-			out_color.r = uniforms.colorC.r;
-			out_color.g = uniforms.colorC.g;
-			out_color.b = uniforms.colorC.b;
-		} else if (sourceColor.g > 0.4) { // apply colorB
-			out_color.r = uniforms.colorB.r;
-			out_color.g = uniforms.colorB.g;
-			out_color.b = uniforms.colorB.b;
-		} else if ((sourceColor.r + sourceColor.g + sourceColor.b) / 3.0 < 0.2) { // apply colorA with lower opacity
-			out_color.r = uniforms.colorA.r;
-			out_color.g = uniforms.colorA.g;
-			out_color.b = uniforms.colorA.b;
-			out_color.a *= 0.7;
-		} else { // apply colorA
-			out_color.r = uniforms.colorA.r;
-			out_color.g = uniforms.colorA.g;
-			out_color.b = uniforms.colorA.b;
-		}
-	} else {
-		if (colorNoise > 0.9) { // apply colorC
-			out_color.r = uniforms.colorC.r;
-			out_color.g = uniforms.colorC.g;
-			out_color.b = uniforms.colorC.b;
-		} else if (colorNoise > 0.7) { // apply colorB
-			out_color.r = uniforms.colorB.r;
-			out_color.g = uniforms.colorB.g;
-			out_color.b = uniforms.colorB.b;
-		} else if (colorNoise > 0.35) { // apply colorA
-			out_color.r = uniforms.colorA.r;
-			out_color.g = uniforms.colorA.g;
-			out_color.b = uniforms.colorA.b;
-		} else { // apply colorA with lower opacity
-			out_color.r = uniforms.colorA.r;
-			out_color.g = uniforms.colorA.g;
-			out_color.b = uniforms.colorA.b;
-			out_color.a *= 0.3;
-		}
+	if ((sourceColor.r + sourceColor.g + sourceColor.b) / 3.0 > 0.7) { // apply colorA
+		out_color.r = uniforms.colorA.r;
+		out_color.g = uniforms.colorA.g;
+		out_color.b = uniforms.colorA.b;
+	} else if (sourceColor.r > 0.75) { // apply colorC
+		out_color.r = uniforms.colorC.r;
+		out_color.g = uniforms.colorC.g;
+		out_color.b = uniforms.colorC.b;
+	} else if (sourceColor.g > 0.4) { // apply colorB
+		out_color.r = uniforms.colorB.r;
+		out_color.g = uniforms.colorB.g;
+		out_color.b = uniforms.colorB.b;
+	} else if ((sourceColor.r + sourceColor.g + sourceColor.b) / 3.0 < 0.2) { // apply colorA with lower opacity
+		out_color.r = uniforms.colorA.r;
+		out_color.g = uniforms.colorA.g;
+		out_color.b = uniforms.colorA.b;
+		out_color.a *= 0.7;
+	} else { // apply colorA
+		out_color.r = uniforms.colorA.r;
+		out_color.g = uniforms.colorA.g;
+		out_color.b = uniforms.colorA.b;
 	}
 
 	if (visibility == 0.0) {
