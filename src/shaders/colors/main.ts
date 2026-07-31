@@ -1,9 +1,10 @@
 import code from './shader.wgsl?raw';
+import { metadata } from './meta.ts';
 import { makeShaderDataDefinitions, makeStructuredView } from 'webgpu-utils';
 import { definePlayground } from '@/utils.ts';
 
 export const playground = definePlayground({
-	title: 'Colors',
+	...metadata,
 	params: {
 		scale: { type: 'range', min: 0.1, max: 4, step: 0.1, label: 'Scale' },
 	},

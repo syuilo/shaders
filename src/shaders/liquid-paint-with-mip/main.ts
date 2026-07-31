@@ -1,9 +1,10 @@
 import code from './shader.wgsl?raw';
+import { metadata } from './meta.ts';
 import { createTextureFromSource, generateMipmap, makeShaderDataDefinitions, makeStructuredView, numMipLevels } from 'webgpu-utils';
 import { definePlayground, isIos, remap } from '@/utils.ts';
 
 export const playground = definePlayground({
-	title: 'Liquid Paint',
+	...metadata,
 	params: {
 		source: { type: 'media', needReinit: true, label: 'Source' },
 		scale: { type: 'range', min: 0.1, max: 2, step: 0.1, label: 'Scale' },

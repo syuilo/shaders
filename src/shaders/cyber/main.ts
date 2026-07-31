@@ -1,9 +1,10 @@
 import code from './shader.wgsl?raw';
+import { metadata } from './meta.ts';
 import { createTextureFromImages, createTextureFromSource, makeShaderDataDefinitions, makeStructuredView } from 'webgpu-utils';
 import { definePlayground } from '@/utils.ts';
 
 export const playground = definePlayground({
-	title: 'Cyber',
+	...metadata,
 	params: {
 		source: { type: 'media', needReinit: true, label: 'Source' },
 		coverSource: { type: 'boolean', label: 'Cover Source' },

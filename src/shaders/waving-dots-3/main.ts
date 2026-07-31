@@ -1,9 +1,10 @@
 import code from './shader.wgsl?raw';
+import { metadata } from './meta.ts';
 import { makeShaderDataDefinitions, makeStructuredView } from 'webgpu-utils';
 import { definePlayground } from '@/utils.ts';
 
 export const playground = definePlayground({
-	title: 'Waving Dots 3',
+	...metadata,
 	params: {
 		divisions: { type: 'range', min: 8, max: 512, step: 1, label: 'Cell Divisions' },
 		waveScale: { type: 'range', min: 0, max: 32, step: 0.01, label: 'Wave Scale' },

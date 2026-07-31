@@ -138,8 +138,12 @@ export type PlaygroundInstance<Options = any> = {
 	dispose?: () => void;
 };
 
-export type Playground<OpSc extends OptionsSchema = OptionsSchema> = {
+export type PlaygroundMetadata = {
 	title: string;
+	isPublic: boolean;
+};
+
+export type Playground<OpSc extends OptionsSchema = OptionsSchema> = PlaygroundMetadata & {
 	params: OpSc;
 	getDefaultParams: () => GetOptionsSchemaValues<OpSc>;
 	init: (args: {
