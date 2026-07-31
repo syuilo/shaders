@@ -228,16 +228,17 @@ fn asymmetricPulse(
 }
 
 fn getV(uv: vec2f) -> f32 {
-	let noise = snoise0to1(vec3f(uv * 4.0, 0.0));
+	let phaseField = snoise0to1(vec3f(uv * 4.0, uniforms.time * 0.0001));
 
 	// 一方向へ進む成分
-	let direction = normalize(vec2(1.0, 0.35));
+	//let direction = normalize(vec2(1.0, 0.35));
+	let direction = normalize(uv);
 	let wavePosition = dot(uv, direction) * uniforms.waveScale;
 
 	let phase = fract(
 		uniforms.time * 0.0001
 		- wavePosition
-		+ noise * 0.35
+		+ phaseField * 0.35
 	);
 
 	return asymmetricPulse(
