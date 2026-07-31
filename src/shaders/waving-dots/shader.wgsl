@@ -241,8 +241,10 @@ fn getV(uv: vec2f) -> f32 {
 		+ phaseField * 0.35
 	);
 
+	let pulseFrequency = 3.0;
+
 	return asymmetricPulse(
-		phase,
+		phase * pulseFrequency,
 		0.025, // 立ち上がり時間。小さいほど急に大きくなる
 		4.0 // 大きいほど早く減衰する
 	);
