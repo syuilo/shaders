@@ -248,7 +248,7 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	let dist = distance(modUv, cellSize * 0.5);
 	let radius1 = clamp(v * 5.0, 0.0, 1.0);
 	let radius2 = clamp(v * 2.0, 0.0, 1.0);
-	let radius3 = clamp(max(0.0, v - 0.25) * 1.5, 0.0, 1.0);
+	let radius3 = clamp(max(0.0, v - 0.25) * 2.0, 0.0, 1.0);
 	let radius4 = max(0.0, v - 0.5) * 2.0;
 	let transparency = max(0.0, v - 0.75) * 4.0;
 
