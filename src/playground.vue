@@ -2,7 +2,7 @@
 <canvas ref="canvas" style="display: block; width: 100%; height: 100%; touch-action: none;"></canvas>
 <button id="menuButton" :class="hideMenuButton ? 'hide' : null" @click="showMenu = !showMenu">MENU</button>
 <div v-if="playgroundDef != null" v-show="showMenu" id="menu">
-	<h1><a href="./">syuil0's WebGPU Playground</a> - "{{ playgroundDef.title }}"</h1>
+	<h1><a href="./">syuilo's Shader Playground</a> - "{{ playgroundDef.title }}"</h1>
 
 	<label v-for="[k, s] in Object.entries(playgroundDef.params)" :key="k">
 		<b>{{ s.label }}</b>

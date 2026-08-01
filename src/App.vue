@@ -1,7 +1,7 @@
 <template>
 <XPlayground v-if="name != null" :name="name"/>
 <div v-else>
-	<h1>syuilo's Shader Playground</h1>
+	<h1>syuilo's Shader Playground (WebGPU)</h1>
 	<ul>
 		<li v-for="shader in shaders" :key="shader.name">
 			<a :href="`?${shader.name}`">{{ shader.title }}</a>
