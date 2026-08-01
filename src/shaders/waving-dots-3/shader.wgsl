@@ -151,31 +151,14 @@ fn linearRisePulse(
 	riseLength: f32,
 ) -> f32 {
 	let _phase = fract(phase);
-
-	// 1周期の最後の riseLength 区間で 0→1
-	let riseStart = 1.0 - riseLength;
-
-	return clamp(
-		(_phase - riseStart) / riseLength,
-		0.0,
-		1.0
-	);
+	let riseStart = 1.0 - riseLength; // 1周期の最後の riseLength 区間で 0→1
+	return clamp((_phase - riseStart) / riseLength, 0.0, 1.0);
 }
 
 fn getV(uv: vec2f) -> f32 {
 	let phaseField = snoise(vec3f(uv * uniforms.waveScale, uniforms.time * 0.00001));
-
-	// 一方向へ進む成分
-	//let direction = normalize(vec2(1.0, 0.35));
-	let direction = normalize(uv);
-
-	let phase = fract(
-		uniforms.time * 0.00005
-		+ phaseField
-	);
-
+	let phase = fract((uniforms.time * 0.00005) + phaseField);
 	let pulseFrequency = 3.0;
-
 	return linearRisePulse(phase * pulseFrequency, 0.3);
 }
 
