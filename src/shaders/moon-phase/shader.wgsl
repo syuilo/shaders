@@ -24,6 +24,10 @@ fn vs(@builtin(vertex_index) vertexIndex: u32) -> VertexOut {
 	return output;
 }
 
+const PI = 3.141592653589793;
+const TWO_PI = 6.283185307179586;
+const HALF_PI = 1.5707963267948966;
+
 // equivalent to GLSL's mod function
 fn modVec2f(a: vec2f, b: vec2f) -> vec2f {
 	return a - b * floor(a / b);
@@ -98,7 +102,9 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	let subDelay = 0.25;
 	let subFactor = 1.05;
 	let subPosOffset = vec2f(0.07, -0.07);
-	let subDist = distance(modUv, (cellSize * 0.5) + (subPosOffset * (cellSize * 0.5)));
+	let subPosOffsetRotation = (rand(cellUv) * TWO_PI) + (uniforms.time * 0.0001);
+	let subPosOffsetRotated = vec2f(subPosOffset.x * cos(subPosOffsetRotation) - subPosOffset.y * sin(subPosOffsetRotation), subPosOffset.x * sin(subPosOffsetRotation) + subPosOffset.y * cos(subPosOffsetRotation));
+	let subDist = distance(modUv, (cellSize * 0.5) + (subPosOffsetRotated * (cellSize * 0.5)));
 	let radiusSub = (((v - subDelay) / (1.0 - subDelay)) * subFactor) + uniforms.outlineWidth;
 	if (dist < radiusMain * (cellSize.x * 0.5)) { color = vec4f(uniforms.color, 1.0); }
 	if (subDist < radiusSub * (cellSize.x * 0.5)) { color = vec4f(0.0, 0.0, 0.0, 0.0); }
