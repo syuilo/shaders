@@ -169,18 +169,8 @@ fn asymmetricPulse(
 
 fn getV(uv: vec2f) -> f32 {
 	let phaseField = snoise(vec3f(uv * uniforms.waveScale, uniforms.time * 0.00001));
-
-	// 一方向へ進む成分
-	//let direction = normalize(vec2(1.0, 0.35));
-	let direction = normalize(uv);
-
-	let phase = fract(
-		uniforms.time * 0.0001
-		+ phaseField
-	);
-
+	let phase = fract((uniforms.time * 0.0001) + phaseField);
 	let pulseFrequency = 3.0;
-
 	return asymmetricPulse(
 		phase * pulseFrequency,
 		0.025, // 立ち上がり時間。小さいほど急に大きくなる
