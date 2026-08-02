@@ -73,9 +73,10 @@ fn linearRisePulse(
 fn getV(uv: vec2f) -> f32 {
 	//let divisions = uniforms.divisions;
 	//let lengthField = ((uv.x * 0.5) + (uv.y * 0.5) * divisions) / (divisions * divisions);
-	let length = max(rand(uv), 0.1);
-	let phase = fract(uniforms.time * 0.001 * length);
-	return linearRisePulse(phase, length);
+	let dutyCycleFactor = 0.25;
+	let dutyCycle = max(rand(uv), 0.1) * dutyCycleFactor;
+	let phase = fract(uniforms.time * 0.001 * dutyCycle);
+	return linearRisePulse(phase, dutyCycle);
 }
 
 @fragment
