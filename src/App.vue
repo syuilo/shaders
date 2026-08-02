@@ -1,5 +1,7 @@
 <template>
-<XPlayground v-if="name != null" :name="name"/>
+<Suspense v-if="name != null">
+	<XPlayground :name="name" :key="name"/>
+</Suspense>
 <div v-else>
 	<h1>syuilo's Shader Playground (WebGPU)</h1>
 	<ul>

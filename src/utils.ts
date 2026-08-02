@@ -146,6 +146,8 @@ export type PlaygroundMetadata = {
 export type Playground<OpSc extends OptionsSchema = OptionsSchema> = PlaygroundMetadata & {
 	params: OpSc;
 	getDefaultParams: () => GetOptionsSchemaValues<OpSc>;
+	alpha?: boolean;
+	backgroundColor?: string;
 	init: (args: {
 		canvas: HTMLCanvasElement;
 		width: number;

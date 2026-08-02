@@ -1,5 +1,5 @@
 <template>
-<canvas ref="canvas" style="display: block; width: 100%; height: 100%; touch-action: none;"></canvas>
+<canvas id="canvas" ref="canvas" style="display: block; width: 100%; height: 100%; touch-action: none;"></canvas>
 <button id="menuButton" :class="hideMenuButton ? 'hide' : null" @click="showMenu = !showMenu">MENU</button>
 <div v-if="playgroundDef != null" v-show="showMenu" id="menu">
 	<h1><a href="./">syuilo's Shader Playground</a> - "{{ playgroundDef.title }}"</h1>
@@ -26,6 +26,13 @@
 	</label>
 
 	<hr>
+
+	<template v-if="playgroundDef.alpha">
+		<label>
+			<b>Background color:</b>
+			<input type="color" :value="bgColor" @input="v => { bgColor = v.target.value; }" />
+		</label>
+	</template>
 
 	<label>
 		<b>Time speed:</b>
@@ -60,8 +67,8 @@
 </template>
 
 <script lang="ts" setup>
-import { markRaw, onMounted, onUnmounted, reactive, ref, shallowRef, useTemplateRef, watch } from 'vue';
-import { debouncePromise, Playground, getHex, getRgb } from '@/utils.ts';
+import { markRaw, onMounted, onUnmounted, reactive, ref, useTemplateRef, watch } from 'vue';
+import { debouncePromise, getHex, getRgb, Playground } from '@/utils.ts';
 import XMedia from './media.vue';
 
 const props = defineProps<{
@@ -69,8 +76,9 @@ const props = defineProps<{
 }>();
 
 const canvas = useTemplateRef('canvas');
-const playgroundDef = shallowRef<Playground | null>(null);
-let params = reactive<Record<string, any>>({});
+const urlParams = new URLSearchParams(window.location.search);
+const playgroundDef = await import(`./shaders/${props.name}/main.ts`).then(module => module.playground as Playground);
+const params = reactive(playgroundDef.getDefaultParams());
 let dispose: (() => void) | null = null;
 
 async function init() {
@@ -78,7 +86,7 @@ async function init() {
 
 	if (dispose != null) dispose();
 	if (canvas.value == null) return;
-	if (playgroundDef.value == null) return;
+	if (playgroundDef == null) return;
 
 	const adapter = await navigator.gpu?.requestAdapter({
 		//powerPreference: 'low-power',
@@ -103,7 +111,7 @@ async function init() {
 	context.configure({
 		device,
 		format: navigator.gpu.getPreferredCanvasFormat(),
-		alphaMode: 'premultiplied',
+		alphaMode: playgroundDef.alpha ? 'premultiplied' : 'opaque',
 		colorSpace: 'display-p3',
 	});
 
@@ -120,7 +128,7 @@ async function init() {
 	// ただそのままUNIX時間を入れると、秒数が大きすぎて浮動小数点数の関係で精度が落ちるため、1日間隔でループ
 	const initialTime = (Date.now() % (1000 * 60 * 60 * 24));
 
-	const playgroundInstance = await playgroundDef.value.init({
+	const playgroundInstance = await playgroundDef.init({
 		width: canvas.value.width,
 		height: canvas.value.height,
 		wgpu: { device, context, sampler },
@@ -171,34 +179,24 @@ async function init() {
 
 const debouncedInit = debouncePromise(init, 100);
 
-watch(
-	() => props.name,
-	async name => {
-		playgroundDef.value = await import(`./shaders/${name}/main.ts`).then(module => module.playground);
-		params = reactive(playgroundDef.value.getDefaultParams());
-
-		const urlParams = new URLSearchParams(window.location.search);
-		for (const k of Object.keys(playgroundDef.value.params)) {
-			const urlValue = urlParams.getAll(k);
-			for (const v of urlValue) {
-				if (v != '') {
-					params[k] = JSON.parse(v);
-				}
-			}
+for (const k of Object.keys(playgroundDef.params)) {
+	const urlValue = urlParams.getAll(k);
+	for (const v of urlValue) {
+		if (v != '') {
+			params[k] = JSON.parse(v);
 		}
+	}
+}
 
-		for (const [k, v] of Object.entries(playgroundDef.value.params)) {
-			if (v.needReinit) {
-				watch(() => params[k], () => {
-					debouncedInit();
-				});
-			}
-		}
+for (const [k, v] of Object.entries(playgroundDef.params)) {
+	if (v.needReinit) {
+		watch(() => params[k], () => {
+			debouncedInit();
+		});
+	}
+}
 
-		debouncedInit();
-	},
-	{ immediate: true }
-);
+debouncedInit();
 
 const showMenu = ref(false);
 
@@ -207,11 +205,11 @@ const tryParseJson = (value: string | null, defa: any) => {
 	return JSON.parse(value);
 };
 
-const urlParams = new URLSearchParams(window.location.search);
 const hideMenuButton = ref(tryParseJson(urlParams.get('_hideMenuButton'), false));
 const timeFactor = ref(tryParseJson(urlParams.get('_timeFactor'), 1.0));
 const pixelRatio = ref(tryParseJson(urlParams.get('_pixelRatio'), 1.0));
 const fps = ref(tryParseJson(urlParams.get('_fps'), null));
+const bgColor = ref(tryParseJson(urlParams.get('_bgColor'), playgroundDef?.backgroundColor ?? '#000000'));
 
 onMounted(async () => {
 	const observer = new ResizeObserver(entries => {
@@ -234,5 +232,7 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-
+#canvas {
+	background-color: v-bind("bgColor");
+}
 </style>
