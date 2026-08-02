@@ -56,7 +56,9 @@ fn scaleUvToCoverGivenAspectRatio(uv: vec2f, aspectRatio: f32) -> vec2f {
 }
 
 fn rand(uv: vec2<f32>) -> f32 {
-    return fract(sin(dot(uv, vec2<f32>(12.9898, 78.233))) * 43758.5453);
+	var p3 = fract(vec3<f32>(uv.xyx) * 0.1031);
+	p3 += dot(p3, p3.yzx + 33.33);
+	return fract((p3.x + p3.y) * p3.z);
 }
 
 fn linearRisePulse(
@@ -69,22 +71,11 @@ fn linearRisePulse(
 }
 
 fn getV(uv: vec2f) -> f32 {
-	let divisions = uniforms.divisions;
-
+	//let divisions = uniforms.divisions;
 	//let lengthField = ((uv.x * 0.5) + (uv.y * 0.5) * divisions) / (divisions * divisions);
-	let length = rand(uv);
-
-	let phase = fract(
-		uniforms.time * 0.001
-		* length
-	);
-
-	let pulseFrequency = 1.0;
-
-	return linearRisePulse(
-		phase * pulseFrequency,
-		length
-	);
+	let length = max(rand(uv), 0.1);
+	let phase = fract(uniforms.time * 0.001 * length);
+	return linearRisePulse(phase, length);
 }
 
 @fragment
