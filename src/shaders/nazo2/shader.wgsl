@@ -82,8 +82,11 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 
 	var color = vec3f(0.0, 0.0, 0.0);
 	let dist = distance(modUv, cellSize * 0.5);
-	let radius = v;
-	if (dist < radius * (cellSize.x * 0.5)) { color = vec3f(1.0, 1.0, 1.0); }
+	let radiusMain = v;
+	let subDelay = 0.25;
+	let radiusSub = (v - subDelay) / (1.0 - subDelay);
+	if (dist < radiusMain * (cellSize.x * 0.5)) { color = vec3f(1.0, 1.0, 1.0); }
+	if (dist < radiusSub * (cellSize.x * 0.5)) { color = vec3f(0.0, 0.0, 0.0); }
 
 	return vec4f(color, 1.0);
 	//return vec4f(uv + 1.0, 0.0, 1.0);
