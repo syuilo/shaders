@@ -115,10 +115,6 @@ fn modVec2f(a: vec2f, b: vec2f) -> vec2f {
 	return a - b * floor(a / b);
 }
 
-fn premultiplyAlpha(color: vec4f) -> vec4f {
-	return vec4f(color.rgb * color.a, color.a);
-}
-
 struct Uniforms {
 	aspectRatio: f32,
 	time: f32,

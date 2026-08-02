@@ -185,10 +185,6 @@ fn modf32(a: f32, b: f32) -> f32 {
 	return a - b * floor(a / b);
 }
 
-fn premultiplyAlpha(color: vec4f) -> vec4f {
-	return vec4f(color.rgb * color.a, color.a);
-}
-
 // https://docs.arduino.cc/language-reference/en/functions/math/map/
 fn remap(value: f32, inMin: f32, inMax: f32, outMin: f32, outMax: f32) -> f32 {
 	return (value - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;

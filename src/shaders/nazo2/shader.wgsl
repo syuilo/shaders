@@ -29,10 +29,6 @@ fn modVec2f(a: vec2f, b: vec2f) -> vec2f {
 	return a - b * floor(a / b);
 }
 
-fn premultiplyAlpha(color: vec4f) -> vec4f {
-	return vec4f(color.rgb * color.a, color.a);
-}
-
 struct Uniforms {
 	aspectRatio: f32,
 	time: f32,
@@ -41,11 +37,6 @@ struct Uniforms {
 };
 
 @group(0) @binding(1) var<uniform> uniforms: Uniforms;
-
-// https://docs.arduino.cc/language-reference/en/functions/math/map/
-fn remap(value: f32, inMin: f32, inMax: f32, outMin: f32, outMax: f32) -> f32 {
-	return (value - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
-}
 
 fn getPixelatedUv(uv: vec2f, cellSize: vec2f) -> vec2f {
 	return (cellSize * floor(uv / cellSize)) + (cellSize / 2.0);
