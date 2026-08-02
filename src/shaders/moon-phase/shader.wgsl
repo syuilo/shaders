@@ -49,11 +49,6 @@ fn premultiplyAlpha(color: vec4f) -> vec4f {
 	return vec4f(color.rgb * color.a, color.a);
 }
 
-// https://docs.arduino.cc/language-reference/en/functions/math/map/
-fn remap(value: f32, inMin: f32, inMax: f32, outMin: f32, outMax: f32) -> f32 {
-	return (value - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
-}
-
 fn getPixelatedUv(uv: vec2f, cellSize: vec2f) -> vec2f {
 	return (cellSize * floor(uv / cellSize)) + (cellSize / 2.0);
 }
@@ -78,8 +73,6 @@ fn linearRisePulse(
 }
 
 fn getV(uv: vec2f) -> f32 {
-	//let divisions = uniforms.divisions;
-	//let lengthField = ((uv.x * 0.5) + (uv.y * 0.5) * divisions) / (divisions * divisions);
 	let dutyCycleFactor = 0.25;
 	let dutyCycle = max(rand(uv), 0.1) * dutyCycleFactor;
 	let phase = fract(uniforms.time * 0.00015 * dutyCycle);
@@ -97,8 +90,11 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	let v = getV(cellUv + 1.0);
 
 	var color = vec4f(0.0, 0.0, 0.0, 0.0);
-	let dist = distance(modUv, cellSize * 0.5);
+
+	let mainDist = distance(modUv, cellSize * 0.5);
 	let radiusMain = v - uniforms.outlineWidth;
+	if (mainDist < radiusMain * (cellSize.x * 0.5)) { color = vec4f(uniforms.color, 1.0); }
+
 	let subDelay = 0.25;
 	let subFactor = 1.05;
 	let subPosOffset = vec2f(0.07, -0.07);
@@ -106,20 +102,15 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	let subPosOffsetRotated = vec2f(subPosOffset.x * cos(subPosOffsetRotation) - subPosOffset.y * sin(subPosOffsetRotation), subPosOffset.x * sin(subPosOffsetRotation) + subPosOffset.y * cos(subPosOffsetRotation));
 	let subDist = distance(modUv, (cellSize * 0.5) + (subPosOffsetRotated * (cellSize * 0.5)));
 	let radiusSub = (((v - subDelay) / (1.0 - subDelay)) * subFactor) + uniforms.outlineWidth;
-	if (dist < radiusMain * (cellSize.x * 0.5)) { color = vec4f(uniforms.color, 1.0); }
 	if (subDist < radiusSub * (cellSize.x * 0.5)) { color = vec4f(0.0, 0.0, 0.0, 0.0); }
 
-	let mainOutline = dist < (radiusMain + uniforms.outlineWidth) * (cellSize.x * 0.5) && dist > (radiusMain - uniforms.outlineWidth) * (cellSize.x * 0.5);
+	let mainOutline = mainDist < (radiusMain + uniforms.outlineWidth) * (cellSize.x * 0.5) && mainDist > (radiusMain - uniforms.outlineWidth) * (cellSize.x * 0.5);
 	let isSubInSide = subDist < radiusSub * (cellSize.x * 0.5);
-	if (mainOutline && !isSubInSide) {
-		color = vec4f(uniforms.outlineColor, 0.5);
-	}
+	if (mainOutline && !isSubInSide) { color = vec4f(uniforms.outlineColor, 0.5); }
 
 	let subOutline = subDist < (radiusSub + uniforms.outlineWidth) * (cellSize.x * 0.5) && subDist > (radiusSub - uniforms.outlineWidth) * (cellSize.x * 0.5);
-	let isMainInSide = dist < radiusMain * (cellSize.x * 0.5);
-	if (subOutline && isMainInSide) {
-		color = vec4f(uniforms.outlineColor, 0.5);
-	}
+	let isMainInSide = mainDist < radiusMain * (cellSize.x * 0.5);
+	if (subOutline && isMainInSide) { color = vec4f(uniforms.outlineColor, 0.5); }
 
 	let transparencyDelay = 0.75;
 	let transparency = max(0.0, v - transparencyDelay) / (1.0 - transparencyDelay);
