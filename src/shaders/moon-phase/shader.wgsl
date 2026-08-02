@@ -33,6 +33,9 @@ struct Uniforms {
 	aspectRatio: f32,
 	time: f32,
 	divisions: f32,
+	color: vec3f,
+	outlineWidth: f32,
+	outlineColor: vec3f,
 	test: u32,
 };
 
@@ -91,14 +94,26 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 
 	var color = vec4f(0.0, 0.0, 0.0, 0.0);
 	let dist = distance(modUv, cellSize * 0.5);
-	let radiusMain = v;
+	let radiusMain = v - uniforms.outlineWidth;
 	let subDelay = 0.25;
 	let subFactor = 1.05;
 	let subPosOffset = vec2f(0.07, -0.07);
 	let subDist = distance(modUv, (cellSize * 0.5) + (subPosOffset * (cellSize * 0.5)));
-	let radiusSub = ((v - subDelay) / (1.0 - subDelay)) * subFactor;
-	if (dist < radiusMain * (cellSize.x * 0.5)) { color = vec4f(1.0, 1.0, 1.0, 1.0); }
+	let radiusSub = (((v - subDelay) / (1.0 - subDelay)) * subFactor) + uniforms.outlineWidth;
+	if (dist < radiusMain * (cellSize.x * 0.5)) { color = vec4f(uniforms.color, 1.0); }
 	if (subDist < radiusSub * (cellSize.x * 0.5)) { color = vec4f(0.0, 0.0, 0.0, 0.0); }
+
+	let mainOutline = dist < (radiusMain + uniforms.outlineWidth) * (cellSize.x * 0.5) && dist > (radiusMain - uniforms.outlineWidth) * (cellSize.x * 0.5);
+	let isSubInSide = subDist < radiusSub * (cellSize.x * 0.5);
+	if (mainOutline && !isSubInSide) {
+		color = vec4f(uniforms.outlineColor, 0.5);
+	}
+
+	let subOutline = subDist < (radiusSub + uniforms.outlineWidth) * (cellSize.x * 0.5) && subDist > (radiusSub - uniforms.outlineWidth) * (cellSize.x * 0.5);
+	let isMainInSide = dist < radiusMain * (cellSize.x * 0.5);
+	if (subOutline && isMainInSide) {
+		color = vec4f(uniforms.outlineColor, 0.5);
+	}
 
 	let transparencyDelay = 0.75;
 	let transparency = max(0.0, v - transparencyDelay) / (1.0 - transparencyDelay);

@@ -6,13 +6,19 @@ import { definePlayground } from '@/utils.ts';
 export const playground = definePlayground({
 	...metadata,
 	alpha: true,
-	backgroundColor: '#cceeff',
+	backgroundColor: '#f7fcff',
 	params: {
 		divisions: { type: 'range', min: 8, max: 512, step: 1, label: 'Cell Divisions' },
+		color: { type: 'color', label: 'Color' },
+		outlineWidth: { type: 'range', min: 0.0, max: 0.05, step: 0.001, label: 'Outline Width' },
+		outlineColor: { type: 'color', label: 'Outline Color' },
 		test: { type: 'boolean', label: 'Test' },
 	},
 	getDefaultParams: () => ({
 		divisions: 8,
+		color: [0.88, 0.98, 1.0],
+		outlineWidth: 0.005,
+		outlineColor: [0.78, 0.88, 0.90],
 		test: false,
 	}),
 	init: async ({ width, height, wgpu, params, canvas }) => {
@@ -57,6 +63,9 @@ export const playground = definePlayground({
 					aspectRatio: width / height,
 					time: ctx.time,
 					divisions: params.divisions,
+					color: params.color,
+					outlineWidth: params.outlineWidth,
+					outlineColor: params.outlineColor,
 					test: params.test ? 1 : 0,
 				});
 				wgpu.device.queue.writeBuffer(uniformBuffer, 0, uniformValues.arrayBuffer);
