@@ -79,7 +79,7 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	let uv = scaleUvToCoverGivenAspectRatio(fragData.uv, uniforms.aspectRatio);
 	let cellSize = vec2f(1.0 / (uniforms.divisions * 0.5));
 
-	let subDelay = 0.25;
+	let subDelay = 0.125;
 
 	var color = vec4f(0.0, 0.0, 0.0, 0.0);
 
