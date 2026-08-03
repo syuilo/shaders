@@ -1,7 +1,8 @@
 <template>
-<canvas id="canvas" ref="canvas" style="display: block; width: 100%; height: 100%; touch-action: none;"></canvas>
+<div v-if="playgroundDef.alpha" id="bg" :class="{ 'animatedBg': animatedBg }"></div>
+<canvas id="canvas" ref="canvas" :class="{ 'animatedBg': animatedBg }"></canvas>
 <button id="menuButton" :class="hideMenuButton ? 'hide' : null" @click="showMenu = !showMenu">MENU</button>
-<div v-if="playgroundDef != null" v-show="showMenu" id="menu">
+<div v-show="showMenu" id="menu">
 	<h1><a href="./">syuilo's Shader Playground</a> - "{{ playgroundDef.title }}"</h1>
 
 	<label v-for="[k, s] in Object.entries(playgroundDef.params)" :key="k">
@@ -31,6 +32,10 @@
 		<label>
 			<b>Background color:</b>
 			<input type="color" :value="bgColor" @input="v => { bgColor = v.target.value; }" />
+		</label>
+		<label>
+			<b>Animated background:</b>
+			<input type="checkbox" v-model="animatedBg" />
 		</label>
 	</template>
 
@@ -210,6 +215,7 @@ const timeFactor = ref(tryParseJson(urlParams.get('_timeFactor'), 1.0));
 const pixelRatio = ref(tryParseJson(urlParams.get('_pixelRatio'), 1.0));
 const fps = ref(tryParseJson(urlParams.get('_fps'), null));
 const bgColor = ref(tryParseJson(urlParams.get('_bgColor'), playgroundDef?.backgroundColor ?? '#000000'));
+const animatedBg = ref(tryParseJson(urlParams.get('_animatedBg'), false));
 
 onMounted(async () => {
 	const observer = new ResizeObserver(entries => {
@@ -233,6 +239,32 @@ onUnmounted(() => {
 
 <style scoped>
 #canvas {
+	position: relative;
+	display: block;
+	width: 100%;
+	height: 100%;
+	touch-action: none;
+}
+
+#bg {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
 	background-color: v-bind("bgColor");
+}
+
+@keyframes bg {
+	0% { background-position: 0 0; }
+	100% { background-position: -30px -30px; }
+}
+
+.animatedBg {
+	--colorA: v-bind("bgColor");
+	--colorB: hsl(from var(--colorA) h s calc(l - 10));
+	background-image: repeating-conic-gradient(var(--colorA) 0% 25%, var(--colorB) 0% 50%);
+	background-size: 30px 30px;
+	animation: bg 1.2s linear infinite;
 }
 </style>
