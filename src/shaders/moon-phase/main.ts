@@ -8,7 +8,7 @@ export const playground = definePlayground({
 	alpha: true,
 	backgroundColor: '#f7fcff',
 	params: {
-		divisions: { type: 'range', min: 8, max: 512, step: 1, label: 'Cell Divisions' },
+		divisions: { type: 'range', min: 1, max: 64, step: 1, label: 'Cell Divisions' },
 		color: { type: 'color', label: 'Color' },
 		outlineWidth: { type: 'range', min: 0.0, max: 0.05, step: 0.001, label: 'Outline Width' },
 		outlineColor: { type: 'color', label: 'Outline Color' },
