@@ -37,6 +37,7 @@ struct Uniforms {
 	aspectRatio: f32,
 	time: f32,
 	divisions: f32,
+	dutyCycle: f32,
 	color: vec3f,
 	outlineWidth: f32,
 	outlineColor: vec3f,
@@ -73,6 +74,15 @@ fn rand(seed: vec2f) -> f32 {
 	return f32(hash >> 8u) * (1.0 / 16777216.0);
 }
 
+fn rotate(uv: vec2f, angle: f32) -> vec2f {
+	let cosAngle = cos(angle);
+	let sinAngle = sin(angle);
+	return vec2f(
+		uv.x * cosAngle - uv.y * sinAngle,
+		uv.x * sinAngle + uv.y * cosAngle
+	);
+}
+
 fn linearRisePulse(
 	phase: f32, // 0.0～1.0
 	riseLength: f32,
@@ -83,48 +93,56 @@ fn linearRisePulse(
 }
 
 fn getV(uv: vec2f) -> f32 {
-	let dutyCycleFactor = 0.25;
+	let dutyCycleFactor = uniforms.dutyCycle;
 	let dutyCycle = max(rand(uv), 0.1) * dutyCycleFactor;
 	let phase = fract(uniforms.time * 0.00015 * dutyCycle);
 	return linearRisePulse(phase, dutyCycle);
 }
 
-@fragment
-fn fs(fragData: VertexOut) -> @location(0) vec4f {
-	let uv = scaleUvToCoverGivenAspectRatio(fragData.uv, uniforms.aspectRatio);
+fn drawLayer(_color: vec4f, uv: vec2f, rotation: f32, offset: vec2f, seed: f32) -> vec4f {
+	var color = _color;
 	let cellSize = vec2f(1.0 / (uniforms.divisions * 0.5));
-	let modUv = modVec2f(uv, cellSize);
-	let cellUv = getPixelatedUv(uv, cellSize);
+	let innerDelay = 0.25;
+	let innerFactor = 1.05;
+	let innerPosOffset = vec2f(0.07, -0.07);
+	let transparencyDelay = 0.75;
 
-	let v = getV(cellUv + 1.0);
+	let _uv = rotate(uv, rotation);
+	let modUv = modVec2f(_uv + (cellSize * offset), cellSize);
+	let cellUv = getPixelatedUv(_uv + (cellSize * offset), cellSize);
+	let v = getV(cellUv + seed);
+	let transparency = max(0.0, v - transparencyDelay) / (1.0 - transparencyDelay);
 
-	var color = vec4f(0.0, 0.0, 0.0, 0.0);
+	let innerPosOffsetRotation = (rand(cellUv) * TWO_PI) + (uniforms.time * 0.0001);
+	let innerPosOffsetRotated = vec2f(innerPosOffset.x * cos(innerPosOffsetRotation) - innerPosOffset.y * sin(innerPosOffsetRotation), innerPosOffset.x * sin(innerPosOffsetRotation) + innerPosOffset.y * cos(innerPosOffsetRotation));
+	let innerDist = distance(modUv, (cellSize * 0.5) + (innerPosOffsetRotated * (cellSize * 0.5)));
+	let radiusInner = (((v - innerDelay) / (1.0 - innerDelay)) * innerFactor) + uniforms.outlineWidth;
 
 	let mainDist = distance(modUv, cellSize * 0.5);
 	let radiusMain = v - uniforms.outlineWidth;
-	if (mainDist < radiusMain * (cellSize.x * 0.5)) { color = vec4f(uniforms.color, 1.0); }
-
-	let subDelay = 0.25;
-	let subFactor = 1.05;
-	let subPosOffset = vec2f(0.07, -0.07);
-	let subPosOffsetRotation = (rand(cellUv) * TWO_PI) + (uniforms.time * 0.0001);
-	let subPosOffsetRotated = vec2f(subPosOffset.x * cos(subPosOffsetRotation) - subPosOffset.y * sin(subPosOffsetRotation), subPosOffset.x * sin(subPosOffsetRotation) + subPosOffset.y * cos(subPosOffsetRotation));
-	let subDist = distance(modUv, (cellSize * 0.5) + (subPosOffsetRotated * (cellSize * 0.5)));
-	let radiusSub = (((v - subDelay) / (1.0 - subDelay)) * subFactor) + uniforms.outlineWidth;
-	if (subDist < radiusSub * (cellSize.x * 0.5)) { color = vec4f(0.0, 0.0, 0.0, 0.0); }
+	if (mainDist < radiusMain * (cellSize.x * 0.5) && innerDist > radiusInner * (cellSize.x * 0.5)) { color = vec4f(uniforms.color, min(1.0, color.a + (1.0 - transparency))); }
 
 	let mainOutline = mainDist < (radiusMain + uniforms.outlineWidth) * (cellSize.x * 0.5) && mainDist > (radiusMain - uniforms.outlineWidth) * (cellSize.x * 0.5);
-	let isSubInSide = subDist < radiusSub * (cellSize.x * 0.5);
-	if (mainOutline && !isSubInSide) { color = vec4f(uniforms.outlineColor, 0.5); }
+	let isInnerInside = innerDist < radiusInner * (cellSize.x * 0.5);
+	if (mainOutline && !isInnerInside) { color = vec4f(uniforms.outlineColor, max(0.0, color.a - 0.5)); }
 
-	let subOutline = subDist < (radiusSub + uniforms.outlineWidth) * (cellSize.x * 0.5) && subDist > (radiusSub - uniforms.outlineWidth) * (cellSize.x * 0.5);
-	let isMainInSide = mainDist < radiusMain * (cellSize.x * 0.5);
-	if (subOutline && isMainInSide) { color = vec4f(uniforms.outlineColor, 0.5); }
+	let innerOutline = innerDist < (radiusInner + uniforms.outlineWidth) * (cellSize.x * 0.5) && innerDist > (radiusInner - uniforms.outlineWidth) * (cellSize.x * 0.5);
+	let isMainInside = mainDist < radiusMain * (cellSize.x * 0.5);
+	if (innerOutline && isMainInside) { color = vec4f(uniforms.outlineColor, max(0.0, color.a - 0.5)); }
 
-	let transparencyDelay = 0.75;
-	let transparency = max(0.0, v - transparencyDelay) / (1.0 - transparencyDelay);
+	return color;
+}
 
-	color.a = color.a * (1.0 - transparency);
+@fragment
+fn fs(fragData: VertexOut) -> @location(0) vec4f {
+	let uv = scaleUvToCoverGivenAspectRatio(fragData.uv, uniforms.aspectRatio);
+
+	var color = vec4f(0.0, 0.0, 0.0, 0.0);
+
+	// 複数のレイヤー(格子)をずらして重ねることで格子感を薄める
+	color = drawLayer(color, uv, radians(0.0), vec2f(0.0, 0.0), 1.0);
+	color = drawLayer(color, uv, radians(22.5), vec2f(0.25, 0.25), 3.0);
+	color = drawLayer(color, uv, radians(45.0), vec2f(0.5, 0.5), 5.0);
 
 	return premultiplyAlpha(color);
 }
