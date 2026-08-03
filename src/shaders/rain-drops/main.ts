@@ -6,11 +6,11 @@ import { definePlayground } from '@/utils.ts';
 export const playground = definePlayground({
 	...metadata,
 	params: {
-		divisions: { type: 'range', min: 8, max: 512, step: 1, label: 'Cell Divisions' },
+		divisions: { type: 'range', min: 1, max: 256, step: 1, label: 'Cell Divisions' },
 		test: { type: 'boolean', label: 'Test' },
 	},
 	getDefaultParams: () => ({
-		divisions: 8,
+		divisions: 16,
 		test: false,
 	}),
 	init: async ({ width, height, wgpu, params, canvas }) => {

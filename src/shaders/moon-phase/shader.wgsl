@@ -82,7 +82,6 @@ fn getV(uv: vec2f) -> f32 {
 @fragment
 fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	let uv = scaleUvToCoverGivenAspectRatio(fragData.uv, uniforms.aspectRatio);
-	//let uv = fragData.uv;
 	let cellSize = vec2f(1.0 / (uniforms.divisions * 0.5));
 	let modUv = modVec2f(uv, cellSize);
 	let cellUv = getPixelatedUv(uv, cellSize);

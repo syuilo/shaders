@@ -1,6 +1,6 @@
 import type { PlaygroundMetadata } from '@/utils.ts';
 
 export const metadata = {
-	title: 'nazo 2',
+	title: 'Rain Drops',
 	isPublic: true,
 } satisfies PlaygroundMetadata;

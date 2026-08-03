@@ -38,6 +38,10 @@ struct Uniforms {
 
 @group(0) @binding(1) var<uniform> uniforms: Uniforms;
 
+fn premultiplyAlpha(color: vec4f) -> vec4f {
+	return vec4f(color.rgb * color.a, color.a);
+}
+
 fn getPixelatedUv(uv: vec2f, cellSize: vec2f) -> vec2f {
 	return (cellSize * floor(uv / cellSize)) + (cellSize / 2.0);
 }
@@ -73,21 +77,30 @@ fn getV(uv: vec2f) -> f32 {
 @fragment
 fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	let uv = scaleUvToCoverGivenAspectRatio(fragData.uv, uniforms.aspectRatio);
-	//let uv = fragData.uv;
 	let cellSize = vec2f(1.0 / (uniforms.divisions * 0.5));
-	let modUv = modVec2f(uv, cellSize);
-	let cellUv = getPixelatedUv(uv, cellSize);
 
-	let v = getV(cellUv + 1.0);
-
-	var color = vec3f(0.0, 0.0, 0.0);
-	let dist = distance(modUv, cellSize * 0.5);
-	let radiusMain = v;
 	let subDelay = 0.25;
-	let radiusSub = (v - subDelay) / (1.0 - subDelay);
-	if (dist < radiusMain * (cellSize.x * 0.5)) { color = vec3f(1.0, 1.0, 1.0); }
-	if (dist < radiusSub * (cellSize.x * 0.5)) { color = vec3f(0.0, 0.0, 0.0); }
 
-	return vec4f(color, 1.0);
-	//return vec4f(uv + 1.0, 0.0, 1.0);
+	var color = vec4f(0.0, 0.0, 0.0, 0.0);
+
+	// ふたつのグリッドを少しずらして重ねることで格子感を薄める
+
+	let a_modUv = modVec2f(uv, cellSize);
+	let a_cellUv = getPixelatedUv(uv, cellSize);
+	let a_v = getV(a_cellUv + 1.0);
+	let a_dist = distance(a_modUv, cellSize * 0.5);
+	let a_radiusMain = a_v;
+	let a_radiusSub = (a_v - subDelay) / (1.0 - subDelay);
+	if (a_dist < a_radiusMain * (cellSize.x * 0.5) && a_dist > a_radiusSub * (cellSize.x * 0.5)) { color = vec4f(1.0, 1.0, 1.0, 1.0); }
+
+	let b_modUv = modVec2f(uv + (cellSize * 0.5), cellSize);
+	let b_cellUv = getPixelatedUv(uv + (cellSize * 0.5), cellSize);
+	let b_v = getV(b_cellUv + 2.0);
+	var b_color = vec3f(0.0, 0.0, 0.0);
+	let b_dist = distance(b_modUv, cellSize * 0.5);
+	let b_radiusMain = b_v;
+	let b_radiusSub = (b_v - subDelay) / (1.0 - subDelay);
+	if (b_dist < b_radiusMain * (cellSize.x * 0.5) && b_dist > b_radiusSub * (cellSize.x * 0.5)) { color = vec4f(1.0, 1.0, 1.0, 1.0); }
+
+	return premultiplyAlpha(color);
 }
