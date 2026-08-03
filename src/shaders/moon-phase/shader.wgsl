@@ -57,10 +57,20 @@ fn scaleUvToCoverGivenAspectRatio(uv: vec2f, aspectRatio: f32) -> vec2f {
 	return uv / vec2f(1.0, aspectRatio) * select(1.0, aspectRatio, 1.0 > aspectRatio);
 }
 
-fn rand(uv: vec2<f32>) -> f32 {
-	var p3 = fract(vec3<f32>(uv.xyx) * 0.1031);
-	p3 += dot(p3, p3.yzx + 33.33);
-	return fract((p3.x + p3.y) * p3.z);
+fn hashU32(value: u32) -> u32 {
+	var x = value;
+	x ^= x >> 16u;
+	x *= 0x7feb352du;
+	x ^= x >> 15u;
+	x *= 0x846ca68bu;
+	x ^= x >> 16u;
+	return x;
+}
+
+fn rand(seed: vec2f) -> f32 {
+	let bits = bitcast<vec2u>(seed);
+	let hash = hashU32(bits.x ^ hashU32(bits.y + 0x9e3779b9u));
+	return f32(hash >> 8u) * (1.0 / 16777216.0);
 }
 
 fn linearRisePulse(

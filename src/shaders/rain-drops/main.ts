@@ -6,7 +6,7 @@ import { definePlayground } from '@/utils.ts';
 export const playground = definePlayground({
 	...metadata,
 	alpha: true,
-	backgroundColor: '#000',
+	backgroundColor: '#012',
 	params: {
 		divisions: { type: 'range', min: 1, max: 256, step: 1, label: 'Cell Divisions' },
 		test: { type: 'boolean', label: 'Test' },
