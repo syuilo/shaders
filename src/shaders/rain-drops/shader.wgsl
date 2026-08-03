@@ -80,6 +80,7 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	let cellSize = vec2f(1.0 / (uniforms.divisions * 0.5));
 
 	let subDelay = 0.125;
+	let transparencyDelay = 0.0;
 
 	var color = vec4f(0.0, 0.0, 0.0, 0.0);
 
@@ -91,7 +92,8 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	let a_dist = distance(a_modUv, cellSize * 0.5);
 	let a_radiusMain = a_v;
 	let a_radiusSub = (a_v - subDelay) / (1.0 - subDelay);
-	if (a_dist < a_radiusMain * (cellSize.x * 0.5) && a_dist > a_radiusSub * (cellSize.x * 0.5)) { color = vec4f(1.0, 1.0, 1.0, 1.0); }
+	let a_transparency = max(0.0, a_v - transparencyDelay) / (1.0 - transparencyDelay);
+	if (a_dist < a_radiusMain * (cellSize.x * 0.5) && a_dist > a_radiusSub * (cellSize.x * 0.5)) { color = vec4f(1.0, 1.0, 1.0, (1.0 - a_transparency)); }
 
 	let b_modUv = modVec2f(uv + (cellSize * 0.5), cellSize);
 	let b_cellUv = getPixelatedUv(uv + (cellSize * 0.5), cellSize);
@@ -100,7 +102,8 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	let b_dist = distance(b_modUv, cellSize * 0.5);
 	let b_radiusMain = b_v;
 	let b_radiusSub = (b_v - subDelay) / (1.0 - subDelay);
-	if (b_dist < b_radiusMain * (cellSize.x * 0.5) && b_dist > b_radiusSub * (cellSize.x * 0.5)) { color = vec4f(1.0, 1.0, 1.0, 1.0); }
+	let b_transparency = max(0.0, b_v - transparencyDelay) / (1.0 - transparencyDelay);
+	if (b_dist < b_radiusMain * (cellSize.x * 0.5) && b_dist > b_radiusSub * (cellSize.x * 0.5)) { color = vec4f(1.0, 1.0, 1.0, (1.0 - b_transparency)); }
 
 	return premultiplyAlpha(color);
 }
