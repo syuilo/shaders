@@ -56,6 +56,15 @@ fn rand(uv: vec2<f32>) -> f32 {
 	return fract((p3.x + p3.y) * p3.z);
 }
 
+fn rotate(uv: vec2f, angle: f32) -> vec2f {
+	let cosAngle = cos(angle);
+	let sinAngle = sin(angle);
+	return vec2f(
+		uv.x * cosAngle - uv.y * sinAngle,
+		uv.x * sinAngle + uv.y * cosAngle
+	);
+}
+
 fn linearRisePulse(
 	phase: f32, // 0.0～1.0
 	riseLength: f32,
@@ -66,45 +75,43 @@ fn linearRisePulse(
 }
 
 fn getV(uv: vec2f) -> f32 {
-	//let divisions = uniforms.divisions;
-	//let lengthField = ((uv.x * 0.5) + (uv.y * 0.5) * divisions) / (divisions * divisions);
 	let dutyCycleFactor = 0.25;
 	let dutyCycle = max(rand(uv), 0.1) * dutyCycleFactor;
 	let phase = fract(uniforms.time * 0.001 * dutyCycle);
 	return linearRisePulse(phase, dutyCycle);
 }
 
-@fragment
-fn fs(fragData: VertexOut) -> @location(0) vec4f {
-	let uv = scaleUvToCoverGivenAspectRatio(fragData.uv, uniforms.aspectRatio);
+fn drawLayer(color: vec4f, uv: vec2f, rotation: f32, offset: vec2f, seed: f32) -> vec4f {
 	let cellSize = vec2f(1.0 / (uniforms.divisions * 0.5));
-
 	let innerDelay = 0.125;
 	let transparencyDelay = 0.0;
 
+	let _uv = rotate(uv, rotation);
+	let modUv = modVec2f(_uv + (cellSize * offset), cellSize);
+	let cellUv = getPixelatedUv(_uv + (cellSize * offset), cellSize);
+	let v = getV(cellUv + seed);
+	let dist = distance(modUv, cellSize * 0.5);
+	let radiusMain = v;
+	let radiusInner = (v - innerDelay) / (1.0 - innerDelay);
+	let transparency = max(0.0, v - transparencyDelay) / (1.0 - transparencyDelay);
+
+	return select(
+		color,
+		vec4f(1.0, 1.0, 1.0, min(1.0, color.a + (1.0 - transparency))),
+		dist < radiusMain * (cellSize.x * 0.5) && dist > radiusInner * (cellSize.x * 0.5)
+	);
+}
+
+@fragment
+fn fs(fragData: VertexOut) -> @location(0) vec4f {
+	let uv = scaleUvToCoverGivenAspectRatio(fragData.uv, uniforms.aspectRatio);
+
 	var color = vec4f(0.0, 0.0, 0.0, 0.0);
 
-	// ふたつのグリッドを少しずらして重ねることで格子感を薄める
-	// NOTE: 3つにするとか、単にオフセットするのではなく回転させるとより不規則になるかもしれない
-
-	let a_modUv = modVec2f(uv, cellSize);
-	let a_cellUv = getPixelatedUv(uv, cellSize);
-	let a_v = getV(a_cellUv + 1.0);
-	let a_dist = distance(a_modUv, cellSize * 0.5);
-	let a_radiusMain = a_v;
-	let a_radiusInner = (a_v - innerDelay) / (1.0 - innerDelay);
-	let a_transparency = max(0.0, a_v - transparencyDelay) / (1.0 - transparencyDelay);
-	if (a_dist < a_radiusMain * (cellSize.x * 0.5) && a_dist > a_radiusInner * (cellSize.x * 0.5)) { color = vec4f(1.0, 1.0, 1.0, (1.0 - a_transparency)); }
-
-	let b_modUv = modVec2f(uv + (cellSize * 0.5), cellSize);
-	let b_cellUv = getPixelatedUv(uv + (cellSize * 0.5), cellSize);
-	let b_v = getV(b_cellUv + 2.0);
-	var b_color = vec3f(0.0, 0.0, 0.0);
-	let b_dist = distance(b_modUv, cellSize * 0.5);
-	let b_radiusMain = b_v;
-	let b_radiusInner = (b_v - innerDelay) / (1.0 - innerDelay);
-	let b_transparency = max(0.0, b_v - transparencyDelay) / (1.0 - transparencyDelay);
-	if (b_dist < b_radiusMain * (cellSize.x * 0.5) && b_dist > b_radiusInner * (cellSize.x * 0.5)) { color = vec4f(1.0, 1.0, 1.0, (1.0 - b_transparency)); }
+	// 複数のレイヤー(格子)をずらして重ねることで格子感を薄める
+	color = drawLayer(color, uv, radians(0.0), vec2f(0.0, 0.0), 1.0);
+	color = drawLayer(color, uv, radians(22.5), vec2f(0.25, 0.25), 3.0);
+	color = drawLayer(color, uv, radians(45.0), vec2f(0.5, 0.5), 5.0);
 
 	return premultiplyAlpha(color);
 }

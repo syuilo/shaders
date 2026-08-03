@@ -12,7 +12,7 @@ export const playground = definePlayground({
 		test: { type: 'boolean', label: 'Test' },
 	},
 	getDefaultParams: () => ({
-		divisions: 16,
+		divisions: 8,
 		test: false,
 	}),
 	init: async ({ width, height, wgpu, params, canvas }) => {
