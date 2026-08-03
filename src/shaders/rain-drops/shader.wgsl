@@ -33,6 +33,7 @@ struct Uniforms {
 	aspectRatio: f32,
 	time: f32,
 	divisions: f32,
+	dutyCycle: f32,
 	test: u32,
 };
 
@@ -85,7 +86,7 @@ fn linearRisePulse(
 }
 
 fn getV(uv: vec2f) -> f32 {
-	let dutyCycleFactor = 0.25;
+	let dutyCycleFactor = uniforms.dutyCycle;
 	let dutyCycle = max(rand(uv), 0.1) * dutyCycleFactor;
 	let phase = fract(uniforms.time * 0.001 * dutyCycle);
 	return linearRisePulse(phase, dutyCycle);
