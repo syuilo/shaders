@@ -85,6 +85,7 @@ fn fs(fragData: VertexOut) -> @location(0) vec4f {
 	var color = vec4f(0.0, 0.0, 0.0, 0.0);
 
 	// ふたつのグリッドを少しずらして重ねることで格子感を薄める
+	// NOTE: 3つにするとか、単にオフセットするのではなく回転させるとより不規則になるかもしれない
 
 	let a_modUv = modVec2f(uv, cellSize);
 	let a_cellUv = getPixelatedUv(uv, cellSize);
