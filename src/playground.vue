@@ -2,6 +2,20 @@
 <div v-if="playgroundDef.alpha" id="bg" :class="{ 'animatedBg': animatedBg }"></div>
 <canvas id="canvas" ref="canvas" :class="{ 'animatedBg': animatedBg }"></canvas>
 <button id="menuButton" :class="hideMenuButton ? 'hide' : null" @click="showMenu = !showMenu">MENU</button>
+<div id="stats" :class="!enableStats ? 'hide' : null">
+	<div>
+		<div>Short avg</div>
+		<div>Long avg</div>
+	</div>
+	<div>
+		<div>{{ gpuAverageDisplayFast.toFixed(1) }}µs</div>
+		<div>{{ gpuAverageDisplaySlow.toFixed(1) }}µs</div>
+	</div>
+	<div>
+		<div>{{ (gpuAverageDisplayFast / 1000).toFixed(1) }}ms</div>
+		<div>{{ (gpuAverageDisplaySlow / 1000).toFixed(1) }}ms</div>
+	</div>
+</div>
 <div v-show="showMenu" id="menu">
 	<h1><a href="./">syuilo's Shader Playground</a> - "{{ playgroundDef.title }}"</h1>
 
@@ -53,6 +67,7 @@
 			<option :value="2">2</option>
 			<option :value="4">4</option>
 		</select>
+		<span>({{ resolutionDisplay.width }} x {{ resolutionDisplay.height }})</span>
 	</label>
 	<label>
 		<b>FPS:</b>
@@ -63,10 +78,15 @@
 			<option :value="60">(up to) 60 FPS</option>
 			<option :value="120">(up to) 120 FPS</option>
 		</select>
+		<span>({{ fpsDisplay.toFixed(1) }} FPS)</span>
 	</label>
 	<label>
 		<b>Hide menu button:</b>
 		<input type="checkbox" v-model="hideMenuButton" />
+	</label>
+	<label>
+		<b>Enable stats:</b>
+		<input type="checkbox" v-model="enableStats" />
 	</label>
 </div>
 </template>
@@ -75,6 +95,8 @@
 import { markRaw, onMounted, onUnmounted, reactive, ref, useTemplateRef, watch } from 'vue';
 import { debouncePromise, getHex, getRgb, Playground } from '@/utils.ts';
 import XMedia from './media.vue';
+import TimingHelper from './TimingHelper.ts';
+import { NonNegativeRollingAverage } from './NonNegativeRollingAverage.ts';
 
 const props = defineProps<{
 	name: string;
@@ -86,6 +108,18 @@ const playgroundDef = await import(`./shaders/${props.name}/main.ts`).then(modul
 const params = reactive(playgroundDef.getDefaultParams());
 let dispose: (() => void) | null = null;
 
+const fpsAverage = new NonNegativeRollingAverage(30);
+const fpsDisplay = ref(0);
+const resolutionDisplay = ref({ width: 0, height: 0 });
+
+const enableStats = ref(false);
+const gpuAverageFast = new NonNegativeRollingAverage(10);
+const gpuAverageMedium = new NonNegativeRollingAverage(100);
+const gpuAverageSlow = new NonNegativeRollingAverage(1000);
+const gpuAverageDisplayFast = ref(0);
+const gpuAverageDisplayMedium = ref(0);
+const gpuAverageDisplaySlow = ref(0);
+
 async function init() {
 	console.log(`Initializing ${props.name}...`);
 
@@ -96,12 +130,18 @@ async function init() {
 	const adapter = await navigator.gpu?.requestAdapter({
 		//powerPreference: 'low-power',
 	});
-	const _device = await adapter?.requestDevice();
+	const _device = await adapter?.requestDevice({
+		requiredFeatures: [
+			...(enableStats.value ? ['timestamp-query'] as const : []),
+		],
+	});
 	if (!_device) {
 		window.alert('need a browser that supports WebGPU');
 		throw new Error('need a browser that supports WebGPU');
 	}
 	const device = _device as GPUDevice;
+
+	const timingHelper = new TimingHelper(device);
 
 	const _context = canvas.value.getContext('webgpu');
 	if (!_context) {
@@ -112,6 +152,9 @@ async function init() {
 
 	canvas.value.width = Math.max(1, Math.min(canvas.value.offsetWidth * (pixelRatio.value ?? window.devicePixelRatio), device.limits.maxTextureDimension2D));
 	canvas.value.height = Math.max(1, Math.min(canvas.value.offsetHeight * (pixelRatio.value ?? window.devicePixelRatio), device.limits.maxTextureDimension2D));
+
+	resolutionDisplay.value.width = canvas.value.width;
+	resolutionDisplay.value.height = canvas.value.height;
 
 	context.configure({
 		device,
@@ -145,14 +188,46 @@ async function init() {
 	let latestTimestamp = performance.now();
 	let time = initialTime;
 
+	const createPassEncoder = (commandEncoder: GPUCommandEncoder, descriptor?: GPURenderPassDescriptor) => {
+		const _descriptor = descriptor ?? {
+			colorAttachments: [{
+				view: context.getCurrentTexture().createView(),
+				clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+				loadOp: 'clear',
+				storeOp: 'store',
+			}],
+		} satisfies GPURenderPassDescriptor;
+		return enableStats.value ? timingHelper.beginRenderPass(commandEncoder, _descriptor) : commandEncoder.beginRenderPass(_descriptor);
+	};
+
 	function render(timeStamp: number) {
 		if (disposed) return;
 		const timeDelta = timeStamp - latestTimestamp;
 		time += Math.floor(timeDelta * timeFactor.value);
 		const commandEncoder = device.createCommandEncoder();
-		playgroundInstance.render({ commandEncoder, time, timeDelta });
+		playgroundInstance.render({
+			commandEncoder,
+			createPassEncoder,
+			time,
+			timeDelta,
+		});
 		device.queue.submit([commandEncoder.finish()]);
 		latestTimestamp = timeStamp;
+
+		fpsAverage.addSample(1000 / timeDelta);
+		fpsDisplay.value = fpsAverage.get();
+
+		if (enableStats.value) {
+			timingHelper.getResult().then(gpuTime => {
+				gpuAverageFast.addSample(gpuTime / 1000);
+				gpuAverageMedium.addSample(gpuTime / 1000);
+				gpuAverageSlow.addSample(gpuTime / 1000);
+			});
+
+			gpuAverageDisplayFast.value = gpuAverageFast.get();
+			gpuAverageDisplayMedium.value = gpuAverageMedium.get();
+			gpuAverageDisplaySlow.value = gpuAverageSlow.get();
+		}
 	}
 
 	let then = 0;
@@ -228,7 +303,7 @@ onMounted(async () => {
 	observer.observe(canvas.value!);
 });
 
-watch([pixelRatio, fps], () => {
+watch([pixelRatio, fps, enableStats], () => {
 	debouncedInit();
 });
 

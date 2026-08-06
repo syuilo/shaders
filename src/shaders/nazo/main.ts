@@ -59,14 +59,7 @@ export const playground = definePlayground({
 				});
 				wgpu.device.queue.writeBuffer(uniformBuffer, 0, uniformValues.arrayBuffer);
 
-				const passEncoder = ctx.commandEncoder.beginRenderPass({
-					colorAttachments: [{
-						view: wgpu.context.getCurrentTexture().createView(),
-						clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
-						loadOp: 'clear',
-						storeOp: 'store',
-					}],
-				});
+				const passEncoder = ctx.createPassEncoder(ctx.commandEncoder);
 				passEncoder.setPipeline(pipeline);
 				passEncoder.setBindGroup(0, bindGroup);
 				passEncoder.draw(6);

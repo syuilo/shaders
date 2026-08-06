@@ -134,6 +134,7 @@ export type PlaygroundInstance<Options = any> = {
 		time: number;
 		timeDelta: number;
 		commandEncoder: GPUCommandEncoder;
+		createPassEncoder: (commandEncoder: GPUCommandEncoder, descriptor?: GPURenderPassDescriptor) => GPURenderPassEncoder;
 	}) => void;
 	dispose?: () => void;
 };
