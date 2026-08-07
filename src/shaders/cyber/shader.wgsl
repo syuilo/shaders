@@ -193,7 +193,14 @@ fn getSourceColor(uv: vec2f) -> vec4f {
 		select(1.0, uniforms.sourceAspectRatio / uniforms.aspectRatio, uniforms.sourceAspectRatio < uniforms.aspectRatio),
 		select(1.0, uniforms.sourceAspectRatio / uniforms.aspectRatio, uniforms.sourceAspectRatio > uniforms.aspectRatio),
 		uniforms.coverSource == 1);
-	let sourceUv = uv * vec2f(1.0, uniforms.sourceAspectRatio) / sourceScale;
+	var sourceUv = uv * vec2f(1.0, uniforms.sourceAspectRatio) / sourceScale;
+
+	let pointerTrailColor = getPointerTrailColor(uv);
+	sourceUv.x -= pointerTrailColor.r;
+	sourceUv.y -= pointerTrailColor.g;
+	sourceUv.x += pointerTrailColor.b;
+	sourceUv.y += pointerTrailColor.a;
+
 	return textureSample(sourceTexture, mySampler, convertTexCoords(sourceUv));
 }
 
@@ -277,11 +284,6 @@ fn fs(fragData: FragmentIn) -> @location(0) vec4f {
 	let sourceColor = getSourceColor(cellUv);
 	let sourceColorLuminance = (sourceColor.r + sourceColor.g + sourceColor.b) / 3.0;
 
-	let pointerTrailColor = getPointerTrailColor(cellUv);
-	let pointerForce = (pointerTrailColor.r + pointerTrailColor.g + pointerTrailColor.b + pointerTrailColor.a) / 4.0;
-
-	//return vec4f(vec3f(pointerForce), 1.0);
-
 	let visibilityNoiseA = snoise0to1(vec3f(cellUv + scroll, time * 0.00000625));
 	let visibilityNoiseB = snoise0to1(vec3f(cellUv * 8.0, time * 0.00000625));
 	var threshold = 0.65;
@@ -289,12 +291,6 @@ fn fs(fragData: FragmentIn) -> @location(0) vec4f {
 	visibility = select(0.0, 1.0, !discardSourceColor(sourceColor));
 
 	var texSelector = select(sourceColorLuminance, remap(sourceColorLuminance, 0.0, discardBrightPixelsThreshold, 0.0, 1.0), uniforms.discardBrightPixels == 1); // discardBrightPixelsでスキップした範囲の分だけ範囲を圧縮する
-
-	if (pointerForce > 0.0) {
-		texSelector += pointerForce * 0.25;
-		texSelector = min(texSelector, 1.0);
-	}
-
 	texSelector = remap(texSelector, 0.0, 1.0, uniforms.symbolTexturesRangeMin, uniforms.symbolTexturesRangeMax);
 
 	var scale = min(1.0, 1.0 - border);
