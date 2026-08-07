@@ -234,20 +234,13 @@ struct FragmentIn {
 @fragment
 fn fs(fragData: FragmentIn) -> @location(0) vec4f {
 	let time = uniforms.time;
-	let u_seed = 1000.0;
 	let scroll = vec2f(0.0, -time * 0.0001);
-
 	let uv = scaleUvToCoverGivenAspectRatio(fragData.uv, uniforms.aspectRatio);
-
 	var cellSize = vec2f(1.0 / (uniforms.divisions * 0.5));
-
 	var border = uniforms.margin;
-
 	var modUv = modVec2f(uv, cellSize);
 
 	let cellUv2 = getPixelatedUv(uv, cellSize * 2.0);
-	let cellUv4 = getPixelatedUv(uv, cellSize * 4.0);
-
 	let a2 = cellUv2 + vec2f(-(cellUv2.x / 2.0 / 2.0), -(cellUv2.y / 2.0 / 2.0));
 	let b2 = cellUv2 + vec2f((cellUv2.x / 2.0 / 2.0), -(cellUv2.y / 2.0 / 2.0));
 	let c2 = cellUv2 + vec2f(-(cellUv2.x / 2.0 / 2.0), (cellUv2.y / 2.0 / 2.0));
@@ -256,7 +249,9 @@ fn fs(fragData: FragmentIn) -> @location(0) vec4f {
 	let sourceColorB2 = getSourceColor(b2);
 	let sourceColorC2 = getSourceColor(c2);
 	let sourceColorD2 = getSourceColor(d2);
+	let similar2 = !discardSourceColor(getSourceColor(cellUv2)) && isSimilar(sourceColorA2, sourceColorB2, sourceColorC2, sourceColorD2, 0.1);
 
+	let cellUv4 = getPixelatedUv(uv, cellSize * 4.0);
 	let a4 = cellUv4 + vec2f(-(cellUv4.x / 4.0 / 2.0), -(cellUv4.y / 4.0 / 2.0));
 	let b4 = cellUv4 + vec2f((cellUv4.x / 4.0 / 2.0), -(cellUv4.y / 4.0 / 2.0));
 	let c4 = cellUv4 + vec2f(-(cellUv4.x / 4.0 / 2.0), (cellUv4.y / 4.0 / 2.0));
@@ -265,8 +260,6 @@ fn fs(fragData: FragmentIn) -> @location(0) vec4f {
 	let sourceColorB4 = getSourceColor(b4);
 	let sourceColorC4 = getSourceColor(c4);
 	let sourceColorD4 = getSourceColor(d4);
-
-	let similar2 = !discardSourceColor(getSourceColor(cellUv2)) && isSimilar(sourceColorA2, sourceColorB2, sourceColorC2, sourceColorD2, 0.1);
 	let similar4 = !discardSourceColor(getSourceColor(cellUv4)) && isSimilar(sourceColorA4, sourceColorB4, sourceColorC4, sourceColorD4, 0.025);
 
 	if (similar4) {
@@ -335,26 +328,15 @@ fn fs(fragData: FragmentIn) -> @location(0) vec4f {
 	}
 
 	if ((sourceColor.r + sourceColor.g + sourceColor.b) / 3.0 > 0.7) { // apply colorA
-		out_color.r = uniforms.colorA.r;
-		out_color.g = uniforms.colorA.g;
-		out_color.b = uniforms.colorA.b;
+		out_color = vec4f(uniforms.colorA.rgb, out_color.a);
 	} else if (sourceColor.r > 0.75) { // apply colorC
-		out_color.r = uniforms.colorC.r;
-		out_color.g = uniforms.colorC.g;
-		out_color.b = uniforms.colorC.b;
+		out_color = vec4f(uniforms.colorC.rgb, out_color.a);
 	} else if (sourceColor.g > 0.4) { // apply colorB
-		out_color.r = uniforms.colorB.r;
-		out_color.g = uniforms.colorB.g;
-		out_color.b = uniforms.colorB.b;
+		out_color = vec4f(uniforms.colorB.rgb, out_color.a);
 	} else if ((sourceColor.r + sourceColor.g + sourceColor.b) / 3.0 < 0.2) { // apply colorA with lower opacity
-		out_color.r = uniforms.colorA.r;
-		out_color.g = uniforms.colorA.g;
-		out_color.b = uniforms.colorA.b;
-		out_color.a *= 0.7;
+		out_color = vec4f(uniforms.colorA.rgb, out_color.a * 0.7);
 	} else { // apply colorA
-		out_color.r = uniforms.colorA.r;
-		out_color.g = uniforms.colorA.g;
-		out_color.b = uniforms.colorA.b;
+		out_color = vec4f(uniforms.colorA.rgb, out_color.a);
 	}
 
 	if (visibility == 0.0) {
