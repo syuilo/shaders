@@ -10,7 +10,7 @@ function assert(cond, msg = '') {
 // we try to read the result before the command buffer has been executed.
 const s_unsubmittedCommandBuffer = new Set();
 
-const MAX_PASSES = 4;
+const MAX_PASSES = 16;
 
 /* global GPUQueue */
 GPUQueue.prototype.submit = (function(origFn) {
