@@ -10,12 +10,12 @@ export const playground = definePlayground({
 	params: {
 		divisions: { type: 'range', min: 1, max: 256, step: 1, label: 'Cell Divisions' },
 		dutyCycle: { type: 'range', min: 0.0, max: 1.0, step: 0.01, label: 'Duty Cycle' },
-		test: { type: 'boolean', label: 'Test' },
+		colorful: { type: 'boolean', label: 'Colorful' },
 	},
 	getDefaultParams: () => ({
 		divisions: 8,
 		dutyCycle: 0.25,
-		test: false,
+		colorful: false,
 	}),
 	init: async ({ width, height, wgpu, params, canvas }) => {
 		const shaderModule = wgpu.device.createShaderModule({
@@ -60,7 +60,7 @@ export const playground = definePlayground({
 					time: ctx.time,
 					divisions: params.divisions,
 					dutyCycle: params.dutyCycle,
-					test: params.test ? 1 : 0,
+					colorful: params.colorful ? 1 : 0,
 				});
 				wgpu.device.queue.writeBuffer(uniformBuffer, 0, uniformValues.arrayBuffer);
 

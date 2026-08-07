@@ -3,15 +3,32 @@ fn modVec2f(a: vec2f, b: vec2f) -> vec2f {
 	return a - b * floor(a / b);
 }
 
-struct Uniforms {
-	aspectRatio: f32,
-	time: f32,
-	divisions: f32,
-	dutyCycle: f32,
-	test: u32,
-};
+fn hslToRgb(hsl: vec3f) -> vec3f {
+	let h = hsl.x;
+	let s = hsl.y;
+	let l = hsl.z;
 
-@group(0) @binding(1) var<uniform> uniforms: Uniforms;
+	let c = (1.0 - abs(2.0 * l - 1.0)) * s;
+	let x = c * (1.0 - abs(fract(h * 6.0) - 1.0));
+	let m = l - c * 0.5;
+
+	var rgb = vec3f(0.0, 0.0, 0.0);
+	if (h < 1.0 / 6.0) {
+		rgb = vec3f(c, x, 0.0);
+	} else if (h < 2.0 / 6.0) {
+		rgb = vec3f(x, c, 0.0);
+	} else if (h < 3.0 / 6.0) {
+		rgb = vec3f(0.0, c, x);
+	} else if (h < 4.0 / 6.0) {
+		rgb = vec3f(0.0, x, c);
+	} else if (h < 5.0 / 6.0) {
+		rgb = vec3f(x, 0.0, c);
+	} else {
+		rgb = vec3f(c, 0.0, x);
+	}
+
+	return rgb + vec3f(m);
+}
 
 fn premultiplyAlpha(color: vec4f) -> vec4f {
 	return vec4f(color.rgb * color.a, color.a);
@@ -59,30 +76,44 @@ fn linearRisePulse(
 	return clamp((_phase - riseStart) / riseLength, 0.0, 1.0);
 }
 
-fn getV(uv: vec2f) -> f32 {
+struct Uniforms {
+	aspectRatio: f32,
+	time: f32,
+	divisions: f32,
+	dutyCycle: f32,
+	colorful: u32,
+};
+
+@group(0) @binding(1) var<uniform> uniforms: Uniforms;
+
+fn getPhaseProgressAndPhaseCount(uv: vec2f) -> vec2f {
 	let dutyCycleFactor = uniforms.dutyCycle;
 	let dutyCycle = max(rand(uv), 0.1) * dutyCycleFactor;
-	let phase = fract(uniforms.time * 0.001 * dutyCycle);
-	return linearRisePulse(phase, dutyCycle);
+	let t = uniforms.time * 0.001 * dutyCycle;
+	let progress = linearRisePulse(fract(t), dutyCycle);
+	let count = floor(t);
+	return vec2f(progress, count);
 }
 
-fn drawLayer(color: vec4f, uv: vec2f, rotation: f32, offset: vec2f, seed: f32) -> vec4f {
+fn drawLayer(bg: vec4f, uv: vec2f, rotation: f32, offset: vec2f, seed: f32) -> vec4f {
 	let cellSize = vec2f(1.0 / (uniforms.divisions * 0.5));
 	let innerDelay = 0.125;
 	let transparencyDelay = 0.0;
-
 	let _uv = rotate(uv, rotation);
 	let modUv = modVec2f(_uv + (cellSize * offset), cellSize);
 	let cellUv = getPixelatedUv(_uv + (cellSize * offset), cellSize);
-	let v = getV(cellUv + seed);
+	let progressAndCount = getPhaseProgressAndPhaseCount(cellUv + seed);
+	let progress= progressAndCount.x;
+	let cycleCount = progressAndCount.y;
 	let dist = distance(modUv, cellSize * 0.5);
-	let radiusMain = v;
-	let radiusInner = (v - innerDelay) / (1.0 - innerDelay);
-	let transparency = max(0.0, v - transparencyDelay) / (1.0 - transparencyDelay);
-
+	let radiusMain = progress;
+	let radiusInner = (progress - innerDelay) / (1.0 - innerDelay);
+	let transparency = max(0.0, progress - transparencyDelay) / (1.0 - transparencyDelay);
+	let h = rand(cellUv + seed + cycleCount);
+	let color = select(vec3f(1.0, 1.0, 1.0), hslToRgb(vec3f(h, 1.0, 0.5)), uniforms.colorful == 1);
 	return select(
-		color,
-		vec4f(1.0, 1.0, 1.0, min(1.0, color.a + (1.0 - transparency))),
+		bg,
+		vec4f(color, min(1.0, bg.a + (1.0 - transparency))),
 		dist < radiusMain * (cellSize.x * 0.5) && dist > radiusInner * (cellSize.x * 0.5)
 	);
 }
