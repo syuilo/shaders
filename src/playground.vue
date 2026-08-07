@@ -101,6 +101,7 @@ import { debouncePromise, getHex, getRgb, Playground } from '@/utils.ts';
 import XMedia from './media.vue';
 import TimingHelper from './TimingHelper.ts';
 import { NonNegativeRollingAverage } from './NonNegativeRollingAverage.ts';
+import defaultVertexShaderCode from './vertex.wgsl?raw';
 
 const props = defineProps<{
 	name: string;
@@ -175,6 +176,10 @@ async function init() {
 		addressModeW: 'mirror-repeat',
 	});
 
+	const defaultVertexShaderModule = device.createShaderModule({
+		code: defaultVertexShaderCode,
+	});
+
 	// 誰が見ても同じレンダリング結果になるように、開いた時間を基準にする
 	// ただそのままUNIX時間を入れると、秒数が大きすぎて浮動小数点数の関係で精度が落ちるため、1日間隔でループ
 	const initialTime = (Date.now() % (1000 * 60 * 60 * 24));
@@ -182,7 +187,7 @@ async function init() {
 	const playgroundInstance = await playgroundDef.init({
 		width: canvas.value.width,
 		height: canvas.value.height,
-		wgpu: { device, context, sampler },
+		wgpu: { device, context, sampler, defaultVertexShaderModule },
 		params: params,
 		canvas: canvas.value,
 	});

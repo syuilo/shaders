@@ -44,8 +44,7 @@ export const playground = definePlayground({
 
 		const pointerTrailPipeline = wgpu.device.createRenderPipeline({
 			vertex: {
-				module: shaderModule,
-				entryPoint: 'vs',
+				module: wgpu.defaultVertexShaderModule,
 			},
 			fragment: {
 				module: shaderModule,
@@ -120,8 +119,7 @@ export const playground = definePlayground({
 
 		const pipeline = wgpu.device.createRenderPipeline({
 			vertex: {
-				module: shaderModule,
-				entryPoint: 'vs',
+				module: wgpu.defaultVertexShaderModule,
 			},
 			fragment: {
 				module: shaderModule,

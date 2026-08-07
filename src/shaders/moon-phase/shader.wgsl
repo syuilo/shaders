@@ -1,29 +1,3 @@
-struct VertexOut {
-	@builtin(position) position: vec4f,
-	@location(0) uv: vec2f,
-};
-
-const vertices = array(
-	// 1st triangle
-	vec2f(-1.0, -1.0),  // center
-	vec2f( 1.0, -1.0),  // right, center
-	vec2f(-1.0,  1.0),  // center, top
-
-	// 2st triangle
-	vec2f(-1.0,  1.0),  // center, top
-	vec2f( 1.0, -1.0),  // right, center
-	vec2f( 1.0,  1.0),  // right, top
-);
-
-@vertex
-fn vs(@builtin(vertex_index) vertexIndex: u32) -> VertexOut {
-	let pos = vertices[vertexIndex];
-	var output: VertexOut;
-	output.position = vec4f(pos, 0.0, 1.0);
-	output.uv = pos.xy;
-	return output;
-}
-
 const PI = 3.141592653589793;
 const TWO_PI = 6.283185307179586;
 const HALF_PI = 1.5707963267948966;
@@ -133,8 +107,12 @@ fn drawLayer(_color: vec4f, uv: vec2f, rotation: f32, offset: vec2f, seed: f32) 
 	return color;
 }
 
+struct FragmentIn {
+	@location(0) uv: vec2f,
+};
+
 @fragment
-fn fs(fragData: VertexOut) -> @location(0) vec4f {
+fn fs(fragData: FragmentIn) -> @location(0) vec4f {
 	let uv = scaleUvToCoverGivenAspectRatio(fragData.uv, uniforms.aspectRatio);
 
 	var color = vec4f(0.0, 0.0, 0.0, 0.0);

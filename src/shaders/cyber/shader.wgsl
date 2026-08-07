@@ -1,29 +1,3 @@
-struct VertexOut {
-	@builtin(position) position: vec4f,
-	@location(0) uv: vec2f,
-};
-
-const vertices = array(
-	// 1st triangle
-	vec2f(-1.0, -1.0),  // center
-	vec2f( 1.0, -1.0),  // right, center
-	vec2f(-1.0,  1.0),  // center, top
-
-	// 2st triangle
-	vec2f(-1.0,  1.0),  // center, top
-	vec2f( 1.0, -1.0),  // right, center
-	vec2f( 1.0,  1.0),  // right, top
-);
-
-@vertex
-fn vs(@builtin(vertex_index) vertexIndex: u32) -> VertexOut {
-	let pos = vertices[vertexIndex];
-	var output: VertexOut;
-	output.position = vec4f(pos, 0.0, 1.0);
-	output.uv = pos.xy;
-	return output;
-}
-
 fn blendNormal(base: f32, blend: f32) -> f32 {
 	return blend;
 }
@@ -253,8 +227,12 @@ fn unscaleUvToCoverGivenAspectRatio(uv: vec2f, aspectRatio: f32) -> vec2f {
 	return uv * vec2f(1.0, aspectRatio) / select(1.0, aspectRatio, 1.0 > aspectRatio);
 }
 
+struct FragmentIn {
+	@location(0) uv: vec2f,
+};
+
 @fragment
-fn fs(fragData: VertexOut) -> @location(0) vec4f {
+fn fs(fragData: FragmentIn) -> @location(0) vec4f {
 	let time = uniforms.time;
 	let u_seed = 1000.0;
 	let scroll = vec2f(0.0, -time * 0.0001);
@@ -429,7 +407,7 @@ fn getPointerForceColor(uv: vec2f) -> vec4f {
 }
 
 @fragment
-fn fsPointerTrail(fragData: VertexOut) -> @location(0) vec4f {
+fn fsPointerTrail(fragData: FragmentIn) -> @location(0) vec4f {
 	var uv = scaleUvToCoverGivenAspectRatio(fragData.uv, pointerTrailUniforms.aspectRatio);
 	var before = textureSample(pointerTrailBeforeTexture, pointerTrailSampler, convertTexCoords(fragData.uv));
 	before -= 1.0 * (pointerTrailUniforms.timeDelta / 2000.0); // 2000msで1.0減る

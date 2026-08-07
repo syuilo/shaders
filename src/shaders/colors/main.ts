@@ -18,7 +18,7 @@ export const playground = definePlayground({
 
 		const pipeline = wgpu.device.createRenderPipeline({
 			vertex: {
-				module: shaderModule,
+				module: wgpu.defaultVertexShaderModule,
 			},
 			fragment: {
 				module: shaderModule,

@@ -157,6 +157,7 @@ export type Playground<OpSc extends OptionsSchema = OptionsSchema> = PlaygroundM
 			device: GPUDevice;
 			context: GPUCanvasContext;
 			sampler: GPUSampler;
+			defaultVertexShaderModule: GPUShaderModule;
 		};
 		params: GetOptionsSchemaValues<OpSc>;
 	}) => Promise<PlaygroundInstance<GetOptionsSchemaValues<OpSc>>>;
