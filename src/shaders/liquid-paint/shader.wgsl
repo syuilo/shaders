@@ -254,17 +254,13 @@ fn fs(fragData: FragmentIn) -> @location(0) vec4f {
 	let aspectUv = scaleUvToCoverGivenAspectRatio(fragData.uv, uniforms.aspectRatio);
 	var uv = aspectUv * uniforms.scale;
 
-	let pointerTrailColor = textureSample(pointerTrailTexture, sourceSampler, convertTexCoords(fragData.uv));
-	//return pointerTrailColor;
+	let pointerTrailVector = textureSample(pointerTrailTexture, sourceSampler, convertTexCoords(fragData.uv)).rg;
 
 	var warpedUv = uv + (vec2f(
 		snoise(vec3f((uv + scroll + 4.0), time)),
 		snoise(vec3f((uv + scroll + 5.0), time))) * 2.0);
 
-	warpedUv.x -= pointerTrailColor.r;
-	warpedUv.y -= pointerTrailColor.g;
-	warpedUv.x += pointerTrailColor.b;
-	warpedUv.y += pointerTrailColor.a;
+	warpedUv -= pointerTrailVector;
 
 	let turbulence = snoise(vec3f((warpedUv + 6.0) * turbulenceScale, time * 0.5));
 
@@ -506,16 +502,13 @@ fn getBlurRadius(_uv: vec2f) -> f32 {
 	var uv = scaleUvToCoverGivenAspectRatio(_uv, blurCommonUniforms.aspectRatio);
 	uv *= blurCommonUniforms.scale;
 
-	var pointerTrailColor = textureSample(pointerTrailTextureForBlur, targetSampler, convertTexCoords(_uv));
+	let pointerTrailVector = textureSample(pointerTrailTextureForBlur, targetSampler, convertTexCoords(_uv)).rg;
 
 	var warpedUv = uv + (vec2f(
 		snoise(vec3f((uv + scroll + 4.0), time)),
 		snoise(vec3f((uv + scroll + 5.0), time))) * 2.0);
 
-	warpedUv.x -= pointerTrailColor.r;
-	warpedUv.y -= pointerTrailColor.g;
-	warpedUv.x += pointerTrailColor.b;
-	warpedUv.y += pointerTrailColor.a;
+	warpedUv -= pointerTrailVector;
 
 	let turbulenceScale = 0.75 * blurUniforms.turbulenceScale;
 	let turbulence = snoise(vec3f((warpedUv + 6.0) * turbulenceScale, time * 0.5));
@@ -525,7 +518,7 @@ fn getBlurRadius(_uv: vec2f) -> f32 {
 	r *= blurUniforms.strength;
 	r = min(max(r, 0.0), 1.0);
 
-	let pointerForce = (pointerTrailColor.r + pointerTrailColor.g + pointerTrailColor.b + pointerTrailColor.a) / 4.0;
+	let pointerForce = (abs(pointerTrailVector.x) + abs(pointerTrailVector.y)) / 4.0;
 	r += max(pointerForce - 0.3, 0.0) * blurUniforms.strength * 0.7;
 
 	return min(max(r, 0.0), 1.0);
@@ -637,28 +630,20 @@ struct PointerTrailUniforms {
 @group(2) @binding(2) var pointerTrailSampler: sampler;
 @group(2) @binding(3) var pointerTrailBeforeTexture: texture_2d<f32>;
 
-fn getPointerForceColor(uv: vec2f) -> vec4f {
+fn getPointerForceVector(uv: vec2f) -> vec2f {
 	if (pointerTrailUniforms.pointerPosition.x <= -999.0 && pointerTrailUniforms.pointerPosition.y <= -999.0) {
-		return vec4f(0.0);
+		return vec2f(0.0);
 	}
 
-	var v = vec4f(0.0);
+	var v = vec2f(0.0);
 	let radius = 0.3;
 
 	let pos = scaleUvToCoverGivenAspectRatio(pointerTrailUniforms.pointerPosition, pointerTrailUniforms.aspectRatio);
 	let d = distance(uv, pos);
 	if (d < radius) {
 		let gradate = 1.0 - (d / radius);
-		v.r = (gradate * gradate) * (pointerTrailUniforms.pointerVector.x * 32.0);
-		v.g = (gradate * gradate) * (pointerTrailUniforms.pointerVector.y * 32.0);
-		v.b = (gradate * gradate) * (-pointerTrailUniforms.pointerVector.x * 32.0);
-		v.a = (gradate * gradate) * (-pointerTrailUniforms.pointerVector.y * 32.0);
+		v = (gradate * gradate) * (pointerTrailUniforms.pointerVector * 32.0);
 	}
-
-	v.r = max(v.r, 0.0);
-	v.g = max(v.g, 0.0);
-	v.b = max(v.b, 0.0);
-	v.a = max(v.a, 0.0);
 
 	return v;
 }
@@ -666,9 +651,8 @@ fn getPointerForceColor(uv: vec2f) -> vec4f {
 @fragment
 fn fsPointerTrail(fragData: FragmentIn) -> @location(0) vec4f {
 	var uv = scaleUvToCoverGivenAspectRatio(fragData.uv, pointerTrailUniforms.aspectRatio);
-	var before = textureSample(pointerTrailBeforeTexture, pointerTrailSampler, convertTexCoords(fragData.uv));
-	before -= 1.0 * (pointerTrailUniforms.timeDelta / 2000.0); // 2000msで1.0減る
-	before = max(before, vec4f(0.0));
-	let v = getPointerForceColor(uv) * 0.3;
-	return vec4f(before.r + v.r, before.g + v.g, before.b + v.b, before.a + v.a);
+	var before = textureSample(pointerTrailBeforeTexture, pointerTrailSampler, convertTexCoords(fragData.uv)).rg;
+	before *= exp2(-pointerTrailUniforms.timeDelta / 300.0);
+	let v = getPointerForceVector(uv) * 0.3;
+	return vec4f(clamp(before + v, vec2f(-1.0), vec2f(1.0)), 0.0, 1.0);
 }

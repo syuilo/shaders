@@ -194,18 +194,12 @@ fn getSourceColor(uv: vec2f) -> vec4f {
 		select(1.0, uniforms.sourceAspectRatio / uniforms.aspectRatio, uniforms.sourceAspectRatio > uniforms.aspectRatio),
 		uniforms.coverSource == 1);
 	var sourceUv = uv * vec2f(1.0, uniforms.sourceAspectRatio) / sourceScale;
-
-	let pointerTrailColor = getPointerTrailColor(uv);
-	sourceUv.x -= pointerTrailColor.r;
-	sourceUv.y -= pointerTrailColor.g;
-	sourceUv.x += pointerTrailColor.b;
-	sourceUv.y += pointerTrailColor.a;
-
+	sourceUv -= getPointerTrailVector(uv);
 	return textureSample(sourceTexture, mySampler, convertTexCoords(sourceUv));
 }
 
-fn getPointerTrailColor(uv: vec2f) -> vec4f {
-	return textureSample(pointerTrailTexture, mySampler, convertTexCoords(unscaleUvToCoverGivenAspectRatio(uv, uniforms.aspectRatio)));
+fn getPointerTrailVector(uv: vec2f) -> vec2f {
+	return textureSample(pointerTrailTexture, mySampler, convertTexCoords(unscaleUvToCoverGivenAspectRatio(uv, uniforms.aspectRatio))).rg;
 }
 
 const discardBrightPixelsThreshold = 0.7;
@@ -294,13 +288,7 @@ fn fs(fragData: FragmentIn) -> @location(0) vec4f {
 	texSelector = remap(texSelector, 0.0, 1.0, uniforms.symbolTexturesRangeMin, uniforms.symbolTexturesRangeMax);
 
 	let scale = min(1.0, 1.0 - border);
-	var shift = vec2f(0.0);
-	let pointerTrailColor = getPointerTrailColor(cellUv);
-	shift.x -= pointerTrailColor.r * cellSize.x;
-	shift.y -= pointerTrailColor.g * cellSize.y;
-	shift.x += pointerTrailColor.b * cellSize.x;
-	shift.y += pointerTrailColor.a * cellSize.y;
-
+	let shift = vec2f(0.0) - getPointerTrailVector(cellUv) * cellSize;
 	let margin = (1.0 - (0.5 + (scale * 0.5))) * cellSize;
 	let transformedCoords = ((modUv + shift) - margin) / (cellSize - (margin * 2.0));
 	var out_color = textureSample(symbolTextures, mySampler, transformedCoords, u32(texSelector * f32(uniforms.symbolTexturesCount)));
@@ -367,28 +355,20 @@ struct PointerTrailUniforms {
 @group(1) @binding(2) var pointerTrailSampler: sampler;
 @group(1) @binding(3) var pointerTrailBeforeTexture: texture_2d<f32>;
 
-fn getPointerForceColor(uv: vec2f) -> vec4f {
+fn getPointerForceVector(uv: vec2f) -> vec2f {
 	if (pointerTrailUniforms.pointerPosition.x <= -999.0 && pointerTrailUniforms.pointerPosition.y <= -999.0) {
-		return vec4f(0.0);
+		return vec2f(0.0);
 	}
 
-	var v = vec4f(0.0);
+	var v = vec2f(0.0);
 	let radius = 0.3;
 
 	let pos = scaleUvToCoverGivenAspectRatio(pointerTrailUniforms.pointerPosition, pointerTrailUniforms.aspectRatio);
 	let d = distance(uv, pos);
 	if (d < radius) {
 		let gradate = 1.0 - (d / radius);
-		v.r = (gradate * gradate) * (pointerTrailUniforms.pointerVector.x * 32.0);
-		v.g = (gradate * gradate) * (pointerTrailUniforms.pointerVector.y * 32.0);
-		v.b = (gradate * gradate) * (-pointerTrailUniforms.pointerVector.x * 32.0);
-		v.a = (gradate * gradate) * (-pointerTrailUniforms.pointerVector.y * 32.0);
+		v = (gradate * gradate) * (pointerTrailUniforms.pointerVector * 32.0);
 	}
-
-	v.r = max(v.r, 0.0);
-	v.g = max(v.g, 0.0);
-	v.b = max(v.b, 0.0);
-	v.a = max(v.a, 0.0);
 
 	return v;
 }
@@ -396,9 +376,8 @@ fn getPointerForceColor(uv: vec2f) -> vec4f {
 @fragment
 fn fsPointerTrail(fragData: FragmentIn) -> @location(0) vec4f {
 	var uv = scaleUvToCoverGivenAspectRatio(fragData.uv, pointerTrailUniforms.aspectRatio);
-	var before = textureSample(pointerTrailBeforeTexture, pointerTrailSampler, convertTexCoords(fragData.uv));
-	before -= 1.0 * (pointerTrailUniforms.timeDelta / 2000.0); // 2000msで1.0減る
-	before = max(before, vec4f(0.0));
-	let v = getPointerForceColor(uv) * 0.3;
-	return vec4f(before.r + v.r, before.g + v.g, before.b + v.b, before.a + v.a);
+	var before = textureSample(pointerTrailBeforeTexture, pointerTrailSampler, convertTexCoords(fragData.uv)).rg;
+	before *= exp2(-pointerTrailUniforms.timeDelta / 300.0);
+	let v = getPointerForceVector(uv) * 0.3;
+	return vec4f(clamp(before + v, vec2f(-1.0), vec2f(1.0)), 0.0, 1.0);
 }
