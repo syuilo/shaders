@@ -279,7 +279,7 @@ export const playground = definePlayground({
 					});
 					wgpu.device.queue.writeBuffer(pointerTrailUniformBuffer, 0, pointerTrailUniformValues.arrayBuffer);
 
-					const passEncoder = ctx.commandEncoder.beginRenderPass({
+					const passEncoder = ctx.createPassEncoder(ctx.commandEncoder, {
 						colorAttachments: [{
 							view: pointerTrailBufferAfter.createView(),
 							clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
@@ -321,7 +321,7 @@ export const playground = definePlayground({
 					});
 					wgpu.device.queue.writeBuffer(uniformBuffer, 0, uniformValues.arrayBuffer);
 
-					const passEncoder = ctx.commandEncoder.beginRenderPass({
+					const passEncoder = ctx.createPassEncoder(ctx.commandEncoder, {
 						colorAttachments: [{
 							view: buffer.createView(),
 							clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
@@ -347,7 +347,7 @@ export const playground = definePlayground({
 						});
 						wgpu.device.queue.writeBuffer(blurHorizontalUniformBuffer, 0, blurHorizontalUniformValues.arrayBuffer);
 
-						const passEncoder = ctx.commandEncoder.beginRenderPass({
+						const passEncoder = ctx.createPassEncoder(ctx.commandEncoder, {
 							colorAttachments: [{
 								view: buffer2.createView(),
 								clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
@@ -381,7 +381,7 @@ export const playground = definePlayground({
 						});
 						wgpu.device.queue.writeBuffer(blurVerticalUniformBuffer, 0, blurVerticalUniformValues.arrayBuffer);
 
-						const passEncoder = ctx.commandEncoder.beginRenderPass({
+						const passEncoder = ctx.createPassEncoder(ctx.commandEncoder, {
 							colorAttachments: [{
 								view: wgpu.context.getCurrentTexture().createView(),
 								clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
@@ -415,7 +415,7 @@ export const playground = definePlayground({
 						});
 						wgpu.device.queue.writeBuffer(blurUniformBuffer, 0, blurUniformValues.arrayBuffer);
 
-						const passEncoder = ctx.commandEncoder.beginRenderPass({
+						const passEncoder = ctx.createPassEncoder(ctx.commandEncoder, {
 							colorAttachments: [{
 								view: wgpu.context.getCurrentTexture().createView(),
 								clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },

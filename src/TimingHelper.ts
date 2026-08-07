@@ -10,6 +10,8 @@ function assert(cond, msg = '') {
 // we try to read the result before the command buffer has been executed.
 const s_unsubmittedCommandBuffer = new Set();
 
+const MAX_PASSES = 4;
+
 /* global GPUQueue */
 GPUQueue.prototype.submit = (function(origFn) {
 	return function(commandBuffers) {
@@ -26,8 +28,10 @@ export default class TimingHelper {
 	#resolveBuffer;
 	#resultBuffer;
 	#commandBuffer;
+	#commandEncoder;
+	#passCount = 0;
 	#resultBuffers = [];
-	// state can be 'free', 'need resolve', 'wait for result'
+	// state can be 'free', 'recording', 'need finish', 'wait for result'
 	#state = 'free';
 
 	constructor(device) {
@@ -36,7 +40,7 @@ export default class TimingHelper {
 		if (this.#canTimestamp) {
 			this.#querySet = device.createQuerySet({
 				type: 'timestamp',
-				count: 2,
+				count: MAX_PASSES * 2,
 			});
 			this.#resolveBuffer = device.createBuffer({
 				size: this.#querySet.count * 8,
@@ -47,38 +51,37 @@ export default class TimingHelper {
 
 	#beginTimestampPass(encoder, fnName, descriptor) {
 		if (this.#canTimestamp) {
-			assert(this.#state === 'free', 'state not free');
-			this.#state = 'need resolve';
+			if (this.#state === 'free') {
+				this.#state = 'recording';
+				this.#commandEncoder = encoder;
 
-			const pass = encoder[fnName]({
+				const resolve = () => this.#resolveTiming(encoder);
+				const trackCommandBuffer = (cb) => this.#trackCommandBuffer(cb);
+				encoder.finish = (function(origFn) {
+					return function() {
+						resolve();
+						const cb = origFn.call(this);
+						trackCommandBuffer(cb);
+						return cb;
+					};
+				})(encoder.finish);
+			} else {
+				assert(this.#state === 'recording', 'state not recording');
+				assert(this.#commandEncoder === encoder, 'all measured passes must use the same command encoder');
+			}
+
+			assert(this.#passCount < MAX_PASSES, `cannot measure more than ${MAX_PASSES} passes per command encoder`);
+			const beginningOfPassWriteIndex = this.#passCount * 2;
+			this.#passCount++;
+
+			return encoder[fnName]({
 				...descriptor,
-				...{
-					timestampWrites: {
-						querySet: this.#querySet,
-						beginningOfPassWriteIndex: 0,
-						endOfPassWriteIndex: 1,
-					},
+				timestampWrites: {
+					querySet: this.#querySet,
+					beginningOfPassWriteIndex,
+					endOfPassWriteIndex: beginningOfPassWriteIndex + 1,
 				},
 			});
-
-			const resolve = () => this.#resolveTiming(encoder);
-			const trackCommandBuffer = (cb) => this.#trackCommandBuffer(cb);
-			pass.end = (function(origFn) {
-				return function() {
-					origFn.call(this);
-					resolve();
-				};
-			})(pass.end);
-
-			encoder.finish = (function(origFn) {
-				return function() {
-					const cb = origFn.call(this);
-					trackCommandBuffer(cb);
-					return cb;
-				};
-			})(encoder.finish);
-
-			return pass;
 		} else {
 			return encoder[fnName](descriptor);
 		}
@@ -107,9 +110,10 @@ export default class TimingHelper {
 			return;
 		}
 		assert(
-			this.#state === 'need resolve',
+			this.#state === 'recording',
 			'you must use timerHelper.beginComputePass or timerHelper.beginRenderPass',
 		);
+		assert(this.#commandEncoder === encoder, 'all measured passes must use the same command encoder');
 		this.#state = 'need finish';
 
 		this.#resultBuffer = this.#resultBuffers.pop() || this.#device.createBuffer({
@@ -117,8 +121,9 @@ export default class TimingHelper {
 			usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
 		});
 
-		encoder.resolveQuerySet(this.#querySet, 0, this.#querySet.count, this.#resolveBuffer, 0);
-		encoder.copyBufferToBuffer(this.#resolveBuffer, 0, this.#resultBuffer, 0, this.#resultBuffer.size);
+		const queryCount = this.#passCount * 2;
+		encoder.resolveQuerySet(this.#querySet, 0, queryCount, this.#resolveBuffer, 0);
+		encoder.copyBufferToBuffer(this.#resolveBuffer, 0, this.#resultBuffer, 0, queryCount * 8);
 	}
 
 	async getResult() {
@@ -134,15 +139,26 @@ export default class TimingHelper {
 			!s_unsubmittedCommandBuffer.has(this.#commandBuffer),
 			'you must submit the command buffer before you can read the result',
 		);
+		const queryCount = this.#passCount * 2;
 		this.#commandBuffer = undefined;
+		this.#commandEncoder = undefined;
+		this.#passCount = 0;
 		this.#state = 'free';
 
 		const resultBuffer = this.#resultBuffer;
 		await resultBuffer.mapAsync(GPUMapMode.READ);
 		const times = new BigUint64Array(resultBuffer.getMappedRange());
-		const duration = Number(times[1] - times[0]);
+		let duration = 0n;
+		for (let i = 0; i < queryCount; i += 2) {
+			const passDuration = times[i + 1] - times[i];
+			if (passDuration < 0n) {
+				duration = passDuration;
+				break;
+			}
+			duration += passDuration;
+		}
 		resultBuffer.unmap();
 		this.#resultBuffers.push(resultBuffer);
-		return duration;
+		return Number(duration);
 	}
 }
