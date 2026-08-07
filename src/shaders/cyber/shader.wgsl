@@ -286,18 +286,27 @@ fn fs(fragData: FragmentIn) -> @location(0) vec4f {
 
 	let visibilityNoiseA = snoise0to1(vec3f(cellUv + scroll, time * 0.00000625));
 	let visibilityNoiseB = snoise0to1(vec3f(cellUv * 8.0, time * 0.00000625));
-	var threshold = 0.65;
+	let threshold = 0.65;
 	var visibility = select(0.0, 1.0, mix(visibilityNoiseA, visibilityNoiseB, 0.5) > threshold);
 	visibility = select(0.0, 1.0, !discardSourceColor(sourceColor));
 
 	var texSelector = select(sourceColorLuminance, remap(sourceColorLuminance, 0.0, discardBrightPixelsThreshold, 0.0, 1.0), uniforms.discardBrightPixels == 1); // discardBrightPixelsでスキップした範囲の分だけ範囲を圧縮する
 	texSelector = remap(texSelector, 0.0, 1.0, uniforms.symbolTexturesRangeMin, uniforms.symbolTexturesRangeMax);
 
-	var scale = min(1.0, 1.0 - border);
+	let scale = min(1.0, 1.0 - border);
+	var shift = vec2f(0.0);
+	let pointerTrailColor = getPointerTrailColor(cellUv);
+	shift.x -= pointerTrailColor.r * cellSize.x;
+	shift.y -= pointerTrailColor.g * cellSize.y;
+	shift.x += pointerTrailColor.b * cellSize.x;
+	shift.y += pointerTrailColor.a * cellSize.y;
 
 	let margin = (1.0 - (0.5 + (scale * 0.5))) * cellSize;
-	let transformedCoords = (modUv - margin) / (cellSize - (margin * 2.0));
+	let transformedCoords = ((modUv + shift) - margin) / (cellSize - (margin * 2.0));
 	var out_color = textureSample(symbolTextures, mySampler, transformedCoords, u32(texSelector * f32(uniforms.symbolTexturesCount)));
+	if (transformedCoords.x < 0.0 || transformedCoords.x > 1.0 || transformedCoords.y < 0.0 || transformedCoords.y > 1.0) {
+		out_color = vec4f(0.0);
+	}
 
 	// background dots and blocks
 	if (visibility == 0.0) {
