@@ -88,6 +88,10 @@
 		<b>Enable stats:</b>
 		<input type="checkbox" v-model="enableStats" />
 	</label>
+	<label>
+		<b>Benchmark mode:</b>
+		<input type="checkbox" v-model="benchmarkMode" />
+	</label>
 </div>
 </template>
 
@@ -107,11 +111,10 @@ const urlParams = new URLSearchParams(window.location.search);
 const playgroundDef = await import(`./shaders/${props.name}/main.ts`).then(module => module.playground as Playground);
 const params = reactive(playgroundDef.getDefaultParams());
 let dispose: (() => void) | null = null;
-
+const benchmarkMode = ref(false);
 const fpsAverage = new NonNegativeRollingAverage(30);
 const fpsDisplay = ref(0);
 const resolutionDisplay = ref({ width: 0, height: 0 });
-
 const enableStats = ref(false);
 const gpuAverageFast = new NonNegativeRollingAverage(10);
 const gpuAverageMedium = new NonNegativeRollingAverage(100);
@@ -150,8 +153,8 @@ async function init() {
 	}
 	const context = _context as GPUCanvasContext;
 
-	canvas.value.width = Math.max(1, Math.min(canvas.value.offsetWidth * (pixelRatio.value ?? window.devicePixelRatio), device.limits.maxTextureDimension2D));
-	canvas.value.height = Math.max(1, Math.min(canvas.value.offsetHeight * (pixelRatio.value ?? window.devicePixelRatio), device.limits.maxTextureDimension2D));
+	canvas.value.width = benchmarkMode.value ? 1024 * (pixelRatio.value ?? 1) : Math.max(1, Math.min(canvas.value.offsetWidth * (pixelRatio.value ?? window.devicePixelRatio), device.limits.maxTextureDimension2D));
+	canvas.value.height = benchmarkMode.value ? 1024 * (pixelRatio.value ?? 1) : Math.max(1, Math.min(canvas.value.offsetHeight * (pixelRatio.value ?? window.devicePixelRatio), device.limits.maxTextureDimension2D));
 
 	resolutionDisplay.value.width = canvas.value.width;
 	resolutionDisplay.value.height = canvas.value.height;
@@ -303,7 +306,7 @@ onMounted(async () => {
 	observer.observe(canvas.value!);
 });
 
-watch([pixelRatio, fps, enableStats], () => {
+watch([pixelRatio, fps, enableStats, benchmarkMode], () => {
 	debouncedInit();
 });
 
