@@ -163,7 +163,9 @@ struct Uniforms {
 	symbolTexturesRangeMin: f32,
 	symbolTexturesRangeMax: f32,
 	sourceAspectRatio: f32,
-	discardBrightPixels: u32,
+	sourceContrast: f32,
+	lightThreshold: f32,
+	darkThreshold: f32,
 	coverSource: u32,
 	bgColor: vec3f,
 	colorA: vec3f,
@@ -200,21 +202,12 @@ fn getSourceColor(uv: vec2f) -> vec4f {
 	if (uniforms.pointerTrailWarp == 1) {
 		sourceUv -= getPointerTrailVector(uv);
 	}
-	return textureSample(sourceTexture, mySampler, convertTexCoords(sourceUv));
+	let color = textureSample(sourceTexture, mySampler, convertTexCoords(sourceUv));
+	return vec4f(pow(color.rgb, vec3f(uniforms.sourceContrast)), color.a);
 }
 
 fn getPointerTrailVector(uv: vec2f) -> vec2f {
 	return textureSample(pointerTrailTexture, mySampler, convertTexCoords(unscaleUvToCoverGivenAspectRatio(uv, uniforms.aspectRatio))).rg;
-}
-
-const discardBrightPixelsThreshold = 0.7;
-
-fn discardSourceColor(c: vec4f) -> bool {
-	var visible = select(false, true, (c.r + c.g + c.b) / 3.0 > 0.1);
-	if (uniforms.discardBrightPixels == 1 && (c.r + c.g + c.b) / 3.0 > discardBrightPixelsThreshold) {
-		visible = false;
-	}
-	return !visible;
 }
 
 fn isSimilar(a: vec4f, b: vec4f, c: vec4f, d: vec4f, threshold: f32) -> bool {
@@ -255,7 +248,7 @@ fn fsWithSource(fragData: FragmentIn) -> @location(0) vec4f {
 	let sourceColorB2 = getSourceColor(b2);
 	let sourceColorC2 = getSourceColor(c2);
 	let sourceColorD2 = getSourceColor(d2);
-	let similar2 = !discardSourceColor(getSourceColor(cellUv2)) && isSimilar(sourceColorA2, sourceColorB2, sourceColorC2, sourceColorD2, 0.1 * uniforms.similarityThresholdFactor);
+	let similar2 = isSimilar(sourceColorA2, sourceColorB2, sourceColorC2, sourceColorD2, 0.1 * uniforms.similarityThresholdFactor);
 
 	let cellUv4 = getPixelatedUv(uv, cellSize * 4.0);
 	let a4 = cellUv4 + vec2f(-(cellUv4.x / 4.0 / 2.0), -(cellUv4.y / 4.0 / 2.0));
@@ -266,7 +259,7 @@ fn fsWithSource(fragData: FragmentIn) -> @location(0) vec4f {
 	let sourceColorB4 = getSourceColor(b4);
 	let sourceColorC4 = getSourceColor(c4);
 	let sourceColorD4 = getSourceColor(d4);
-	let similar4 = !discardSourceColor(getSourceColor(cellUv4)) && isSimilar(sourceColorA4, sourceColorB4, sourceColorC4, sourceColorD4, 0.025 * uniforms.similarityThresholdFactor);
+	let similar4 = isSimilar(sourceColorA4, sourceColorB4, sourceColorC4, sourceColorD4, 0.025 * uniforms.similarityThresholdFactor);
 
 	if (similar4) {
 		modUv = modVec2f(uv, cellSize * 4.0);
@@ -283,13 +276,7 @@ fn fsWithSource(fragData: FragmentIn) -> @location(0) vec4f {
 	let sourceColor = getSourceColor(cellUv);
 	let sourceColorLuminance = (sourceColor.r + sourceColor.g + sourceColor.b) / 3.0;
 
-	let visibilityNoiseA = snoise0to1(vec3f(cellUv + scroll, time * 0.00000625));
-	let visibilityNoiseB = snoise0to1(vec3f(cellUv * 8.0, time * 0.00000625));
-	let threshold = 0.65;
-	var visibility = select(0.0, 1.0, mix(visibilityNoiseA, visibilityNoiseB, 0.5) > threshold);
-	visibility = select(0.0, 1.0, !discardSourceColor(sourceColor));
-
-	var texSelector = select(sourceColorLuminance, remap(sourceColorLuminance, 0.0, discardBrightPixelsThreshold, 0.0, 1.0), uniforms.discardBrightPixels == 1); // discardBrightPixelsでスキップした範囲の分だけ範囲を圧縮する
+	var texSelector = remap(sourceColorLuminance, uniforms.darkThreshold, uniforms.lightThreshold, 0.0, 1.0); // クリップする範囲の分だけ範囲を圧縮する
 	texSelector = remap(texSelector, 0.0, 1.0, uniforms.symbolTexturesRangeMin, uniforms.symbolTexturesRangeMax);
 
 	let scale = min(1.0, 1.0 - border);
@@ -301,17 +288,21 @@ fn fsWithSource(fragData: FragmentIn) -> @location(0) vec4f {
 		out_color = vec4f(0.0);
 	}
 
-	// background dots and blocks
-	if (visibility == 0.0) {
-		//return sourceColor;
-		let n = mix(visibilityNoiseA, visibilityNoiseB, 0.2);
-		if (n > 0.75) {
-			return premultiplyAlpha(vec4f(mix(uniforms.bgColor, uniforms.colorA, 0.05), 1.0));
-		} else if (n > 0.5) {
-			if (distance(modUv / cellSize, vec2(0.5, 0.5)) < 0.05) {
-				return premultiplyAlpha(vec4f(mix(uniforms.bgColor, uniforms.colorA, 0.25), 1.0));
-			}
+	if (sourceColorLuminance > uniforms.lightThreshold) {
+		return premultiplyAlpha(vec4f(0.0));
+	}
+
+	// fill background dots and blocks
+	if (sourceColorLuminance < uniforms.darkThreshold * 0.3) {
+		return premultiplyAlpha(vec4f(0.0));
+	} else if (sourceColorLuminance < uniforms.darkThreshold * 0.7) {
+		if (distance(modUv / cellSize, vec2(0.5, 0.5)) < 0.05) {
+			return premultiplyAlpha(vec4f(mix(uniforms.bgColor, uniforms.colorA, 0.25), 1.0));
+		} else {
+			return premultiplyAlpha(vec4f(0.0));
 		}
+	} else if (sourceColorLuminance < uniforms.darkThreshold) {
+		return premultiplyAlpha(vec4f(mix(uniforms.bgColor, uniforms.colorA, 0.05), 1.0));
 	}
 
 	let isIn = (
@@ -335,10 +326,6 @@ fn fsWithSource(fragData: FragmentIn) -> @location(0) vec4f {
 		out_color = vec4f(uniforms.colorA.rgb, out_color.a * 0.7);
 	} else { // apply colorA
 		out_color = vec4f(uniforms.colorA.rgb, out_color.a);
-	}
-
-	if (visibility == 0.0) {
-		out_color = vec4f(1.0, 1.0, 1.0, 0.0);
 	}
 
 	out_color.r = mix(uniforms.bgColor.r, out_color.r, out_color.a);
