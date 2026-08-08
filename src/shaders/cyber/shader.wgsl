@@ -164,8 +164,8 @@ struct Uniforms {
 	symbolTexturesRangeMax: f32,
 	sourceAspectRatio: f32,
 	sourceContrast: f32,
-	lightThreshold: f32,
-	darkThreshold: f32,
+	highlightClipThreshold: f32,
+	shadowClipThreshold: f32,
 	coverSource: u32,
 	bgColor: vec3f,
 	colorA: vec3f,
@@ -276,7 +276,7 @@ fn fsWithSource(fragData: FragmentIn) -> @location(0) vec4f {
 	let sourceColor = getSourceColor(cellUv);
 	let sourceColorLuminance = (sourceColor.r + sourceColor.g + sourceColor.b) / 3.0;
 
-	var texSelector = remap(sourceColorLuminance, uniforms.darkThreshold, uniforms.lightThreshold, 0.0, 1.0); // クリップする範囲の分だけ範囲を圧縮する
+	var texSelector = remap(sourceColorLuminance, uniforms.shadowClipThreshold, uniforms.highlightClipThreshold, 0.0, 1.0); // クリップする範囲の分だけ範囲を圧縮する
 	texSelector = remap(texSelector, 0.0, 1.0, uniforms.symbolTexturesRangeMin, uniforms.symbolTexturesRangeMax);
 
 	let scale = min(1.0, 1.0 - border);
@@ -288,20 +288,20 @@ fn fsWithSource(fragData: FragmentIn) -> @location(0) vec4f {
 		out_color = vec4f(0.0);
 	}
 
-	if (sourceColorLuminance > uniforms.lightThreshold) {
+	if (sourceColorLuminance > uniforms.highlightClipThreshold) {
 		return premultiplyAlpha(vec4f(0.0));
 	}
 
 	// fill background dots and blocks
-	if (sourceColorLuminance < uniforms.darkThreshold * 0.3) {
+	if (sourceColorLuminance < uniforms.shadowClipThreshold * 0.3) {
 		return premultiplyAlpha(vec4f(0.0));
-	} else if (sourceColorLuminance < uniforms.darkThreshold * 0.7) {
+	} else if (sourceColorLuminance < uniforms.shadowClipThreshold * 0.7) {
 		if (distance(modUv / cellSize, vec2(0.5, 0.5)) < 0.05) {
 			return premultiplyAlpha(vec4f(mix(uniforms.bgColor, uniforms.colorA, 0.25), 1.0));
 		} else {
 			return premultiplyAlpha(vec4f(0.0));
 		}
-	} else if (sourceColorLuminance < uniforms.darkThreshold) {
+	} else if (sourceColorLuminance < uniforms.shadowClipThreshold) {
 		return premultiplyAlpha(vec4f(mix(uniforms.bgColor, uniforms.colorA, 0.05), 1.0));
 	}
 
