@@ -18,6 +18,8 @@ export const playground = definePlayground({
 		colorA: { type: 'color', label: 'Color A' },
 		colorB: { type: 'color', label: 'Color B' },
 		colorC: { type: 'color', label: 'Color C' },
+		pointerTrailShift: { type: 'boolean', label: 'Pointer Trail Shift' },
+		pointerTrailWarp: { type: 'boolean', label: 'Pointer Trail Warp' },
 		test: { type: 'boolean', label: 'Test' },
 	},
 	getDefaultParams: () => ({
@@ -33,6 +35,8 @@ export const playground = definePlayground({
 		colorA: [1, 1, 1],
 		colorB: [0.8, 1, 0],
 		colorC: [1, 0.3, 0],
+		pointerTrailShift: true,
+		pointerTrailWarp: true,
 		test: false,
 	}),
 	init: async ({ width, height, wgpu, params, canvas }) => {
@@ -280,6 +284,8 @@ export const playground = definePlayground({
 					colorA: params.colorA,
 					colorB: params.colorB,
 					colorC: params.colorC,
+					pointerTrailShift: params.pointerTrailShift ? 1 : 0,
+					pointerTrailWarp: params.pointerTrailWarp ? 1 : 0,
 					pointerPosition: [pointerX, -pointerY],
 					test: params.test ? 1 : 0,
 				});

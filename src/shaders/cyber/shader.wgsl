@@ -170,6 +170,8 @@ struct Uniforms {
 	colorA: vec3f,
 	colorB: vec3f,
 	colorC: vec3f,
+	pointerTrailShift: u32,
+	pointerTrailWarp: u32,
 	test: u32,
 };
 
@@ -194,7 +196,9 @@ fn getSourceColor(uv: vec2f) -> vec4f {
 		select(1.0, uniforms.sourceAspectRatio / uniforms.aspectRatio, uniforms.sourceAspectRatio > uniforms.aspectRatio),
 		uniforms.coverSource == 1);
 	var sourceUv = uv * vec2f(1.0, uniforms.sourceAspectRatio) / sourceScale;
-	sourceUv -= getPointerTrailVector(uv);
+	if (uniforms.pointerTrailWarp == 1) {
+		sourceUv -= getPointerTrailVector(uv);
+	}
 	return textureSample(sourceTexture, mySampler, convertTexCoords(sourceUv));
 }
 
@@ -288,7 +292,7 @@ fn fs(fragData: FragmentIn) -> @location(0) vec4f {
 	texSelector = remap(texSelector, 0.0, 1.0, uniforms.symbolTexturesRangeMin, uniforms.symbolTexturesRangeMax);
 
 	let scale = min(1.0, 1.0 - border);
-	let shift = vec2f(0.0) - getPointerTrailVector(cellUv) * cellSize;
+	let shift = select(vec2f(0.0), vec2f(0.0) - getPointerTrailVector(cellUv) * cellSize, uniforms.pointerTrailShift == 1);
 	let margin = (1.0 - (0.5 + (scale * 0.5))) * cellSize;
 	let transformedCoords = ((modUv + shift) - margin) / (cellSize - (margin * 2.0));
 	var out_color = textureSample(symbolTextures, mySampler, transformedCoords, u32(texSelector * f32(uniforms.symbolTexturesCount)));
