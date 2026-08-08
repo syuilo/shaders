@@ -238,7 +238,7 @@ struct FragmentIn {
 };
 
 @fragment
-fn fs(fragData: FragmentIn) -> @location(0) vec4f {
+fn fsWithSource(fragData: FragmentIn) -> @location(0) vec4f {
 	let time = uniforms.time;
 	let scroll = vec2f(0.0, -time * 0.0001);
 	let uv = scaleUvToCoverGivenAspectRatio(fragData.uv, uniforms.aspectRatio);
@@ -350,7 +350,7 @@ fn fs(fragData: FragmentIn) -> @location(0) vec4f {
 }
 
 @fragment
-fn fsNoSource(fragData: FragmentIn) -> @location(0) vec4f {
+fn fsWithoutSource(fragData: FragmentIn) -> @location(0) vec4f {
 	let time = uniforms.time;
 	let scroll = vec2f(0.0, -time * 0.0001);
 	let uv = scaleUvToCoverGivenAspectRatio(fragData.uv, uniforms.aspectRatio);
