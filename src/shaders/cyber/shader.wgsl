@@ -162,7 +162,6 @@ struct Uniforms {
 	symbolTexturesCount: u32,
 	symbolTexturesRangeMin: f32,
 	symbolTexturesRangeMax: f32,
-	pointerPosition: vec2f,
 	sourceAspectRatio: f32,
 	discardBrightPixels: u32,
 	coverSource: u32,
@@ -170,8 +169,10 @@ struct Uniforms {
 	colorA: vec3f,
 	colorB: vec3f,
 	colorC: vec3f,
+	similarityThresholdFactor: f32,
 	pointerTrailShift: u32,
 	pointerTrailWarp: u32,
+	pointerPosition: vec2f,
 	test: u32,
 };
 
@@ -254,7 +255,7 @@ fn fs(fragData: FragmentIn) -> @location(0) vec4f {
 	let sourceColorB2 = getSourceColor(b2);
 	let sourceColorC2 = getSourceColor(c2);
 	let sourceColorD2 = getSourceColor(d2);
-	let similar2 = !discardSourceColor(getSourceColor(cellUv2)) && isSimilar(sourceColorA2, sourceColorB2, sourceColorC2, sourceColorD2, 0.1);
+	let similar2 = !discardSourceColor(getSourceColor(cellUv2)) && isSimilar(sourceColorA2, sourceColorB2, sourceColorC2, sourceColorD2, 0.1 * uniforms.similarityThresholdFactor);
 
 	let cellUv4 = getPixelatedUv(uv, cellSize * 4.0);
 	let a4 = cellUv4 + vec2f(-(cellUv4.x / 4.0 / 2.0), -(cellUv4.y / 4.0 / 2.0));
@@ -265,7 +266,7 @@ fn fs(fragData: FragmentIn) -> @location(0) vec4f {
 	let sourceColorB4 = getSourceColor(b4);
 	let sourceColorC4 = getSourceColor(c4);
 	let sourceColorD4 = getSourceColor(d4);
-	let similar4 = !discardSourceColor(getSourceColor(cellUv4)) && isSimilar(sourceColorA4, sourceColorB4, sourceColorC4, sourceColorD4, 0.025);
+	let similar4 = !discardSourceColor(getSourceColor(cellUv4)) && isSimilar(sourceColorA4, sourceColorB4, sourceColorC4, sourceColorD4, 0.025 * uniforms.similarityThresholdFactor);
 
 	if (similar4) {
 		modUv = modVec2f(uv, cellSize * 4.0);
