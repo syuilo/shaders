@@ -349,6 +349,105 @@ fn fs(fragData: FragmentIn) -> @location(0) vec4f {
 	return premultiplyAlpha(out_color);
 }
 
+@fragment
+fn fsNoSource(fragData: FragmentIn) -> @location(0) vec4f {
+	let time = uniforms.time;
+	let scroll = vec2f(0.0, -time * 0.0001);
+	let uv = scaleUvToCoverGivenAspectRatio(fragData.uv, uniforms.aspectRatio);
+	var cellSize = vec2f(1.0 / (uniforms.divisions * 0.5));
+	var border = uniforms.margin;
+	var modUv = modVec2f(uv, cellSize);
+
+	let cellUv2 = getPixelatedUv(uv, cellSize * 2.0);
+	let cellUv4 = getPixelatedUv(uv, cellSize * 4.0);
+
+	let cellMultiplier2Noise = snoise0to1(vec3f(cellUv2.x * 3.0, cellUv2.y * 3.0, time * 0.000025));
+	let cellMultiplier4Noise = snoise0to1(vec3f(cellUv4.x * 3.0, cellUv4.y * 3.0, time * 0.000025));
+	if (cellMultiplier4Noise > 0.9) {
+		modUv = modVec2f(uv, cellSize * 4.0);
+		cellSize = cellSize * 4.0;
+		border /= 4.0;
+	} else if (cellMultiplier2Noise > 0.75) {
+		modUv = modVec2f(uv, cellSize * 2.0);
+		cellSize = cellSize * 2.0;
+		border /= 2.0;
+	}
+
+	var cellUv = getPixelatedUv(uv, cellSize);
+
+	if (uniforms.pointerTrailWarp == 1) {
+		cellUv -= getPointerTrailVector(cellUv);
+	}
+
+	let sourceColor = getSourceColor(cellUv); // なぜか無いと死ぬ
+
+	let visibilityNoiseA = snoise0to1(vec3f(cellUv + scroll, time * 0.00000625));
+	let visibilityNoiseB = snoise0to1(vec3f(cellUv * 8.0, time * 0.00000625));
+	let threshold = 0.65;
+	let visibility = select(0.0, 1.0, mix(visibilityNoiseA, visibilityNoiseB, 0.5) > threshold);
+
+	var texSelector = snoise0to1(vec3f((cellUv * 3.0) + scroll, time * 0.00001));
+	texSelector = remap(texSelector, 0.0, 1.0, uniforms.symbolTexturesRangeMin, uniforms.symbolTexturesRangeMax);
+
+	let scaleNoise = snoise0to1(vec3f(cellUv * 0.7, time * 0.0000125));
+	var scale = select(0.4, 1.0, scaleNoise > 0.25);
+	scale = min(scale, 1.0 - border);
+
+	let shift = select(vec2f(0.0), vec2f(0.0) - getPointerTrailVector(cellUv) * cellSize, uniforms.pointerTrailShift == 1);
+	let margin = (1.0 - (0.5 + (scale * 0.5))) * cellSize;
+	let transformedCoords = ((modUv + shift) - margin) / (cellSize - (margin * 2.0));
+	var out_color = textureSample(symbolTextures, mySampler, transformedCoords, u32(texSelector * f32(uniforms.symbolTexturesCount)));
+	if (transformedCoords.x < 0.0 || transformedCoords.x > 1.0 || transformedCoords.y < 0.0 || transformedCoords.y > 1.0) {
+		out_color = vec4f(0.0);
+	}
+
+	let colorNoise = snoise0to1(vec3f((cellUv * 8.0) + scroll, time * 0.000025));
+
+	// background dots and blocks
+	if (visibility == 0.0) {
+		let n = mix(visibilityNoiseA, visibilityNoiseB, 0.2);
+		if (n > 0.75) {
+			return premultiplyAlpha(vec4f(mix(uniforms.bgColor, uniforms.colorA, 0.05), 1.0));
+		} else if (n > 0.5) {
+			if (distance(modUv / cellSize, vec2(0.5, 0.5)) < 0.05) {
+				return premultiplyAlpha(vec4f(mix(uniforms.bgColor, uniforms.colorA, 0.25), 1.0));
+			}
+		}
+	}
+
+	let isIn = (
+		(modUv.x / cellSize.x) > (1.0 - scale) / 2.0 &&
+		(modUv.x / cellSize.x) < 0.5 + (scale / 2.0) &&
+		(modUv.y / cellSize.y) > (1.0 - scale) / 2.0 &&
+		(modUv.y / cellSize.y) < 0.5 + (scale / 2.0)
+	);
+
+	if (!isIn) {
+		return premultiplyAlpha(vec4f(vec3f(uniforms.bgColor), 1.0));
+	}
+
+	if (colorNoise > 0.9) { // apply colorC
+		out_color = vec4f(uniforms.colorC.rgb, out_color.a);
+	} else if (colorNoise > 0.7) { // apply colorB
+		out_color = vec4f(uniforms.colorB.rgb, out_color.a);
+	} else if (colorNoise > 0.35) { // apply colorA
+		out_color = vec4f(uniforms.colorA.rgb, out_color.a);
+	} else { // apply colorA with lower opacity
+		out_color = vec4f(uniforms.colorA.rgb, out_color.a * 0.3);
+	}
+
+	if (visibility == 0.0) {
+		out_color = vec4f(1.0, 1.0, 1.0, 0.0);
+	}
+
+	out_color.r = mix(uniforms.bgColor.r, out_color.r, out_color.a);
+	out_color.g = mix(uniforms.bgColor.g, out_color.g, out_color.a);
+	out_color.b = mix(uniforms.bgColor.b, out_color.b, out_color.a);
+	out_color.a = 1.0;
+
+	return premultiplyAlpha(out_color);
+}
+
 struct PointerTrailUniforms {
 	aspectRatio: f32,
 	timeDelta: f32,

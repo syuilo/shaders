@@ -125,7 +125,7 @@ export const playground = definePlayground({
 			},
 			fragment: {
 				module: shaderModule,
-				entryPoint: 'fs',
+				entryPoint: params.source != null ? 'fs' : 'fsNoSource',
 				targets: [{
 					format: navigator.gpu.getPreferredCanvasFormat(),
 				}],
