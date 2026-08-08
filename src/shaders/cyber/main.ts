@@ -29,7 +29,7 @@ export const playground = definePlayground({
 		source: null,
 		coverSource: true,
 		sourceContrast: 1.0,
-		lightThreshold: 0.7,
+		lightThreshold: 0.8,
 		darkThreshold: 0.2,
 		divisions: 64,
 		margin: 0.25,
