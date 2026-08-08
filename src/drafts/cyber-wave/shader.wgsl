@@ -1,0 +1,590 @@
+fn blendNormal(base: f32, blend: f32) -> f32 {
+	return blend;
+}
+fn blendNormalVec3f(base: vec3f, blend: vec3f) -> vec3f {
+	return blend;
+}
+
+fn blendAdd(base: f32, blend: f32) -> f32 {
+	return min(base + blend, 1.0);
+}
+fn blendAddVec3f(base: vec3f, blend: vec3f) -> vec3f {
+	return min(base + blend, vec3f(1.0));
+}
+
+fn blendSubtract(base: f32, blend: f32) -> f32 {
+	return max(base + blend - 1.0, 0.0);
+}
+fn blendSubtractVec3f(base: vec3f, blend: vec3f) -> vec3f {
+	return max(base + blend - vec3f(1.0), vec3f(0.0));
+}
+
+fn blendMultiply(base: f32, blend: f32) -> f32 {
+	return base * blend;
+}
+fn blendMultiplyVec3f(base: vec3f, blend: vec3f) -> vec3f {
+	return base * blend;
+}
+
+fn blendDarken(base: f32, blend: f32) -> f32 {
+	return min(blend, base);
+}
+fn blendDarkenVec3f(base: vec3f, blend: vec3f) -> vec3f {
+	return vec3f(blendDarken(base.r, blend.r), blendDarken(base.g, blend.g), blendDarken(base.b, blend.b));
+}
+
+fn blendLighten(base: f32, blend: f32) -> f32 {
+	return max(blend, base);
+}
+fn blendLightenVec3f(base: vec3f, blend: vec3f) -> vec3f {
+	return vec3f(blendLighten(base.r, blend.r), blendLighten(base.g, blend.g), blendLighten(base.b, blend.b));
+}
+
+fn blendScreen(base: f32, blend: f32) -> f32 {
+	return 1.0 - ((1.0 - base) * (1.0 - blend));
+}
+fn blendScreenVec3f(base: vec3f, blend: vec3f) -> vec3f {
+	return vec3f(blendScreen(base.r, blend.r), blendScreen(base.g, blend.g), blendScreen(base.b, blend.b));
+}
+
+fn blendOverlay(base: f32, blend: f32) -> f32 {
+	return select(1.0 - 2.0 * (1.0 - base) * (1.0 - blend), 2.0 * base * blend, base < 0.5);
+}
+fn blendOverlayVec3f(base: vec3f, blend: vec3f) -> vec3f {
+	return vec3f(blendOverlay(base.r, blend.r), blendOverlay(base.g, blend.g), blendOverlay(base.b, blend.b));
+}
+
+const PI = 3.141592653589793;
+const TWO_PI = 6.283185307179586;
+const HALF_PI = 1.5707963267948966;
+
+fn mod289_3(x: vec3f) -> vec3f {
+	return x - floor(x * (1.0 / 289.0)) * 289.0;
+}
+
+fn mod289_4(x: vec4f) -> vec4f {
+	return x - floor(x * (1.0 / 289.0)) * 289.0;
+}
+
+fn permute(x: vec4f) -> vec4f {
+	return mod289_4(((x * 34.0) + 10.0) * x);
+}
+
+fn taylorInvSqrt(r: vec4f) -> vec4f {
+	return 1.79284291400159 - 0.85373472095314 * r;
+}
+
+// -1.0 ~ +1.0
+fn snoise(v: vec3f) -> f32 {
+	const C = vec2f(1.0 / 6.0, 1.0 / 3.0);
+	const D = vec4f(0.0, 0.5, 1.0, 2.0);
+
+	var i = floor(v + dot(v, C.yyy));
+	var x0 = v - i + dot(i, C.xxx);
+
+	var g = step(x0.yzx, x0.xyz);
+	var l = 1.0 - g;
+	var i1 = min(g.xyz, l.zxy);
+	var i2 = max(g.xyz, l.zxy);
+
+	var x1 = x0 - i1 + C.xxx;
+	var x2 = x0 - i2 + C.yyy;
+	var x3 = x0 - D.yyy;
+
+	i = mod289_3(i);
+	var p = permute(permute(permute(
+						i.z + vec4f(0.0, i1.z, i2.z, 1.0))
+					+ i.y + vec4f(0.0, i1.y, i2.y, 1.0))
+					+ i.x + vec4f(0.0, i1.x, i2.x, 1.0));
+
+	var n_ = 0.142857142857;
+	var ns = n_ * D.wyz - D.xzx;
+
+	var j = p - 49.0 * floor(p * ns.z * ns.z);
+
+	var x_ = floor(j * ns.z);
+	var y_ = floor(j - 7.0 * x_);
+
+	var x = x_ * ns.x + ns.yyyy;
+	var y = y_ * ns.x + ns.yyyy;
+	var h = 1.0 - abs(x) - abs(y);
+
+	var b0 = vec4f(x.xy, y.xy);
+	var b1 = vec4f(x.zw, y.zw);
+
+	var s0 = floor(b0) * 2.0 + 1.0;
+	var s1 = floor(b1) * 2.0 + 1.0;
+	var sh = -step(h, vec4f(0.0));
+
+	var a0 = b0.xzyw + s0.xzyw * sh.xxyy;
+	var a1 = b1.xzyw + s1.xzyw * sh.zzww;
+
+	var p0 = vec3f(a0.xy, h.x);
+	var p1 = vec3f(a0.zw, h.y);
+	var p2 = vec3f(a1.xy, h.z);
+	var p3 = vec3f(a1.zw, h.w);
+
+	var norm = taylorInvSqrt(vec4f(dot(p0, p0), dot(p1, p1), dot(p2, p2), dot(p3, p3)));
+	p0 *= norm.x;
+	p1 *= norm.y;
+	p2 *= norm.z;
+	p3 *= norm.w;
+
+	var m = max(0.5 - vec4f(dot(x0, x0), dot(x1, x1), dot(x2, x2), dot(x3, x3)), vec4f(0.0));
+	m = m * m;
+	return 105.0 * dot(m * m, vec4f(dot(p0, x0), dot(p1, x1), dot(p2, x2), dot(p3, x3)));
+}
+
+// +0.0 ~ +1.0
+fn snoise0to1(v: vec3f) -> f32 {
+	return (snoise(v) + 1.0) / 2.0;
+}
+
+// equivalent to GLSL's mod function
+fn modVec2f(a: vec2f, b: vec2f) -> vec2f {
+	return a - b * floor(a / b);
+}
+
+fn premultiplyAlpha(color: vec4f) -> vec4f {
+	return vec4f(color.rgb * color.a, color.a);
+}
+
+// テクスチャ座標(0~1、+Yが下)に変換
+fn convertTexCoords(uv: vec2f) -> vec2f {
+	return vec2f(uv.x, -uv.y) * 0.5 + vec2f(0.5);
+}
+
+struct Uniforms {
+	aspectRatio: f32,
+	time: f32,
+	divisions: f32,
+	margin: f32,
+	symbolTexturesCount: u32,
+	symbolTexturesRangeMin: f32,
+	symbolTexturesRangeMax: f32,
+	sourceAspectRatio: f32,
+	discardBrightPixels: u32,
+	coverSource: u32,
+	bgColor: vec3f,
+	colorA: vec3f,
+	colorB: vec3f,
+	colorC: vec3f,
+	similarityThresholdFactor: f32,
+	pointerTrailWeight: f32,
+	pointerTrailShift: u32,
+	pointerTrailWarp: u32,
+	pointerPosition: vec2f,
+	test: u32,
+};
+
+@group(0) @binding(1) var<uniform> uniforms: Uniforms;
+@group(0) @binding(2) var mySampler: sampler;
+@group(0) @binding(3) var symbolTextures: texture_2d_array<f32>;
+@group(0) @binding(4) var sourceTexture: texture_2d<f32>;
+@group(0) @binding(5) var pointerTrailTexture: texture_2d<f32>;
+@group(0) @binding(6) var waveVectorTexture: texture_2d<f32>;
+
+// https://docs.arduino.cc/language-reference/en/functions/math/map/
+fn remap(value: f32, inMin: f32, inMax: f32, outMin: f32, outMax: f32) -> f32 {
+	return (value - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
+}
+
+fn getPixelatedUv(uv: vec2f, cellSize: vec2f) -> vec2f {
+	return (cellSize * floor(uv / cellSize)) + (cellSize / 2.0);
+}
+
+fn getSourceColor(uv: vec2f) -> vec4f {
+	let sourceScale = select(
+		select(1.0, uniforms.sourceAspectRatio / uniforms.aspectRatio, uniforms.sourceAspectRatio < uniforms.aspectRatio),
+		select(1.0, uniforms.sourceAspectRatio / uniforms.aspectRatio, uniforms.sourceAspectRatio > uniforms.aspectRatio),
+		uniforms.coverSource == 1);
+	var sourceUv = uv * vec2f(1.0, uniforms.sourceAspectRatio) / sourceScale;
+	if (uniforms.pointerTrailWarp == 1) {
+		sourceUv -= getDistortionVector(uv);
+	}
+	return textureSample(sourceTexture, mySampler, convertTexCoords(sourceUv));
+}
+
+fn getPointerTrailVector(uv: vec2f) -> vec2f {
+	return textureSample(pointerTrailTexture, mySampler, convertTexCoords(unscaleUvToCoverGivenAspectRatio(uv, uniforms.aspectRatio))).rg;
+}
+
+fn getWaveVector(uv: vec2f) -> vec2f {
+	return textureSample(waveVectorTexture, mySampler, convertTexCoords(unscaleUvToCoverGivenAspectRatio(uv, uniforms.aspectRatio))).rg;
+}
+
+fn getDistortionVector(uv: vec2f) -> vec2f {
+	return getWaveVector(uv) + (getPointerTrailVector(uv) * uniforms.pointerTrailWeight);
+}
+
+const discardBrightPixelsThreshold = 0.7;
+
+fn discardSourceColor(c: vec4f) -> bool {
+	var visible = select(false, true, (c.r + c.g + c.b) / 3.0 > 0.1);
+	if (uniforms.discardBrightPixels == 1 && (c.r + c.g + c.b) / 3.0 > discardBrightPixelsThreshold) {
+		visible = false;
+	}
+	return !visible;
+}
+
+fn isSimilar(a: vec4f, b: vec4f, c: vec4f, d: vec4f, threshold: f32) -> bool {
+	return (
+		abs(a.r - b.r) < threshold && abs(a.g - b.g) < threshold && abs(a.b - b.b) < threshold &&
+		abs(a.r - c.r) < threshold && abs(a.g - c.g) < threshold && abs(a.b - c.b) < threshold &&
+		abs(a.r - d.r) < threshold && abs(a.g - d.g) < threshold && abs(a.b - d.b) < threshold
+	);
+}
+
+fn scaleUvToCoverGivenAspectRatio(uv: vec2f, aspectRatio: f32) -> vec2f {
+	return uv / vec2f(1.0, aspectRatio) * select(1.0, aspectRatio, 1.0 > aspectRatio);
+}
+
+fn unscaleUvToCoverGivenAspectRatio(uv: vec2f, aspectRatio: f32) -> vec2f {
+	return uv * vec2f(1.0, aspectRatio) / select(1.0, aspectRatio, 1.0 > aspectRatio);
+}
+
+struct FragmentIn {
+	@location(0) uv: vec2f,
+};
+
+@fragment
+fn fsWithSource(fragData: FragmentIn) -> @location(0) vec4f {
+	let time = uniforms.time;
+	let scroll = vec2f(0.0, -time * 0.0001);
+	let uv = scaleUvToCoverGivenAspectRatio(fragData.uv, uniforms.aspectRatio);
+	var cellSize = vec2f(1.0 / (uniforms.divisions * 0.5));
+	var border = uniforms.margin;
+	var modUv = modVec2f(uv, cellSize);
+
+	let cellUv2 = getPixelatedUv(uv, cellSize * 2.0);
+	let a2 = cellUv2 + vec2f(-(cellUv2.x / 2.0 / 2.0), -(cellUv2.y / 2.0 / 2.0));
+	let b2 = cellUv2 + vec2f((cellUv2.x / 2.0 / 2.0), -(cellUv2.y / 2.0 / 2.0));
+	let c2 = cellUv2 + vec2f(-(cellUv2.x / 2.0 / 2.0), (cellUv2.y / 2.0 / 2.0));
+	let d2 = cellUv2 + vec2f((cellUv2.x / 2.0 / 2.0), (cellUv2.y / 2.0 / 2.0));
+	let sourceColorA2 = getSourceColor(a2);
+	let sourceColorB2 = getSourceColor(b2);
+	let sourceColorC2 = getSourceColor(c2);
+	let sourceColorD2 = getSourceColor(d2);
+	let similar2 = !discardSourceColor(getSourceColor(cellUv2)) && isSimilar(sourceColorA2, sourceColorB2, sourceColorC2, sourceColorD2, 0.1 * uniforms.similarityThresholdFactor);
+
+	let cellUv4 = getPixelatedUv(uv, cellSize * 4.0);
+	let a4 = cellUv4 + vec2f(-(cellUv4.x / 4.0 / 2.0), -(cellUv4.y / 4.0 / 2.0));
+	let b4 = cellUv4 + vec2f((cellUv4.x / 4.0 / 2.0), -(cellUv4.y / 4.0 / 2.0));
+	let c4 = cellUv4 + vec2f(-(cellUv4.x / 4.0 / 2.0), (cellUv4.y / 4.0 / 2.0));
+	let d4 = cellUv4 + vec2f((cellUv4.x / 4.0 / 2.0), (cellUv4.y / 4.0 / 2.0));
+	let sourceColorA4 = getSourceColor(a4);
+	let sourceColorB4 = getSourceColor(b4);
+	let sourceColorC4 = getSourceColor(c4);
+	let sourceColorD4 = getSourceColor(d4);
+	let similar4 = !discardSourceColor(getSourceColor(cellUv4)) && isSimilar(sourceColorA4, sourceColorB4, sourceColorC4, sourceColorD4, 0.025 * uniforms.similarityThresholdFactor);
+
+	if (similar4) {
+		modUv = modVec2f(uv, cellSize * 4.0);
+		cellSize = cellSize * 4.0;
+		border /= 4.0;
+	} else if (similar2) {
+		modUv = modVec2f(uv, cellSize * 2.0);
+		cellSize = cellSize * 2.0;
+		border /= 2.0;
+	}
+
+	let cellUv = getPixelatedUv(uv, cellSize);
+
+	let sourceColor = getSourceColor(cellUv);
+	let sourceColorLuminance = (sourceColor.r + sourceColor.g + sourceColor.b) / 3.0;
+
+	let visibilityNoiseA = snoise0to1(vec3f(cellUv + scroll, time * 0.00000625));
+	let visibilityNoiseB = snoise0to1(vec3f(cellUv * 8.0, time * 0.00000625));
+	let threshold = 0.65;
+	var visibility = select(0.0, 1.0, mix(visibilityNoiseA, visibilityNoiseB, 0.5) > threshold);
+	visibility = select(0.0, 1.0, !discardSourceColor(sourceColor));
+
+	var texSelector = select(sourceColorLuminance, remap(sourceColorLuminance, 0.0, discardBrightPixelsThreshold, 0.0, 1.0), uniforms.discardBrightPixels == 1); // discardBrightPixelsでスキップした範囲の分だけ範囲を圧縮する
+	texSelector = remap(texSelector, 0.0, 1.0, uniforms.symbolTexturesRangeMin, uniforms.symbolTexturesRangeMax);
+
+	let scale = min(1.0, 1.0 - border);
+	let shift = select(vec2f(0.0), vec2f(0.0) - getDistortionVector(cellUv) * cellSize, uniforms.pointerTrailShift == 1);
+	let margin = (1.0 - (0.5 + (scale * 0.5))) * cellSize;
+	let transformedCoords = ((modUv + shift) - margin) / (cellSize - (margin * 2.0));
+	var out_color = textureSample(symbolTextures, mySampler, transformedCoords, u32(texSelector * f32(uniforms.symbolTexturesCount)));
+	if (transformedCoords.x < 0.0 || transformedCoords.x > 1.0 || transformedCoords.y < 0.0 || transformedCoords.y > 1.0) {
+		out_color = vec4f(0.0);
+	}
+
+	// background dots and blocks
+	if (visibility == 0.0) {
+		//return sourceColor;
+		let n = mix(visibilityNoiseA, visibilityNoiseB, 0.2);
+		if (n > 0.75) {
+			return premultiplyAlpha(vec4f(mix(uniforms.bgColor, uniforms.colorA, 0.05), 1.0));
+		} else if (n > 0.5) {
+			if (distance(modUv / cellSize, vec2(0.5, 0.5)) < 0.05) {
+				return premultiplyAlpha(vec4f(mix(uniforms.bgColor, uniforms.colorA, 0.25), 1.0));
+			}
+		}
+	}
+
+	let isIn = (
+		(modUv.x / cellSize.x) > (1.0 - scale) / 2.0 &&
+		(modUv.x / cellSize.x) < 0.5 + (scale / 2.0) &&
+		(modUv.y / cellSize.y) > (1.0 - scale) / 2.0 &&
+		(modUv.y / cellSize.y) < 0.5 + (scale / 2.0)
+	);
+
+	if (!isIn) {
+		return premultiplyAlpha(vec4f(vec3f(uniforms.bgColor), 1.0));
+	}
+
+	if ((sourceColor.r + sourceColor.g + sourceColor.b) / 3.0 > 0.7) { // apply colorA
+		out_color = vec4f(uniforms.colorA.rgb, out_color.a);
+	} else if (sourceColor.r > 0.75) { // apply colorC
+		out_color = vec4f(uniforms.colorC.rgb, out_color.a);
+	} else if (sourceColor.g > 0.4) { // apply colorB
+		out_color = vec4f(uniforms.colorB.rgb, out_color.a);
+	} else if ((sourceColor.r + sourceColor.g + sourceColor.b) / 3.0 < 0.2) { // apply colorA with lower opacity
+		out_color = vec4f(uniforms.colorA.rgb, out_color.a * 0.7);
+	} else { // apply colorA
+		out_color = vec4f(uniforms.colorA.rgb, out_color.a);
+	}
+
+	if (visibility == 0.0) {
+		out_color = vec4f(1.0, 1.0, 1.0, 0.0);
+	}
+
+	out_color.r = mix(uniforms.bgColor.r, out_color.r, out_color.a);
+	out_color.g = mix(uniforms.bgColor.g, out_color.g, out_color.a);
+	out_color.b = mix(uniforms.bgColor.b, out_color.b, out_color.a);
+	out_color.a = 1.0;
+
+	return premultiplyAlpha(out_color);
+}
+
+@fragment
+fn fsWithoutSource(fragData: FragmentIn) -> @location(0) vec4f {
+	let time = uniforms.time;
+	let scroll = vec2f(0.0, -time * 0.0001);
+	let uv = scaleUvToCoverGivenAspectRatio(fragData.uv, uniforms.aspectRatio);
+	var cellSize = vec2f(1.0 / (uniforms.divisions * 0.5));
+	var border = uniforms.margin;
+	var modUv = modVec2f(uv, cellSize);
+
+	let cellUv2 = getPixelatedUv(uv, cellSize * 2.0);
+	let cellUv4 = getPixelatedUv(uv, cellSize * 4.0);
+
+	let cellMultiplier2Noise = snoise0to1(vec3f(cellUv2.x * 3.0, cellUv2.y * 3.0, time * 0.000025));
+	let cellMultiplier4Noise = snoise0to1(vec3f(cellUv4.x * 3.0, cellUv4.y * 3.0, time * 0.000025));
+	if (cellMultiplier4Noise > 0.9) {
+		modUv = modVec2f(uv, cellSize * 4.0);
+		cellSize = cellSize * 4.0;
+		border /= 4.0;
+	} else if (cellMultiplier2Noise > 0.75) {
+		modUv = modVec2f(uv, cellSize * 2.0);
+		cellSize = cellSize * 2.0;
+		border /= 2.0;
+	}
+
+	var cellUv = getPixelatedUv(uv, cellSize);
+
+	if (uniforms.pointerTrailWarp == 1) {
+		cellUv -= getDistortionVector(cellUv);
+	}
+
+	let sourceColor = getSourceColor(cellUv); // なぜか無いと死ぬ
+
+	let visibilityNoiseA = snoise0to1(vec3f(cellUv + scroll, time * 0.00000625));
+	let visibilityNoiseB = snoise0to1(vec3f(cellUv * 8.0, time * 0.00000625));
+	let threshold = 0.65;
+	let visibility = select(0.0, 1.0, mix(visibilityNoiseA, visibilityNoiseB, 0.5) > threshold);
+
+	var texSelector = snoise0to1(vec3f((cellUv * 3.0) + scroll, time * 0.00001));
+	texSelector = remap(texSelector, 0.0, 1.0, uniforms.symbolTexturesRangeMin, uniforms.symbolTexturesRangeMax);
+
+	let scaleNoise = snoise0to1(vec3f(cellUv * 0.7, time * 0.0000125));
+	var scale = select(0.4, 1.0, scaleNoise > 0.25);
+	scale = min(scale, 1.0 - border);
+
+	let shift = select(vec2f(0.0), vec2f(0.0) - getDistortionVector(cellUv) * cellSize, uniforms.pointerTrailShift == 1);
+	let margin = (1.0 - (0.5 + (scale * 0.5))) * cellSize;
+	let transformedCoords = ((modUv + shift) - margin) / (cellSize - (margin * 2.0));
+	var out_color = textureSample(symbolTextures, mySampler, transformedCoords, u32(texSelector * f32(uniforms.symbolTexturesCount)));
+	if (transformedCoords.x < 0.0 || transformedCoords.x > 1.0 || transformedCoords.y < 0.0 || transformedCoords.y > 1.0) {
+		out_color = vec4f(0.0);
+	}
+
+	let colorNoise = snoise0to1(vec3f((cellUv * 8.0) + scroll, time * 0.000025));
+
+	// background dots and blocks
+	if (visibility == 0.0) {
+		let n = mix(visibilityNoiseA, visibilityNoiseB, 0.2);
+		if (n > 0.75) {
+			return premultiplyAlpha(vec4f(mix(uniforms.bgColor, uniforms.colorA, 0.05), 1.0));
+		} else if (n > 0.5) {
+			if (distance(modUv / cellSize, vec2(0.5, 0.5)) < 0.05) {
+				return premultiplyAlpha(vec4f(mix(uniforms.bgColor, uniforms.colorA, 0.25), 1.0));
+			}
+		}
+	}
+
+	let isIn = (
+		(modUv.x / cellSize.x) > (1.0 - scale) / 2.0 &&
+		(modUv.x / cellSize.x) < 0.5 + (scale / 2.0) &&
+		(modUv.y / cellSize.y) > (1.0 - scale) / 2.0 &&
+		(modUv.y / cellSize.y) < 0.5 + (scale / 2.0)
+	);
+
+	if (!isIn) {
+		return premultiplyAlpha(vec4f(vec3f(uniforms.bgColor), 1.0));
+	}
+
+	if (colorNoise > 0.9) { // apply colorC
+		out_color = vec4f(uniforms.colorC.rgb, out_color.a);
+	} else if (colorNoise > 0.7) { // apply colorB
+		out_color = vec4f(uniforms.colorB.rgb, out_color.a);
+	} else if (colorNoise > 0.35) { // apply colorA
+		out_color = vec4f(uniforms.colorA.rgb, out_color.a);
+	} else { // apply colorA with lower opacity
+		out_color = vec4f(uniforms.colorA.rgb, out_color.a * 0.3);
+	}
+
+	if (visibility == 0.0) {
+		out_color = vec4f(1.0, 1.0, 1.0, 0.0);
+	}
+
+	out_color.r = mix(uniforms.bgColor.r, out_color.r, out_color.a);
+	out_color.g = mix(uniforms.bgColor.g, out_color.g, out_color.a);
+	out_color.b = mix(uniforms.bgColor.b, out_color.b, out_color.a);
+	out_color.a = 1.0;
+
+	return premultiplyAlpha(out_color);
+}
+
+struct PointerTrailUniforms {
+	aspectRatio: f32,
+	timeDelta: f32,
+	pointerPosition: vec2f,
+	pointerVector: vec2f,
+};
+
+@group(1) @binding(1) var<uniform> pointerTrailUniforms: PointerTrailUniforms;
+@group(1) @binding(2) var pointerTrailSampler: sampler;
+@group(1) @binding(3) var pointerTrailBeforeTexture: texture_2d<f32>;
+
+fn getPointerForceVector(uv: vec2f) -> vec2f {
+	if (pointerTrailUniforms.pointerPosition.x <= -999.0 && pointerTrailUniforms.pointerPosition.y <= -999.0) {
+		return vec2f(0.0);
+	}
+
+	var v = vec2f(0.0);
+	let radius = 0.3;
+
+	let pos = scaleUvToCoverGivenAspectRatio(pointerTrailUniforms.pointerPosition, pointerTrailUniforms.aspectRatio);
+	let d = distance(uv, pos);
+	if (d < radius) {
+		let gradate = 1.0 - (d / radius);
+		v = (gradate * gradate) * (pointerTrailUniforms.pointerVector * 32.0);
+	}
+
+	return v;
+}
+
+@fragment
+fn fsPointerTrail(fragData: FragmentIn) -> @location(0) vec4f {
+	var uv = scaleUvToCoverGivenAspectRatio(fragData.uv, pointerTrailUniforms.aspectRatio);
+	var before = textureSample(pointerTrailBeforeTexture, pointerTrailSampler, convertTexCoords(fragData.uv)).rg;
+	before *= exp2(-pointerTrailUniforms.timeDelta / 300.0);
+	let v = getPointerForceVector(uv) * 0.3;
+	return vec4f(clamp(before + v, vec2f(-1.0), vec2f(1.0)), 0.0, 1.0);
+}
+
+struct WaveUniforms {
+	timeDelta: f32,
+	aspectRatio: f32,
+	pointerPosition: vec2f,
+	pointerVector: vec2f,
+};
+
+@group(3) @binding(1) var<uniform> waveUniforms: WaveUniforms;
+@group(3) @binding(2) var waveStateBeforeTexture: texture_2d<f32>;
+
+fn reflectWaveIndex(index: i32, size: i32) -> i32 {
+	if (size <= 1) {
+		return 0;
+	}
+	if (index < 0) {
+		return -index;
+	}
+	if (index >= size) {
+		return (size * 2) - index - 2;
+	}
+	return index;
+}
+
+fn reflectWaveCoord(coord: vec2i, size: vec2i) -> vec2i {
+	return vec2i(
+		reflectWaveIndex(coord.x, size.x),
+		reflectWaveIndex(coord.y, size.y),
+	);
+}
+
+fn getWaveCoord(uv: vec2f) -> vec2i {
+	let size = vec2i(textureDimensions(waveStateBeforeTexture));
+	let texUv = clamp(convertTexCoords(uv), vec2f(0.0), vec2f(0.999999));
+	return clamp(vec2i(texUv * vec2f(size)), vec2i(0), size - vec2i(1));
+}
+
+fn loadWaveState(coord: vec2i) -> vec2f {
+	let size = vec2i(textureDimensions(waveStateBeforeTexture));
+	return textureLoad(waveStateBeforeTexture, reflectWaveCoord(coord, size), 0).rg;
+}
+
+fn getWaveImpulse(uv: vec2f) -> f32 {
+	if (waveUniforms.pointerPosition.x <= -999.0 && waveUniforms.pointerPosition.y <= -999.0) {
+		return 0.0;
+	}
+
+	let aspectUv = scaleUvToCoverGivenAspectRatio(uv, waveUniforms.aspectRatio);
+	let pointerPosition = scaleUvToCoverGivenAspectRatio(waveUniforms.pointerPosition, waveUniforms.aspectRatio);
+	let radius = 0.08;
+	let distanceFromPointer = distance(aspectUv, pointerPosition);
+	if (distanceFromPointer >= radius) {
+		return 0.0;
+	}
+
+	let normalizedDistance = distanceFromPointer / radius;
+	let falloff = 1.0 - normalizedDistance;
+	let zeroMeanImpulse = (1.0 - (normalizedDistance * 2.5)) * falloff * falloff;
+	let pointerSpeed = min(length(waveUniforms.pointerVector) * 800.0 / max(waveUniforms.timeDelta, 1.0), 1.0);
+	return zeroMeanImpulse * pointerSpeed * 0.18;
+}
+
+@fragment
+fn fsWaveState(fragData: FragmentIn) -> @location(0) vec4f {
+	let coord = getWaveCoord(fragData.uv);
+	let center = loadWaveState(coord);
+	let laplacian =
+		loadWaveState(coord + vec2i(-1, 0)).r +
+		loadWaveState(coord + vec2i(1, 0)).r +
+		loadWaveState(coord + vec2i(0, -1)).r +
+		loadWaveState(coord + vec2i(0, 1)).r -
+		(center.r * 4.0);
+
+	let timeDeltaMs = min(waveUniforms.timeDelta, 25.0);
+	let timeStep = timeDeltaMs / 16.666667;
+	var velocity = center.g + (laplacian * 0.2 * timeStep);
+	velocity *= exp2(-timeDeltaMs / 2000.0);
+	velocity += getWaveImpulse(fragData.uv) * timeStep;
+	let height = center.r + (velocity * timeStep);
+
+	return vec4f(clamp(vec2f(height, velocity), vec2f(-1.0), vec2f(1.0)), 0.0, 1.0);
+}
+
+@fragment
+fn fsWaveVector(fragData: FragmentIn) -> @location(0) vec4f {
+	let coord = getWaveCoord(fragData.uv);
+	let left = loadWaveState(coord + vec2i(-1, 0)).r;
+	let right = loadWaveState(coord + vec2i(1, 0)).r;
+	let up = loadWaveState(coord + vec2i(0, -1)).r;
+	let down = loadWaveState(coord + vec2i(0, 1)).r;
+	let gradient = vec2f(right - left, up - down) * 1.5;
+	return vec4f(clamp(gradient, vec2f(-0.25), vec2f(0.25)), 0.0, 1.0);
+}
