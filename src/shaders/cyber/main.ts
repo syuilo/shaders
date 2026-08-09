@@ -76,6 +76,7 @@ export const playground = definePlayground({
 			format: pointerTrailTextureFormat,
 			usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
 		}));
+		const pointerTrailBufferViews = pointerTrailBuffers.map(pointerTrailBuffer => pointerTrailBuffer.createView());
 
 		const pointerTrailUniformValues = makeStructuredView(shaderDataDefinitions.uniforms.pointerTrailUniforms);
 		const pointerTrailUniformBuffer = wgpu.device.createBuffer({
@@ -83,12 +84,12 @@ export const playground = definePlayground({
 			usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 		});
 
-		const pointerTrailBindGroups = pointerTrailBuffers.map(pointerTrailBuffer => wgpu.device.createBindGroup({
+		const pointerTrailBindGroups = pointerTrailBufferViews.map(pointerTrailBufferView => wgpu.device.createBindGroup({
 			layout: pointerTrailPipeline.getBindGroupLayout(1),
 			entries: [
 				{ binding: 1, resource: { buffer: pointerTrailUniformBuffer }},
 				{ binding: 2, resource: wgpu.sampler },
-				{ binding: 3, resource: pointerTrailBuffer.createView() }
+				{ binding: 3, resource: pointerTrailBufferView }
 			],
 		}));
 		let currentPointerTrailBufferIndex = 0;
@@ -196,15 +197,17 @@ export const playground = definePlayground({
 			size: uniformValues.arrayBuffer.byteLength,
 			usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 		});
+		const symbolTexturesView = symbolTextures.createView({ dimension: '2d-array' });
+		const sourceTextureView = sourceTexture.createView();
 
-		const bindGroups = pointerTrailBuffers.map(pointerTrailBuffer => wgpu.device.createBindGroup({
+		const bindGroups = pointerTrailBufferViews.map(pointerTrailBufferView => wgpu.device.createBindGroup({
 			layout: pipeline.getBindGroupLayout(0),
 			entries: [
 				{ binding: 1, resource: { buffer: uniformBuffer }},
 				{ binding: 2, resource: wgpu.sampler },
-				{ binding: 3, resource: symbolTextures.createView({ dimension: '2d-array' }) },
-				{ binding: 4, resource: sourceTexture.createView() },
-				{ binding: 5, resource: pointerTrailBuffer.createView() },
+				{ binding: 3, resource: symbolTexturesView },
+				{ binding: 4, resource: sourceTextureView },
+				{ binding: 5, resource: pointerTrailBufferView },
 			],
 		}));
 
@@ -249,7 +252,6 @@ export const playground = definePlayground({
 				pointerYPrev = pointerY;
 				const pointerTrailReadBufferIndex = currentPointerTrailBufferIndex;
 				const pointerTrailWriteBufferIndex = 1 - pointerTrailReadBufferIndex;
-				const pointerTrailWriteBuffer = pointerTrailBuffers[pointerTrailWriteBufferIndex];
 
 				{ // pointer trail pass
 					pointerTrailUniformValues.set({
@@ -263,7 +265,7 @@ export const playground = definePlayground({
 
 					const passEncoder = ctx.commandEncoder.beginRenderPass({
 						colorAttachments: [{
-							view: pointerTrailWriteBuffer.createView(),
+							view: pointerTrailBufferViews[pointerTrailWriteBufferIndex],
 							clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
 							loadOp: 'clear',
 							storeOp: 'store',
