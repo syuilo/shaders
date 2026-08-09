@@ -184,7 +184,7 @@ export const playground = definePlayground({
 		];
 
 		const symbolTextures = await createTextureFromImages(wgpu.device, symbolTextureUrls, {
-			mips: false, // 有効にすると綺麗になるしパフォーマンス上も益があるけど特定条件下(marginが0)で画像の端に線が入ってしまう
+			mips: false, // 有効にすると特定条件下(marginが0)で画像の端に線が入ってしまう あとにじむ
 		});
 
 		const sourceTexture = createTextureFromSource(wgpu.device, params.source?.element ?? [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], {
