@@ -19,8 +19,9 @@
 </template>
 
 <script lang="ts" setup>
-import { onMounted, ref, useTemplateRef, watch } from 'vue';
+import { ref, watch } from 'vue';
 import { setupWebcam, Media } from '@/utils.ts';
+import { waitForVideoFrame } from '@/video.ts';
 
 const emit = defineEmits<{
 	(ev: 'updated', v: Media | null): void;
@@ -30,13 +31,16 @@ const imageElement = document.createElement('img');
 const videoElement = document.createElement('video');
 videoElement.loop = true;
 videoElement.preload = 'auto';
+videoElement.playsInline = true;
 
-const sorceType = ref<'image' | 'video' | null>(null);
+const sourceType = ref<'image' | 'video' | null>(null);
+let imageObjectUrl: string | null = null;
+let videoObjectUrl: string | null = null;
 
 function sourceUpdated() {
-	if (sorceType.value === 'image') {
+	if (sourceType.value === 'image') {
 		emit('updated', { type: 'image', element: imageElement });
-	} else if (sorceType.value === 'video') {
+	} else if (sourceType.value === 'video') {
 		emit('updated', { type: 'video', element: videoElement });
 	} else {
 		emit('updated', null);
@@ -61,36 +65,64 @@ function seekVideoTo(v: number) {
 	videoElement.currentTime = v;
 }
 
+function resetVideoElement() {
+	videoElement.pause();
+	videoElement.srcObject = null;
+	videoElement.removeAttribute('src');
+	videoElement.load();
+	if (videoObjectUrl !== null) {
+		URL.revokeObjectURL(videoObjectUrl);
+		videoObjectUrl = null;
+	}
+}
+
+async function playVideoAfterFirstFrameIsReady() {
+	const firstFrameReady = waitForVideoFrame(videoElement);
+	await Promise.all([
+		videoElement.play(),
+		firstFrameReady,
+	]);
+}
+
 async function onFileSelected(ev: Event) {
 	const input = ev.target as HTMLInputElement;
 	if (!input.files || input.files.length == 0) return;
 	const file = input.files[0];
 	if (file.type.startsWith('image/')) {
-		imageElement.src = URL.createObjectURL(file);
+		resetVideoElement();
+		if (imageObjectUrl !== null) URL.revokeObjectURL(imageObjectUrl);
+		imageObjectUrl = URL.createObjectURL(file);
+		imageElement.src = imageObjectUrl;
 		await imageElement.decode();
-		sorceType.value = 'image';
+		sourceType.value = 'image';
 	} else if (file.type.startsWith('video/')) {
-		videoElement.src = URL.createObjectURL(file);
-		await videoElement.play();
-		sorceType.value = 'video';
+		resetVideoElement();
+		videoObjectUrl = URL.createObjectURL(file);
+		videoElement.src = videoObjectUrl;
+		await playVideoAfterFirstFrameIsReady();
+		sourceType.value = 'video';
 	}
-	sourceUpdated()
+	sourceUpdated();
 }
 
 async function useWebcam() {
 	const camera = await setupWebcam();
+	resetVideoElement();
 	videoElement.srcObject = camera;
-	await videoElement.play();
-	sorceType.value = 'video';
-	sourceUpdated()
+	await playVideoAfterFirstFrameIsReady();
+	sourceType.value = 'video';
+	sourceUpdated();
 }
 
 function clear() {
-	videoElement.pause();
-	videoElement.src = '';
-	imageElement.src = '';
-	sorceType.value = null;
-	sourceUpdated()
+	resetVideoElement();
+	imageElement.removeAttribute('src');
+	if (imageObjectUrl !== null) {
+		URL.revokeObjectURL(imageObjectUrl);
+		imageObjectUrl = null;
+	}
+	sourceType.value = null;
+	sourceUpdated();
 }
 </script>
 

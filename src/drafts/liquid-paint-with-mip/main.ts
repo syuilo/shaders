@@ -2,6 +2,7 @@ import code from './shader.wgsl?raw';
 import { metadata } from './meta.ts';
 import { createTextureFromSource, generateMipmap, makeShaderDataDefinitions, makeStructuredView, numMipLevels } from 'webgpu-utils';
 import { definePlayground, isIos, remap } from '@/utils.ts';
+import { isVideoFrameAvailable } from '@/video.ts';
 
 export const playground = definePlayground({
 	...metadata,
@@ -247,7 +248,7 @@ export const playground = definePlayground({
 
 		return {
 			render: ctx => {
-				if (params.source != null && params.source.type === 'video' && params.source.element.readyState >= 4) {
+				if (params.source != null && params.source.type === 'video' && isVideoFrameAvailable(params.source.element)) {
 					wgpu.device.queue.copyExternalImageToTexture(
 						{ source: params.source.element },
 						{ texture: sourceTexture },
