@@ -151,6 +151,8 @@ export const playground = definePlayground({
 				entryPoint: 'fs',
 				targets: [{
 					format: navigator.gpu.getPreferredCanvasFormat(),
+				}, {
+					format: 'r16float',
 				}],
 			},
 			primitive: {
@@ -183,6 +185,13 @@ export const playground = definePlayground({
 			usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
 		});
 		const bufferView = buffer.createView();
+
+		const blurRadiusTexture = wgpu.device.createTexture({
+			size: { width, height },
+			format: 'r16float',
+			usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
+		});
+		const blurRadiusTextureView = blurRadiusTexture.createView();
 
 		const buffer2 = wgpu.device.createTexture({
 			size: { width, height },
@@ -243,38 +252,38 @@ export const playground = definePlayground({
 			usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 		});
 
-		const blurHorizontalBindGroups = pointerTrailBufferViews.map(pointerTrailBufferView => wgpu.device.createBindGroup({
+		const blurHorizontalBindGroup = wgpu.device.createBindGroup({
 			layout: blurLqPipeline.getBindGroupLayout(1),
 			entries: [
 				{ binding: 1, resource: { buffer: uniformBuffer }},
 				{ binding: 2, resource: { buffer: blurHorizontalUniformBuffer }},
 				{ binding: 3, resource: wgpu.sampler },
 				{ binding: 4, resource: bufferView },
-				{ binding: 5, resource: pointerTrailBufferView },
+				{ binding: 5, resource: blurRadiusTextureView },
 			],
-		}));
+		});
 
-		const blurVerticalBindGroups = pointerTrailBufferViews.map(pointerTrailBufferView => wgpu.device.createBindGroup({
+		const blurVerticalBindGroup = wgpu.device.createBindGroup({
 			layout: blurLqPipeline.getBindGroupLayout(1),
 			entries: [
 				{ binding: 1, resource: { buffer: uniformBuffer }},
 				{ binding: 2, resource: { buffer: blurVerticalUniformBuffer }},
 				{ binding: 3, resource: wgpu.sampler },
 				{ binding: 4, resource: buffer2View },
-				{ binding: 5, resource: pointerTrailBufferView },
+				{ binding: 5, resource: blurRadiusTextureView },
 			],
-		}));
+		});
 
-		const blurBindGroups = pointerTrailBufferViews.map(pointerTrailBufferView => wgpu.device.createBindGroup({
+		const blurBindGroup = wgpu.device.createBindGroup({
 			layout: blurPipeline.getBindGroupLayout(1),
 			entries: [
 				{ binding: 1, resource: { buffer: uniformBuffer }},
 				{ binding: 2, resource: { buffer: blurUniformBuffer }},
 				{ binding: 3, resource: wgpu.sampler },
 				{ binding: 4, resource: bufferView },
-				{ binding: 5, resource: pointerTrailBufferView },
+				{ binding: 5, resource: blurRadiusTextureView },
 			],
-		}));
+		});
 
 		return {
 			render: ctx => {
@@ -331,6 +340,8 @@ export const playground = definePlayground({
 						time: ctx.time,
 						scrollFactor: params.scrollFactor,
 						turbulenceScale: params.turbulenceScale,
+						blurStrength: params.blurStrength,
+						blurExtend: params.blurExtend,
 						pallette:
 							params.pallette === 'colorful' ? 0.0 :
 							params.pallette === 'cider' ? 1.0 :
@@ -358,6 +369,11 @@ export const playground = definePlayground({
 							clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
 							loadOp: 'clear',
 							storeOp: 'store',
+						}, {
+							view: blurRadiusTextureView,
+							clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 0.0 },
+							loadOp: 'clear',
+							storeOp: 'store',
 						}],
 					});
 					passEncoder.setPipeline(pipeline);
@@ -370,9 +386,7 @@ export const playground = definePlayground({
 					{ // two-pass blur pass - horizontal
 						blurHorizontalUniformValues.set({
 							isHorizontal: 1.0,
-							turbulenceScale: params.turbulenceScale,
 							strength: params.blurStrength,
-							extend: params.blurExtend,
 							quality: Math.round(remap(params.blurQuality, 0, 1, 1, 32)),
 							isIos: isIos ? 1.0 : 0.0,
 						});
@@ -387,7 +401,7 @@ export const playground = definePlayground({
 							}],
 						});
 						passEncoder.setPipeline(blurLqPipeline);
-						passEncoder.setBindGroup(1, blurHorizontalBindGroups[pointerTrailWriteBufferIndex]);
+						passEncoder.setBindGroup(1, blurHorizontalBindGroup);
 						passEncoder.draw(6);
 						passEncoder.end();
 					}
@@ -395,9 +409,7 @@ export const playground = definePlayground({
 					{ // two-pass blur pass - vertical
 						blurVerticalUniformValues.set({
 							isHorizontal: 0.0,
-							turbulenceScale: params.turbulenceScale,
 							strength: params.blurStrength,
-							extend: params.blurExtend,
 							quality: Math.round(remap(params.blurQuality, 0, 1, 1, 32)),
 							isIos: isIos ? 1.0 : 0.0,
 						});
@@ -412,16 +424,14 @@ export const playground = definePlayground({
 							}],
 						});
 						passEncoder.setPipeline(blurLqPipeline);
-						passEncoder.setBindGroup(1, blurVerticalBindGroups[pointerTrailWriteBufferIndex]);
+						passEncoder.setBindGroup(1, blurVerticalBindGroup);
 						passEncoder.draw(6);
 						passEncoder.end();
 					}
 				} else {
 					{ // blur pass
 						blurUniformValues.set({
-							turbulenceScale: params.turbulenceScale,
 							strength: params.blurStrength,
-							extend: params.blurExtend,
 							quality: Math.round(remap(params.blurQuality, 0, 1, 1, 512)),
 							isIos: isIos ? 1.0 : 0.0,
 							monteCarlo: params.blurMethod === 'monteCarlo' ? 1.0 : 0.0,
@@ -437,7 +447,7 @@ export const playground = definePlayground({
 							}],
 						});
 						passEncoder.setPipeline(blurPipeline);
-						passEncoder.setBindGroup(1, blurBindGroups[pointerTrailWriteBufferIndex]);
+						passEncoder.setBindGroup(1, blurBindGroup);
 						passEncoder.draw(6);
 						passEncoder.end();
 					}
@@ -450,6 +460,7 @@ export const playground = definePlayground({
 				uniformBuffer.destroy();
 				sourceTexture.destroy();
 				buffer.destroy();
+				blurRadiusTexture.destroy();
 				buffer2.destroy();
 				blurUniformBuffer.destroy();
 				blurHorizontalUniformBuffer.destroy();

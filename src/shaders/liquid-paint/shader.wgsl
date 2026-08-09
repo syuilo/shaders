@@ -215,6 +215,8 @@ struct Uniforms {
 	time: f32,
 	scrollFactor: f32,
 	turbulenceScale: f32,
+	blurStrength: f32,
+	blurExtend: f32,
 	pallette: u32,
 	discardThreshold: f32,
 	channelAFactor: f32,
@@ -244,8 +246,17 @@ struct FragmentIn {
 	@location(0) uv: vec2f,
 };
 
+struct FragmentOut {
+	@location(0) color: vec4f,
+	@location(1) blurRadius: f32,
+};
+
+fn makeFragmentOut(color: vec4f, blurRadius: f32) -> FragmentOut {
+	return FragmentOut(color, blurRadius);
+}
+
 @fragment
-fn fs(fragData: FragmentIn) -> @location(0) vec4f {
+fn fs(fragData: FragmentIn) -> FragmentOut {
 	let time = uniforms.time * 0.00005;
 	let scroll = vec2f(0.0, uniforms.time * 0.0001 * uniforms.scrollFactor);
 	let noiseScale = 0.75;
@@ -265,6 +276,10 @@ fn fs(fragData: FragmentIn) -> @location(0) vec4f {
 	let turbulence = snoise(vec3f((warpedUv + 6.0) * turbulenceScale, time * 0.5));
 
 	let power = ((warpedUv.x - uv.x) + (warpedUv.y - uv.y) + turbulence) / 3.0; // 3つの成分を混ぜるので-1 ~ +1の範囲にするために3で割る
+	var blurRadius = clamp((power + uniforms.blurExtend) * uniforms.blurStrength, 0.0, 1.0);
+	let pointerForce = (abs(pointerTrailVector.x) + abs(pointerTrailVector.y)) / 4.0;
+	blurRadius += max(pointerForce - 0.3, 0.0) * uniforms.blurStrength * 0.7;
+	blurRadius = clamp(blurRadius, 0.0, 1.0);
 
 	let sourceColor = select(vec4f(0.0), getSourceColor((aspectUv)), uniforms.hasSource == 1);
 	let sourceColorWarped = select(vec4f(0.0), getSourceColor((aspectUv + ((warpedUv + turbulence) * 0.125))), uniforms.hasSource == 1);
@@ -277,7 +292,7 @@ fn fs(fragData: FragmentIn) -> @location(0) vec4f {
 		var c = select(vec3f(1.0, 1.0, 1.0), vec3f(sourceColorWarped.r, sourceColorWarped.g, sourceColorWarped.b), uniforms.hasSource == 1);
 
 		if (uniforms.discardThreshold > -1.0 && power < uniforms.discardThreshold) {
-			return select(vec4f(1.0, 1.0, 1.0, 1.0), sourceColor, uniforms.hasSource == 1);
+			return makeFragmentOut(select(vec4f(1.0, 1.0, 1.0, 1.0), sourceColor, uniforms.hasSource == 1), blurRadius);
 		}
 
 		if (noiseA < -0.35) {
@@ -295,12 +310,12 @@ fn fs(fragData: FragmentIn) -> @location(0) vec4f {
 		c = mix(c, blendNormalVec3f(c, vec3f(0.0, 0.0, 1.0)), noiseC * uniforms.channelCFactor);
 
 		c = clamp(c, vec3f(0.0), vec3f(1.0));
-		return vec4f(c, 1.0);
+		return makeFragmentOut(vec4f(c, 1.0), blurRadius);
 	} else if (uniforms.pallette == 1) {
 		var c = select(vec3f(1.0, 1.0, 1.0), vec3f(sourceColorWarped.r, sourceColorWarped.g, sourceColorWarped.b), uniforms.hasSource == 1);
 
 		if (uniforms.discardThreshold > -1.0 && power < uniforms.discardThreshold) {
-			return select(vec4f(c, 1.0), sourceColor, uniforms.hasSource == 1);
+			return makeFragmentOut(select(vec4f(c, 1.0), sourceColor, uniforms.hasSource == 1), blurRadius);
 		}
 
 		if (noiseA < -0.35) {
@@ -318,12 +333,12 @@ fn fs(fragData: FragmentIn) -> @location(0) vec4f {
 		c = mix(c, blendLightenVec3f(c, mix(vec3f(0.5, 0.1, 0.3), vec3f(0.0, 1.0, 0.2), remap(noiseC % (1.0 - noiseC), 0.0, (1.0 - noiseC), 0.0, 1.0))), noiseC * 6.0 * uniforms.channelCFactor);
 
 		c = clamp(c, vec3f(0.0), vec3f(1.0));
-		return vec4f(c, 1.0);
+		return makeFragmentOut(vec4f(c, 1.0), blurRadius);
 	} else if (uniforms.pallette == 2) {
 		var c = select(vec3f(0.0, 0.0, 0.6), vec3f(sourceColorWarped.r, sourceColorWarped.g, sourceColorWarped.b), uniforms.hasSource == 1);
 
 		if (uniforms.discardThreshold > -1.0 && power < uniforms.discardThreshold) {
-			return select(vec4f(0.0, 0.0, 0.0, 1.0), sourceColor, uniforms.hasSource == 1);
+			return makeFragmentOut(select(vec4f(0.0, 0.0, 0.0, 1.0), sourceColor, uniforms.hasSource == 1), blurRadius);
 		}
 
 		if (noiseA < -0.35) {
@@ -346,24 +361,24 @@ fn fs(fragData: FragmentIn) -> @location(0) vec4f {
 		c = blendSubtractVec3f(c, vec3f(0.5));
 
 		c = clamp(c, vec3f(0.0), vec3f(1.0));
-		return vec4f(c, 1.0);
+		return makeFragmentOut(vec4f(c, 1.0), blurRadius);
 	} else if (uniforms.pallette == 3) {
 		var c = select(vec3f(1.0, 1.0, 1.0), vec3f(sourceColorWarped.r, sourceColorWarped.g, sourceColorWarped.b), uniforms.hasSource == 1);
 
 		if (uniforms.discardThreshold > -1.0 && power < uniforms.discardThreshold) {
-			return select(vec4f(1.0, 1.0, 1.0, 1.0), sourceColor, uniforms.hasSource == 1);
+			return makeFragmentOut(select(vec4f(1.0, 1.0, 1.0, 1.0), sourceColor, uniforms.hasSource == 1), blurRadius);
 		}
 
 		c = blendAddVec3f(c, vec3f(1.0, 0.0, 0.0) * noiseA * uniforms.channelAFactor);
 		c = blendAddVec3f(c, vec3f(0.0, 1.0, 0.0) * noiseB * uniforms.channelBFactor);
 		c = blendAddVec3f(c, vec3f(0.0, 0.0, 1.0) * noiseC * uniforms.channelCFactor);
 		c = clamp(c, vec3f(0.0), vec3f(1.0));
-		return vec4f(c, 1.0);
+		return makeFragmentOut(vec4f(c, 1.0), blurRadius);
 	} else if (uniforms.pallette == 4) {
 		var c = select(vec3f(0.0, 0.0, 0.0), vec3f(sourceColorWarped.r, sourceColorWarped.g, sourceColorWarped.b), uniforms.hasSource == 1);
 
 		if (uniforms.discardThreshold > -1.0 && power < uniforms.discardThreshold) {
-			return select(vec4f(0.0, 0.0, 0.0, 1.0), sourceColor, uniforms.hasSource == 1);
+			return makeFragmentOut(select(vec4f(0.0, 0.0, 0.0, 1.0), sourceColor, uniforms.hasSource == 1), blurRadius);
 		}
 
 		//if (noiseA < -0.35) {
@@ -394,12 +409,12 @@ fn fs(fragData: FragmentIn) -> @location(0) vec4f {
 		//c = blendSubtractVec3f(c, vec3f(0.5));
 
 		c = clamp(c, vec3f(0.0), vec3f(1.0));
-		return vec4f(c, 1.0);
+		return makeFragmentOut(vec4f(c, 1.0), blurRadius);
 	} else if (uniforms.pallette == 5) {
 		var c = select(vec3f(0.0, 0.0, 0.6), vec3f(sourceColorWarped.r, sourceColorWarped.g, sourceColorWarped.b), uniforms.hasSource == 1);
 
 		if (uniforms.discardThreshold > -1.0 && power < uniforms.discardThreshold) {
-			return select(vec4f(0.0, 0.0, 0.0, 1.0), sourceColor, uniforms.hasSource == 1);
+			return makeFragmentOut(select(vec4f(0.0, 0.0, 0.0, 1.0), sourceColor, uniforms.hasSource == 1), blurRadius);
 		}
 
 		if (noiseA < -0.35) {
@@ -422,12 +437,12 @@ fn fs(fragData: FragmentIn) -> @location(0) vec4f {
 		c = blendSubtractVec3f(c, vec3f(0.5));
 
 		c = clamp(c, vec3f(0.0), vec3f(1.0));
-		return vec4f(c, 1.0);
+		return makeFragmentOut(vec4f(c, 1.0), blurRadius);
 	} else if (uniforms.pallette == 6) {
 		var c = select(vec3f(1.0, 1.0, 1.0), vec3f(sourceColorWarped.r, sourceColorWarped.g, sourceColorWarped.b), uniforms.hasSource == 1);
 
 		if (uniforms.discardThreshold > -1.0 && power < uniforms.discardThreshold) {
-			return select(vec4f(c, 1.0), sourceColor, uniforms.hasSource == 1);
+			return makeFragmentOut(select(vec4f(c, 1.0), sourceColor, uniforms.hasSource == 1), blurRadius);
 		}
 
 		//if (noiseA < -0.35) {
@@ -445,12 +460,12 @@ fn fs(fragData: FragmentIn) -> @location(0) vec4f {
 		c = mix(c, blendNormalVec3f(c, mix(vec3f(0.0, 1.0, 0.5), vec3f(0.0, 1.0, 1.0), remap(noiseC % (1.0 - noiseC), 0.0, (1.0 - noiseC), 0.0, 1.0))), noiseC * 4.0 * uniforms.channelCFactor);
 
 		c = clamp(c, vec3f(0.0), vec3f(1.0));
-		return vec4f(c, 1.0);
+		return makeFragmentOut(vec4f(c, 1.0), blurRadius);
 	} else {
 		var c = select(vec3f(0.0, 0.03, 0.1), vec3f(sourceColorWarped.r, sourceColorWarped.g, sourceColorWarped.b), uniforms.hasSource == 1);
 
 		if (uniforms.discardThreshold > -1.0 && power < uniforms.discardThreshold) {
-			return select(vec4f(c, 1.0), sourceColor, uniforms.hasSource == 1);
+			return makeFragmentOut(select(vec4f(c, 1.0), sourceColor, uniforms.hasSource == 1), blurRadius);
 		}
 
 		if (noiseA < -0.4) {
@@ -473,14 +488,12 @@ fn fs(fragData: FragmentIn) -> @location(0) vec4f {
 
 		//c = mix(c, normalize(c), power * 3.0);
 		c = clamp(c, vec3f(0.0), vec3f(1.0));
-		return vec4f(c, 1.0);
+		return makeFragmentOut(vec4f(c, 1.0), blurRadius);
 	}
 }
 
 struct BlurUniforms {
-	turbulenceScale: f32,
 	strength: f32,
-	extend: f32,
 	quality: i32,
 	isIos: u32,
 	isHorizontal: u32,
@@ -492,36 +505,12 @@ struct BlurUniforms {
 @group(1) @binding(2) var<uniform> blurUniforms: BlurUniforms;
 @group(1) @binding(3) var targetSampler: sampler;
 @group(1) @binding(4) var targetTexture: texture_2d<f32>;
-@group(1) @binding(5) var pointerTrailTextureForBlur: texture_2d<f32>;
+@group(1) @binding(5) var blurRadiusTexture: texture_2d<f32>;
 
 const goldenAngle = 2.399963229728653; // radians
 
 fn getBlurRadius(_uv: vec2f) -> f32 {
-	let time = blurCommonUniforms.time * 0.00005;
-	let scroll = vec2f(0.0, blurCommonUniforms.time * 0.0001 * blurCommonUniforms.scrollFactor);
-	var uv = scaleUvToCoverGivenAspectRatio(_uv, blurCommonUniforms.aspectRatio);
-	uv *= blurCommonUniforms.scale;
-
-	let pointerTrailVector = textureSample(pointerTrailTextureForBlur, targetSampler, convertTexCoords(_uv)).rg;
-
-	var warpedUv = uv + (vec2f(
-		snoise(vec3f((uv + scroll + 4.0), time)),
-		snoise(vec3f((uv + scroll + 5.0), time))) * 2.0);
-
-	warpedUv -= pointerTrailVector;
-
-	let turbulenceScale = 0.75 * blurUniforms.turbulenceScale;
-	let turbulence = snoise(vec3f((warpedUv + 6.0) * turbulenceScale, time * 0.5));
-
-	var r = ((warpedUv.x - uv.x) + (warpedUv.y - uv.y) + turbulence) / 3.0; // 3つの成分を混ぜるので-1 ~ +1の範囲にするために3で割る
-	r += blurUniforms.extend;
-	r *= blurUniforms.strength;
-	r = min(max(r, 0.0), 1.0);
-
-	let pointerForce = (abs(pointerTrailVector.x) + abs(pointerTrailVector.y)) / 4.0;
-	r += max(pointerForce - 0.3, 0.0) * blurUniforms.strength * 0.7;
-
-	return min(max(r, 0.0), 1.0);
+	return textureSampleLevel(blurRadiusTexture, targetSampler, convertTexCoords(_uv), 0.0).r;
 }
 
 @fragment
