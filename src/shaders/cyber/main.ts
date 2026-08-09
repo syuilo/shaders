@@ -230,9 +230,20 @@ export const playground = definePlayground({
 		});
 	*/
 
+		// パフォーマンスのため、動画のフレームが更新された場合のみcopyExternalImageToTextureするようにするためのフラグ
+		let haveNewVideoFrame = true;
+		if (params.source != null && params.source.type === 'video') {
+			function recordHaveNewFrame() {
+				haveNewVideoFrame = true;
+				params.source.element.requestVideoFrameCallback(recordHaveNewFrame);
+			}
+			params.source.element.requestVideoFrameCallback(recordHaveNewFrame);
+		}
+
 		return {
 			render: ctx => {
-				if (params.source != null && params.source.type === 'video' && isVideoFrameAvailable(params.source.element)) {
+				if (params.source != null && params.source.type === 'video' && isVideoFrameAvailable(params.source.element) && haveNewVideoFrame) {
+					haveNewVideoFrame = false;
 					wgpu.device.queue.copyExternalImageToTexture(
 						{ source: params.source.element },
 						{ texture: sourceTexture },
