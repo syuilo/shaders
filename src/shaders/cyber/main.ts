@@ -14,7 +14,15 @@ export const playground = definePlayground({
 		shadowClipThreshold: { type: 'range', min: 0, max: 1, step: 0.01, label: 'Shadow Clip Threshold' },
 		divisions: { type: 'range', min: 8, max: 512, step: 1, label: 'Cell Divisions' },
 		margin: { type: 'range', min: 0, max: 1, step: 0.01, label: 'Cell Margin' },
-		withNumbers: { type: 'boolean', needReinit: true, label: 'With Numbers' },
+		iconset: { type: 'enum', label: 'Iconset', needReinit: true, enum: [{
+			value: 'symbols_numbers', label: 'Symbols + Numbers'
+		}, {
+			value: 'symbols', label: 'Symbols'
+		}, {
+			value: 'numbers', label: 'Numbers'
+		}, {
+			value: 'sweets', label: 'Sweets'
+		}]},
 		symbolTexturesRangeMin: { type: 'range', min: 0, max: 1, step: 0.01, label: 'Symbol Textures Range Min' },
 		symbolTexturesRangeMax: { type: 'range', min: 0, max: 1, step: 0.01, label: 'Symbol Textures Range Max' },
 		bgColor: { type: 'color', label: 'Background Color' },
@@ -34,7 +42,7 @@ export const playground = definePlayground({
 		shadowClipThreshold: 0.2,
 		divisions: 64,
 		margin: 0.25,
-		withNumbers: false,
+		iconset: 'symbols',
 		symbolTexturesRangeMin: 0.0,
 		symbolTexturesRangeMax: 1.0,
 		bgColor: [0, 0, 0],
@@ -142,7 +150,7 @@ export const playground = definePlayground({
 			layout: 'auto',
 		});
 
-		const symbolTextureUrls = [
+		const symbolTextureUrls = params.iconset === 'symbols_numbers' ? [
 			'./assets/symbols/dot.png',
 			'./assets/symbols/dot.png',
 			'./assets/symbols/dot.png',
@@ -163,25 +171,63 @@ export const playground = definePlayground({
 			'./assets/symbols/circle-slash.png',
 			'./assets/symbols/square-slash.png',
 
-			...(params.withNumbers ? [
-				'./assets/chars/0.png',
-				'./assets/chars/1.png',
-				'./assets/chars/2.png',
-				'./assets/chars/3.png',
-				'./assets/chars/4.png',
-				'./assets/chars/5.png',
-				'./assets/chars/6.png',
-				'./assets/chars/7.png',
-				'./assets/chars/8.png',
-				'./assets/chars/9.png',
-			] : []),
+			'./assets/chars/0.png',
+			'./assets/chars/1.png',
+			'./assets/chars/2.png',
+			'./assets/chars/3.png',
+			'./assets/chars/4.png',
+			'./assets/chars/5.png',
+			'./assets/chars/6.png',
+			'./assets/chars/7.png',
+			'./assets/chars/8.png',
+			'./assets/chars/9.png',
 
 			'./assets/symbols/block.png',
+		] : params.iconset === 'symbols' ? [
+			'./assets/symbols/dot.png',
+			'./assets/symbols/dot.png',
+			'./assets/symbols/dot.png',
+			'./assets/symbols/dots.png',
+			'./assets/symbols/dots3.png',
 
-			//'./assets/symbols/square-slash.png',
-			//'./assets/symbols/stripe.png',
-			//'./assets/symbols/fill.png',
-		];
+			'./assets/symbols/o1.png',
+			'./assets/symbols/o2.png',
+			'./assets/symbols/o3.png',
+			'./assets/symbols/o4.png',
+			'./assets/symbols/x1.png',
+			'./assets/symbols/x2.png',
+			'./assets/symbols/cross1.png',
+			'./assets/symbols/cross2.png',
+			'./assets/symbols/slash1.png',
+			'./assets/symbols/slash2.png',
+			'./assets/symbols/corner.png',
+			'./assets/symbols/circle-slash.png',
+			'./assets/symbols/square-slash.png',
+
+			'./assets/symbols/block.png',
+		] : params.iconset === 'numbers' ? [
+			'./assets/chars/0.png',
+			'./assets/chars/1.png',
+			'./assets/chars/2.png',
+			'./assets/chars/3.png',
+			'./assets/chars/4.png',
+			'./assets/chars/5.png',
+			'./assets/chars/6.png',
+			'./assets/chars/7.png',
+			'./assets/chars/8.png',
+			'./assets/chars/9.png',
+		] : params.iconset === 'sweets' ? [
+			'./assets/emojis/candy_3d.png',
+			'./assets/emojis/chocolate_bar_3d.png',
+			'./assets/emojis/cookie_3d.png',
+			'./assets/emojis/dango_3d.png',
+			'./assets/emojis/doughnut_3d.png',
+			'./assets/emojis/ice_cream_3d.png',
+			'./assets/emojis/lollipop_3d.png',
+			'./assets/emojis/pancakes_3d.png',
+			'./assets/emojis/shortcake_3d.png',
+			'./assets/emojis/soft_ice_cream_3d.png',
+		] : [];
 
 		const symbolTextures = await createTextureFromImages(wgpu.device, symbolTextureUrls, {
 			mips: false, // 有効にすると特定条件下(marginが0)で画像の端に線が入ってしまう あとにじむ
@@ -302,6 +348,8 @@ export const playground = definePlayground({
 					symbolTexturesCount: symbolTextureUrls.length,
 					symbolTexturesRangeMin: params.symbolTexturesRangeMin,
 					symbolTexturesRangeMax: params.symbolTexturesRangeMax,
+					useOriginalColor: params.iconset === 'sweets' ? 1 : 0,
+					enableClippedAreaFill: params.iconset === 'sweets' ? 0 : 1,
 					bgColor: params.bgColor,
 					colorA: params.colorA,
 					colorB: params.colorB,

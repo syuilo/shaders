@@ -162,10 +162,12 @@ struct Uniforms {
 	symbolTexturesCount: u32,
 	symbolTexturesRangeMin: f32,
 	symbolTexturesRangeMax: f32,
+	useOriginalColor: u32,
 	sourceAspectRatio: f32,
 	sourceContrast: f32,
 	highlightClipThreshold: f32,
 	shadowClipThreshold: f32,
+	enableClippedAreaFill: u32,
 	coverSource: u32,
 	bgColor: vec3f,
 	colorA: vec3f,
@@ -285,24 +287,30 @@ fn fsWithSource(fragData: FragmentIn) -> @location(0) vec4f {
 	let transformedCoords = ((modUv + shift) - margin) / (cellSize - (margin * 2.0));
 	var out_color = textureSample(symbolTextures, mySampler, vec2f(transformedCoords.x, 1.0 - transformedCoords.y), u32(texSelector * f32(uniforms.symbolTexturesCount)));
 	if (transformedCoords.x < 0.0 || transformedCoords.x > 1.0 || transformedCoords.y < 0.0 || transformedCoords.y > 1.0) {
-		out_color = vec4f(0.0);
+		out_color = vec4f(0.0); // 範囲外の参照は無として扱う
 	}
 
 	if (sourceColorLuminance > uniforms.highlightClipThreshold) {
-		return premultiplyAlpha(vec4f(0.0));
+		return premultiplyAlpha(vec4f(uniforms.bgColor, 1.0));
 	}
 
 	// fill background dots and blocks
-	if (sourceColorLuminance < uniforms.shadowClipThreshold * 0.3) {
-		return premultiplyAlpha(vec4f(0.0));
-	} else if (sourceColorLuminance < uniforms.shadowClipThreshold * 0.7) {
-		if (distance(modUv / cellSize, vec2(0.5, 0.5)) < 0.05) {
-			return premultiplyAlpha(vec4f(mix(uniforms.bgColor, uniforms.colorA, 0.25), 1.0));
-		} else {
-			return premultiplyAlpha(vec4f(0.0));
+	if (uniforms.enableClippedAreaFill == 1) {
+		if (sourceColorLuminance < uniforms.shadowClipThreshold * 0.3) {
+			return premultiplyAlpha(vec4f(uniforms.bgColor, 1.0));
+		} else if (sourceColorLuminance < uniforms.shadowClipThreshold * 0.7) {
+			if (distance(modUv / cellSize, vec2(0.5, 0.5)) < 0.05) {
+				return premultiplyAlpha(vec4f(mix(uniforms.bgColor, uniforms.colorA, 0.25), 1.0));
+			} else {
+				return premultiplyAlpha(vec4f(uniforms.bgColor, 1.0));
+			}
+		} else if (sourceColorLuminance < uniforms.shadowClipThreshold) {
+			return premultiplyAlpha(vec4f(mix(uniforms.bgColor, uniforms.colorA, 0.05), 1.0));
 		}
-	} else if (sourceColorLuminance < uniforms.shadowClipThreshold) {
-		return premultiplyAlpha(vec4f(mix(uniforms.bgColor, uniforms.colorA, 0.05), 1.0));
+	} else {
+		if (sourceColorLuminance < uniforms.shadowClipThreshold) {
+			return premultiplyAlpha(vec4f(uniforms.bgColor, 1.0));
+		}
 	}
 
 	let isIn = (
@@ -316,16 +324,18 @@ fn fsWithSource(fragData: FragmentIn) -> @location(0) vec4f {
 		return premultiplyAlpha(vec4f(vec3f(uniforms.bgColor), 1.0));
 	}
 
-	if ((sourceColor.r + sourceColor.g + sourceColor.b) / 3.0 > 0.7) { // apply colorA
-		out_color = vec4f(uniforms.colorA.rgb, out_color.a);
-	} else if (sourceColor.r > 0.75) { // apply colorC
-		out_color = vec4f(uniforms.colorC.rgb, out_color.a);
-	} else if (sourceColor.g > 0.4) { // apply colorB
-		out_color = vec4f(uniforms.colorB.rgb, out_color.a);
-	} else if ((sourceColor.r + sourceColor.g + sourceColor.b) / 3.0 < 0.2) { // apply colorA with lower opacity
-		out_color = vec4f(uniforms.colorA.rgb, out_color.a * 0.7);
-	} else { // apply colorA
-		out_color = vec4f(uniforms.colorA.rgb, out_color.a);
+	if (uniforms.useOriginalColor == 0) {
+		if ((sourceColor.r + sourceColor.g + sourceColor.b) / 3.0 > 0.7) { // apply colorA
+			out_color = vec4f(uniforms.colorA.rgb, out_color.a);
+		} else if (sourceColor.r > 0.75) { // apply colorC
+			out_color = vec4f(uniforms.colorC.rgb, out_color.a);
+		} else if (sourceColor.g > 0.4) { // apply colorB
+			out_color = vec4f(uniforms.colorB.rgb, out_color.a);
+		} else if ((sourceColor.r + sourceColor.g + sourceColor.b) / 3.0 < 0.2) { // apply colorA with lower opacity
+			out_color = vec4f(uniforms.colorA.rgb, out_color.a * 0.7);
+		} else { // apply colorA
+			out_color = vec4f(uniforms.colorA.rgb, out_color.a);
+		}
 	}
 
 	out_color.r = mix(uniforms.bgColor.r, out_color.r, out_color.a);
@@ -385,13 +395,13 @@ fn fsWithoutSource(fragData: FragmentIn) -> @location(0) vec4f {
 	let transformedCoords = ((modUv + shift) - margin) / (cellSize - (margin * 2.0));
 	var out_color = textureSample(symbolTextures, mySampler, vec2f(transformedCoords.x, 1.0 - transformedCoords.y), u32(texSelector * f32(uniforms.symbolTexturesCount)));
 	if (transformedCoords.x < 0.0 || transformedCoords.x > 1.0 || transformedCoords.y < 0.0 || transformedCoords.y > 1.0) {
-		out_color = vec4f(0.0);
+		out_color = vec4f(0.0); // 範囲外の参照は無として扱う
 	}
 
 	let colorNoise = snoise0to1(vec3f((cellUv * 8.0) + scroll, time * 0.000025));
 
 	// background dots and blocks
-	if (visibility == 0.0) {
+	if (visibility == 0.0 && uniforms.enableClippedAreaFill == 1) {
 		let n = mix(visibilityNoiseA, visibilityNoiseB, 0.2);
 		if (n > 0.75) {
 			return premultiplyAlpha(vec4f(mix(uniforms.bgColor, uniforms.colorA, 0.05), 1.0));
@@ -413,14 +423,16 @@ fn fsWithoutSource(fragData: FragmentIn) -> @location(0) vec4f {
 		return premultiplyAlpha(vec4f(vec3f(uniforms.bgColor), 1.0));
 	}
 
-	if (colorNoise > 0.9) { // apply colorC
-		out_color = vec4f(uniforms.colorC.rgb, out_color.a);
-	} else if (colorNoise > 0.7) { // apply colorB
-		out_color = vec4f(uniforms.colorB.rgb, out_color.a);
-	} else if (colorNoise > 0.35) { // apply colorA
-		out_color = vec4f(uniforms.colorA.rgb, out_color.a);
-	} else { // apply colorA with lower opacity
-		out_color = vec4f(uniforms.colorA.rgb, out_color.a * 0.3);
+	if (uniforms.useOriginalColor == 0) {
+		if (colorNoise > 0.9) { // apply colorC
+			out_color = vec4f(uniforms.colorC.rgb, out_color.a);
+		} else if (colorNoise > 0.7) { // apply colorB
+			out_color = vec4f(uniforms.colorB.rgb, out_color.a);
+		} else if (colorNoise > 0.35) { // apply colorA
+			out_color = vec4f(uniforms.colorA.rgb, out_color.a);
+		} else { // apply colorA with lower opacity
+			out_color = vec4f(uniforms.colorA.rgb, out_color.a * 0.3);
+		}
 	}
 
 	if (visibility == 0.0) {
