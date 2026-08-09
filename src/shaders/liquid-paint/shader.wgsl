@@ -526,11 +526,16 @@ fn getBlurRadius(_uv: vec2f) -> f32 {
 
 @fragment
 fn fsBlur(fragData: FragmentIn) -> @location(0) vec4f {
+	let centerUv = convertTexCoords(fragData.uv);
+
 	if (blurUniforms.strength == 0.0) {
-		return textureSample(targetTexture, targetSampler, convertTexCoords(fragData.uv));
+		return textureSample(targetTexture, targetSampler, centerUv);
 	}
 
 	let r = getBlurRadius(fragData.uv);
+	if (r <= 0.0) {
+		return textureSampleLevel(targetTexture, targetSampler, centerUv, 0.0);
+	}
 
 	if (blurUniforms.monteCarlo == 1) {
 		let sampleCount = blurUniforms.quality;
@@ -538,7 +543,7 @@ fn fsBlur(fragData: FragmentIn) -> @location(0) vec4f {
 		for (var i = 0; i < sampleCount; i++) {
 			let x = remap(rand(vec2f(fragData.uv.x + f32(i), fragData.uv.y + f32(i))), 0.0, 1.0, -1.0, 1.0);
 			let y = remap(rand(vec2f(fragData.uv.y + f32(i), fragData.uv.x + f32(i))), 0.0, 1.0, -1.0, 1.0);
-			result += textureSample(targetTexture, targetSampler, convertTexCoordsClamp(vec2f(fragData.uv.x + (x * r), fragData.uv.y + (y * r))));
+			result += textureSampleLevel(targetTexture, targetSampler, convertTexCoordsClamp(vec2f(fragData.uv.x + (x * r), fragData.uv.y + (y * r))), 0.0);
 		}
 
 		return result / f32(sampleCount);
@@ -560,7 +565,7 @@ fn fsBlur(fragData: FragmentIn) -> @location(0) vec4f {
 				sampleUv.x = clamp(sampleUv.x, -1.0, 1.0);
 				sampleUv.y = clamp(sampleUv.y, -1.0, 1.0);
 			}
-			result += textureSample(targetTexture, targetSampler, convertTexCoords(sampleUv)) * weight;
+			result += textureSampleLevel(targetTexture, targetSampler, convertTexCoords(sampleUv), 0.0) * weight;
 			//result += vec3f(snoiseFractal(vec3f((uv + offset + 1.0) * 0.75, time * 0.5))) * weight;
 			totalSamples += weight;
 		}
