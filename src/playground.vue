@@ -85,13 +85,26 @@
 		<input type="checkbox" v-model="hideMenuButton" />
 	</label>
 	<label>
-		<b>Enable stats:</b>
-		<input type="checkbox" v-model="enableStats" />
+		<b>Show debug menu:</b>
+		<input type="checkbox" v-model="showDebugMenu" />
 	</label>
-	<label>
-		<b>Benchmark mode:</b>
-		<input type="checkbox" v-model="benchmarkMode" />
-	</label>
+
+	<template v-if="showDebugMenu">
+		<hr>
+
+		<label>
+			<b>Enable stats:</b>
+			<input type="checkbox" v-model="enableStats" />
+		</label>
+		<label>
+			<b>Time specified:</b>
+			<input type="number" v-model.number="timeSpecified" /> (ms)
+		</label>
+		<label>
+			<b>Benchmark mode:</b>
+			<input type="checkbox" v-model="benchmarkMode" />
+		</label>
+	</template>
 </div>
 </template>
 
@@ -106,6 +119,11 @@ import defaultVertexShaderCode from './vertex.wgsl?raw';
 const props = defineProps<{
 	name: string;
 }>();
+
+const tryParseJson = (value: string | null, defa: any) => {
+	if (value == null) return defa;
+	return JSON.parse(value);
+};
 
 const canvas = useTemplateRef('canvas');
 const urlParams = new URLSearchParams(window.location.search);
@@ -123,6 +141,15 @@ const gpuAverageSlow = new NonNegativeRollingAverage(1000);
 const gpuAverageDisplayFast = ref(0);
 const gpuAverageDisplayMedium = ref(0);
 const gpuAverageDisplaySlow = ref(0);
+const showMenu = ref(false);
+const showDebugMenu = ref(false);
+const hideMenuButton = ref(tryParseJson(urlParams.get('_hideMenuButton'), false));
+const timeFactor = ref(tryParseJson(urlParams.get('_timeFactor'), 1.0));
+const timeSpecified = ref(tryParseJson(urlParams.get('_timeSpecified'), null));
+const pixelRatio = ref(tryParseJson(urlParams.get('_pixelRatio'), null));
+const fps = ref(tryParseJson(urlParams.get('_fps'), null));
+const bgColor = ref(tryParseJson(urlParams.get('_bgColor'), playgroundDef?.backgroundColor ?? '#000000'));
+const animatedBg = ref(tryParseJson(urlParams.get('_animatedBg'), false));
 
 async function init() {
 	console.log(`Initializing ${props.name}...`);
@@ -216,8 +243,8 @@ async function init() {
 		playgroundInstance.render({
 			commandEncoder,
 			createPassEncoder,
-			time,
-			timeDelta,
+			time: timeSpecified.value != null && timeSpecified.value != '' ? timeSpecified.value : time,
+			timeDelta: timeSpecified.value != null && timeSpecified.value != '' ? 0 : timeDelta,
 		});
 		device.queue.submit([commandEncoder.finish()]);
 		latestTimestamp = timeStamp;
@@ -285,20 +312,6 @@ for (const [k, v] of Object.entries(playgroundDef.params)) {
 }
 
 debouncedInit();
-
-const showMenu = ref(false);
-
-const tryParseJson = (value: string | null, defa: any) => {
-	if (value == null) return defa;
-	return JSON.parse(value);
-};
-
-const hideMenuButton = ref(tryParseJson(urlParams.get('_hideMenuButton'), false));
-const timeFactor = ref(tryParseJson(urlParams.get('_timeFactor'), 1.0));
-const pixelRatio = ref(tryParseJson(urlParams.get('_pixelRatio'), null));
-const fps = ref(tryParseJson(urlParams.get('_fps'), null));
-const bgColor = ref(tryParseJson(urlParams.get('_bgColor'), playgroundDef?.backgroundColor ?? '#000000'));
-const animatedBg = ref(tryParseJson(urlParams.get('_animatedBg'), false));
 
 onMounted(async () => {
 	const observer = new ResizeObserver(entries => {
