@@ -40,12 +40,6 @@ export function waitForVideoFrame(video: HTMLVideoElement): Promise<void> {
 
 		video.addEventListener('error', onError, { once: true });
 
-		if (typeof video.requestVideoFrameCallback === 'function') {
-			videoFrameCallbackId = video.requestVideoFrameCallback(finish);
-			return;
-		}
-
-		video.addEventListener('loadeddata', onLoadedData);
-		if (isVideoFrameAvailable(video)) finish();
+		videoFrameCallbackId = video.requestVideoFrameCallback(finish);
 	});
 }
