@@ -255,7 +255,6 @@ export const playground = definePlayground({
 		const blurHorizontalBindGroup = wgpu.device.createBindGroup({
 			layout: blurLqPipeline.getBindGroupLayout(1),
 			entries: [
-				{ binding: 1, resource: { buffer: uniformBuffer }},
 				{ binding: 2, resource: { buffer: blurHorizontalUniformBuffer }},
 				{ binding: 3, resource: wgpu.sampler },
 				{ binding: 4, resource: bufferView },
@@ -266,7 +265,6 @@ export const playground = definePlayground({
 		const blurVerticalBindGroup = wgpu.device.createBindGroup({
 			layout: blurLqPipeline.getBindGroupLayout(1),
 			entries: [
-				{ binding: 1, resource: { buffer: uniformBuffer }},
 				{ binding: 2, resource: { buffer: blurVerticalUniformBuffer }},
 				{ binding: 3, resource: wgpu.sampler },
 				{ binding: 4, resource: buffer2View },
