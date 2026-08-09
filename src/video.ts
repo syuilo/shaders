@@ -4,6 +4,15 @@ export function isVideoFrameAvailable(video: HTMLVideoElement): boolean {
 		&& video.videoHeight > 0;
 }
 
+export async function playMutedVideoAfterFirstFrameIsReady(video: HTMLVideoElement): Promise<void> {
+	video.muted = true;
+	const firstFrameReady = waitForVideoFrame(video);
+	await Promise.all([
+		video.play(),
+		firstFrameReady,
+	]);
+}
+
 export function waitForVideoFrame(video: HTMLVideoElement): Promise<void> {
 	return new Promise((resolve, reject) => {
 		let videoFrameCallbackId: number | undefined;

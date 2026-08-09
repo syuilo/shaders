@@ -7,6 +7,7 @@
 	<label>
 		<b>audio volume:</b>
 		<input type="range" min="0" max="1" step="0.01" v-model="videoAudioVolume" />
+		<button @click="videoElement.muted = false; videoElement.play()">enable audio</button>
 	</label>
 	<label>
 		<b>video control:</b>
@@ -21,7 +22,7 @@
 <script lang="ts" setup>
 import { ref, watch } from 'vue';
 import { setupWebcam, Media } from '@/utils.ts';
-import { waitForVideoFrame } from '@/video.ts';
+import { playMutedVideoAfterFirstFrameIsReady } from '@/video.ts';
 
 const emit = defineEmits<{
 	(ev: 'updated', v: Media | null): void;
@@ -76,14 +77,6 @@ function resetVideoElement() {
 	}
 }
 
-async function playVideoAfterFirstFrameIsReady() {
-	const firstFrameReady = waitForVideoFrame(videoElement);
-	await Promise.all([
-		videoElement.play(),
-		firstFrameReady,
-	]);
-}
-
 async function onFileSelected(ev: Event) {
 	const input = ev.target as HTMLInputElement;
 	if (!input.files || input.files.length == 0) return;
@@ -99,7 +92,7 @@ async function onFileSelected(ev: Event) {
 		resetVideoElement();
 		videoObjectUrl = URL.createObjectURL(file);
 		videoElement.src = videoObjectUrl;
-		await playVideoAfterFirstFrameIsReady();
+		await playMutedVideoAfterFirstFrameIsReady(videoElement);
 		sourceType.value = 'video';
 	}
 	sourceUpdated();
@@ -109,7 +102,7 @@ async function useWebcam() {
 	const camera = await setupWebcam();
 	resetVideoElement();
 	videoElement.srcObject = camera;
-	await playVideoAfterFirstFrameIsReady();
+	await playMutedVideoAfterFirstFrameIsReady(videoElement);
 	sourceType.value = 'video';
 	sourceUpdated();
 }
