@@ -283,7 +283,7 @@ fn fsWithSource(fragData: FragmentIn) -> @location(0) vec4f {
 	let shift = select(vec2f(0.0), vec2f(0.0) - getPointerTrailVector(cellUv) * cellSize, uniforms.pointerTrailShift == 1);
 	let margin = (1.0 - (0.5 + (scale * 0.5))) * cellSize;
 	let transformedCoords = ((modUv + shift) - margin) / (cellSize - (margin * 2.0));
-	var out_color = textureSample(symbolTextures, mySampler, transformedCoords, u32(texSelector * f32(uniforms.symbolTexturesCount)));
+	var out_color = textureSample(symbolTextures, mySampler, vec2f(transformedCoords.x, 1.0 - transformedCoords.y), u32(texSelector * f32(uniforms.symbolTexturesCount)));
 	if (transformedCoords.x < 0.0 || transformedCoords.x > 1.0 || transformedCoords.y < 0.0 || transformedCoords.y > 1.0) {
 		out_color = vec4f(0.0);
 	}
@@ -383,7 +383,7 @@ fn fsWithoutSource(fragData: FragmentIn) -> @location(0) vec4f {
 	let shift = select(vec2f(0.0), vec2f(0.0) - getPointerTrailVector(cellUv) * cellSize, uniforms.pointerTrailShift == 1);
 	let margin = (1.0 - (0.5 + (scale * 0.5))) * cellSize;
 	let transformedCoords = ((modUv + shift) - margin) / (cellSize - (margin * 2.0));
-	var out_color = textureSample(symbolTextures, mySampler, transformedCoords, u32(texSelector * f32(uniforms.symbolTexturesCount)));
+	var out_color = textureSample(symbolTextures, mySampler, vec2f(transformedCoords.x, 1.0 - transformedCoords.y), u32(texSelector * f32(uniforms.symbolTexturesCount)));
 	if (transformedCoords.x < 0.0 || transformedCoords.x > 1.0 || transformedCoords.y < 0.0 || transformedCoords.y > 1.0) {
 		out_color = vec4f(0.0);
 	}
