@@ -384,7 +384,6 @@ export const playground = definePlayground({
 					{ // two-pass blur pass - horizontal
 						blurHorizontalUniformValues.set({
 							isHorizontal: 1.0,
-							strength: params.blurStrength,
 							quality: Math.round(remap(params.blurQuality, 0, 1, 1, 32)),
 							isIos: isIos ? 1.0 : 0.0,
 						});
@@ -407,7 +406,6 @@ export const playground = definePlayground({
 					{ // two-pass blur pass - vertical
 						blurVerticalUniformValues.set({
 							isHorizontal: 0.0,
-							strength: params.blurStrength,
 							quality: Math.round(remap(params.blurQuality, 0, 1, 1, 32)),
 							isIos: isIos ? 1.0 : 0.0,
 						});
@@ -429,7 +427,6 @@ export const playground = definePlayground({
 				} else {
 					{ // blur pass
 						blurUniformValues.set({
-							strength: params.blurStrength,
 							quality: Math.round(remap(params.blurQuality, 0, 1, 1, 512)),
 							isIos: isIos ? 1.0 : 0.0,
 							monteCarlo: params.blurMethod === 'monteCarlo' ? 1.0 : 0.0,

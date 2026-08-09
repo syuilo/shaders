@@ -493,7 +493,6 @@ fn fs(fragData: FragmentIn) -> FragmentOut {
 }
 
 struct BlurUniforms {
-	strength: f32,
 	quality: i32,
 	isIos: u32,
 	isHorizontal: u32,
@@ -516,10 +515,6 @@ fn getBlurRadius(_uv: vec2f) -> f32 {
 @fragment
 fn fsBlur(fragData: FragmentIn) -> @location(0) vec4f {
 	let centerUv = convertTexCoords(fragData.uv);
-
-	if (blurUniforms.strength == 0.0) {
-		return textureSample(targetTexture, targetSampler, centerUv);
-	}
 
 	let r = getBlurRadius(fragData.uv);
 	if (r <= 0.0) {
@@ -580,10 +575,6 @@ fn fsBlur(fragData: FragmentIn) -> @location(0) vec4f {
 
 @fragment
 fn fsBlurLight(fragData: FragmentIn) -> @location(0) vec4f {
-	if (blurUniforms.strength == 0.0) {
-		return textureSample(targetTexture, targetSampler, convertTexCoords(fragData.uv));
-	}
-
 	let r = getBlurRadius(fragData.uv);
 
 	let sampleCount = blurUniforms.quality;
