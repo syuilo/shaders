@@ -199,17 +199,18 @@ fn getSourceColor(uv: vec2f) -> vec4f {
 	let sourceScale = select(
 		select(1.0, uniforms.sourceAspectRatio / uniforms.aspectRatio, uniforms.sourceAspectRatio < uniforms.aspectRatio),
 		select(1.0, uniforms.sourceAspectRatio / uniforms.aspectRatio, uniforms.sourceAspectRatio > uniforms.aspectRatio),
-		uniforms.coverSource == 1);
-	var sourceUv = uv * vec2f(1.0, uniforms.sourceAspectRatio) / sourceScale;
+		uniforms.coverSource == 1) * min(1.0, uniforms.aspectRatio);
+	let sourceUvScale = vec2f(1.0, uniforms.sourceAspectRatio) / sourceScale;
+	var sourceUv = uv * sourceUvScale;
 	if (uniforms.pointerTrailWarp == 1) {
-		sourceUv -= getPointerTrailVector(uv);
+		sourceUv -= getPointerTrailAspectVector(uv) * sourceUvScale;
 	}
 	let color = textureSample(sourceTexture, mySampler, convertTexCoords(sourceUv));
 	return vec4f(pow(color.rgb, vec3f(uniforms.sourceContrast)), color.a);
 }
 
-fn getPointerTrailVector(uv: vec2f) -> vec2f {
-	return textureSample(pointerTrailTexture, mySampler, convertTexCoords(unscaleUvToCoverGivenAspectRatio(uv, uniforms.aspectRatio))).rg;
+fn getPointerTrailAspectVector(aspectUv: vec2f) -> vec2f {
+	return scaleUvToCoverGivenAspectRatio(textureSample(pointerTrailTexture, mySampler, convertTexCoords(unscaleUvToCoverGivenAspectRatio(aspectUv, uniforms.aspectRatio))).rg, uniforms.aspectRatio);
 }
 
 fn isSimilar(a: vec4f, b: vec4f, c: vec4f, d: vec4f, threshold: f32) -> bool {
@@ -242,10 +243,11 @@ fn fsWithSource(fragData: FragmentIn) -> @location(0) vec4f {
 	var modUv = modVec2f(uv, cellSize);
 
 	let cellUv2 = getPixelatedUv(uv, cellSize * 2.0);
-	let a2 = cellUv2 + vec2f(-(cellUv2.x / 2.0 / 2.0), -(cellUv2.y / 2.0 / 2.0));
-	let b2 = cellUv2 + vec2f((cellUv2.x / 2.0 / 2.0), -(cellUv2.y / 2.0 / 2.0));
-	let c2 = cellUv2 + vec2f(-(cellUv2.x / 2.0 / 2.0), (cellUv2.y / 2.0 / 2.0));
-	let d2 = cellUv2 + vec2f((cellUv2.x / 2.0 / 2.0), (cellUv2.y / 2.0 / 2.0));
+	let cellOffset2 = cellSize * 0.5;
+	let a2 = cellUv2 + vec2f(-cellOffset2.x, -cellOffset2.y);
+	let b2 = cellUv2 + vec2f(cellOffset2.x, -cellOffset2.y);
+	let c2 = cellUv2 + vec2f(-cellOffset2.x, cellOffset2.y);
+	let d2 = cellUv2 + vec2f(cellOffset2.x, cellOffset2.y);
 	let sourceColorA2 = getSourceColor(a2);
 	let sourceColorB2 = getSourceColor(b2);
 	let sourceColorC2 = getSourceColor(c2);
@@ -253,10 +255,11 @@ fn fsWithSource(fragData: FragmentIn) -> @location(0) vec4f {
 	let similar2 = isSimilar(sourceColorA2, sourceColorB2, sourceColorC2, sourceColorD2, 0.1 * uniforms.similarityThresholdFactor);
 
 	let cellUv4 = getPixelatedUv(uv, cellSize * 4.0);
-	let a4 = cellUv4 + vec2f(-(cellUv4.x / 4.0 / 2.0), -(cellUv4.y / 4.0 / 2.0));
-	let b4 = cellUv4 + vec2f((cellUv4.x / 4.0 / 2.0), -(cellUv4.y / 4.0 / 2.0));
-	let c4 = cellUv4 + vec2f(-(cellUv4.x / 4.0 / 2.0), (cellUv4.y / 4.0 / 2.0));
-	let d4 = cellUv4 + vec2f((cellUv4.x / 4.0 / 2.0), (cellUv4.y / 4.0 / 2.0));
+	let cellOffset4 = cellSize * 1.5;
+	let a4 = cellUv4 + vec2f(-cellOffset4.x, -cellOffset4.y);
+	let b4 = cellUv4 + vec2f(cellOffset4.x, -cellOffset4.y);
+	let c4 = cellUv4 + vec2f(-cellOffset4.x, cellOffset4.y);
+	let d4 = cellUv4 + vec2f(cellOffset4.x, cellOffset4.y);
 	let sourceColorA4 = getSourceColor(a4);
 	let sourceColorB4 = getSourceColor(b4);
 	let sourceColorC4 = getSourceColor(c4);
@@ -282,7 +285,7 @@ fn fsWithSource(fragData: FragmentIn) -> @location(0) vec4f {
 	texSelector = remap(texSelector, 0.0, 1.0, uniforms.symbolTexturesRangeMin, uniforms.symbolTexturesRangeMax);
 
 	let scale = min(1.0, 1.0 - border);
-	let shift = select(vec2f(0.0), vec2f(0.0) - getPointerTrailVector(cellUv) * cellSize, uniforms.pointerTrailShift == 1);
+	let shift = select(vec2f(0.0), -getPointerTrailAspectVector(cellUv) * cellSize, uniforms.pointerTrailShift == 1);
 	let margin = (1.0 - (0.5 + (scale * 0.5))) * cellSize;
 	let transformedCoords = ((modUv + shift) - margin) / (cellSize - (margin * 2.0));
 	var out_color = textureSample(symbolTextures, mySampler, vec2f(transformedCoords.x, 1.0 - transformedCoords.y), u32(texSelector * f32(uniforms.symbolTexturesCount)));
@@ -373,7 +376,7 @@ fn fsWithoutSource(fragData: FragmentIn) -> @location(0) vec4f {
 	var cellUv = getPixelatedUv(uv, cellSize);
 
 	if (uniforms.pointerTrailWarp == 1) {
-		cellUv -= getPointerTrailVector(cellUv);
+		cellUv -= getPointerTrailAspectVector(cellUv);
 	}
 
 	let sourceColor = getSourceColor(cellUv); // なぜか無いと死ぬ
@@ -390,7 +393,7 @@ fn fsWithoutSource(fragData: FragmentIn) -> @location(0) vec4f {
 	var scale = select(0.4, 1.0, scaleNoise > 0.25);
 	scale = min(scale, 1.0 - border);
 
-	let shift = select(vec2f(0.0), vec2f(0.0) - getPointerTrailVector(cellUv) * cellSize, uniforms.pointerTrailShift == 1);
+	let shift = select(vec2f(0.0), -getPointerTrailAspectVector(cellUv) * cellSize, uniforms.pointerTrailShift == 1);
 	let margin = (1.0 - (0.5 + (scale * 0.5))) * cellSize;
 	let transformedCoords = ((modUv + shift) - margin) / (cellSize - (margin * 2.0));
 	var out_color = textureSample(symbolTextures, mySampler, vec2f(transformedCoords.x, 1.0 - transformedCoords.y), u32(texSelector * f32(uniforms.symbolTexturesCount)));
@@ -482,5 +485,5 @@ fn fsPointerTrail(fragData: FragmentIn) -> @location(0) vec4f {
 	var before = textureSample(pointerTrailBeforeTexture, pointerTrailSampler, convertTexCoords(fragData.uv)).rg;
 	before *= exp2(-pointerTrailUniforms.timeDelta / 300.0);
 	let v = getPointerForceVector(uv) * 0.3;
-	return vec4f(clamp(before + v, vec2f(-1.0), vec2f(1.0)), 0.0, 1.0);
+	return vec4f(before + v, 0.0, 1.0);
 }

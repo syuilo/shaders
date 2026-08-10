@@ -193,14 +193,26 @@ fn getPixelatedUv(uv: vec2f, cellSize: vec2f) -> vec2f {
 	return (cellSize * floor(uv / cellSize)) + (cellSize / 2.0);
 }
 
-fn getSourceColor(uv: vec2f) -> vec4f {
+fn getSourceUvScale() -> vec2f {
 	let sourceScale = select(
 		select(1.0, uniforms.sourceAspectRatio / uniforms.aspectRatio, uniforms.sourceAspectRatio < uniforms.aspectRatio),
 		select(1.0, uniforms.sourceAspectRatio / uniforms.aspectRatio, uniforms.sourceAspectRatio > uniforms.aspectRatio),
-		uniforms.coverSource == 1);
-	var sourceUv = uv * vec2f(1.0, uniforms.sourceAspectRatio) / sourceScale;
+		uniforms.coverSource == 1) * min(1.0, uniforms.aspectRatio);
+	return vec2f(1.0, uniforms.sourceAspectRatio) / sourceScale;
+}
+
+fn convertAspectUvToSourceUv(uv: vec2f) -> vec2f {
+	return uv * getSourceUvScale();
+}
+
+fn convertScreenVectorToSourceUv(vector: vec2f) -> vec2f {
+	return scaleUvToCoverGivenAspectRatio(vector, uniforms.aspectRatio) * getSourceUvScale();
+}
+
+fn getSourceColor(uv: vec2f) -> vec4f {
+	var sourceUv = convertAspectUvToSourceUv(uv);
 	if (uniforms.pointerTrailWarp == 1) {
-		sourceUv -= getDistortionVector(uv);
+		sourceUv -= convertScreenVectorToSourceUv(getDistortionVector(uv));
 	}
 	return textureSample(sourceTexture, mySampler, convertTexCoords(sourceUv));
 }
@@ -257,10 +269,11 @@ fn fsWithSource(fragData: FragmentIn) -> @location(0) vec4f {
 	var modUv = modVec2f(uv, cellSize);
 
 	let cellUv2 = getPixelatedUv(uv, cellSize * 2.0);
-	let a2 = cellUv2 + vec2f(-(cellUv2.x / 2.0 / 2.0), -(cellUv2.y / 2.0 / 2.0));
-	let b2 = cellUv2 + vec2f((cellUv2.x / 2.0 / 2.0), -(cellUv2.y / 2.0 / 2.0));
-	let c2 = cellUv2 + vec2f(-(cellUv2.x / 2.0 / 2.0), (cellUv2.y / 2.0 / 2.0));
-	let d2 = cellUv2 + vec2f((cellUv2.x / 2.0 / 2.0), (cellUv2.y / 2.0 / 2.0));
+	let cellOffset2 = cellSize * 0.5;
+	let a2 = cellUv2 + vec2f(-cellOffset2.x, -cellOffset2.y);
+	let b2 = cellUv2 + vec2f(cellOffset2.x, -cellOffset2.y);
+	let c2 = cellUv2 + vec2f(-cellOffset2.x, cellOffset2.y);
+	let d2 = cellUv2 + vec2f(cellOffset2.x, cellOffset2.y);
 	let sourceColorA2 = getSourceColor(a2);
 	let sourceColorB2 = getSourceColor(b2);
 	let sourceColorC2 = getSourceColor(c2);
@@ -268,10 +281,11 @@ fn fsWithSource(fragData: FragmentIn) -> @location(0) vec4f {
 	let similar2 = !discardSourceColor(getSourceColor(cellUv2)) && isSimilar(sourceColorA2, sourceColorB2, sourceColorC2, sourceColorD2, 0.1 * uniforms.similarityThresholdFactor);
 
 	let cellUv4 = getPixelatedUv(uv, cellSize * 4.0);
-	let a4 = cellUv4 + vec2f(-(cellUv4.x / 4.0 / 2.0), -(cellUv4.y / 4.0 / 2.0));
-	let b4 = cellUv4 + vec2f((cellUv4.x / 4.0 / 2.0), -(cellUv4.y / 4.0 / 2.0));
-	let c4 = cellUv4 + vec2f(-(cellUv4.x / 4.0 / 2.0), (cellUv4.y / 4.0 / 2.0));
-	let d4 = cellUv4 + vec2f((cellUv4.x / 4.0 / 2.0), (cellUv4.y / 4.0 / 2.0));
+	let cellOffset4 = cellSize * 1.5;
+	let a4 = cellUv4 + vec2f(-cellOffset4.x, -cellOffset4.y);
+	let b4 = cellUv4 + vec2f(cellOffset4.x, -cellOffset4.y);
+	let c4 = cellUv4 + vec2f(-cellOffset4.x, cellOffset4.y);
+	let d4 = cellUv4 + vec2f(cellOffset4.x, cellOffset4.y);
 	let sourceColorA4 = getSourceColor(a4);
 	let sourceColorB4 = getSourceColor(b4);
 	let sourceColorC4 = getSourceColor(c4);

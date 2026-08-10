@@ -237,7 +237,7 @@ fn getSourceColor(uv: vec2f) -> vec4f {
 	let sourceScale = select(
 		select(1.0, uniforms.sourceAspectRatio / uniforms.aspectRatio, uniforms.sourceAspectRatio < uniforms.aspectRatio),
 		select(1.0, uniforms.sourceAspectRatio / uniforms.aspectRatio, uniforms.sourceAspectRatio > uniforms.aspectRatio),
-		uniforms.coverSource == 1);
+		uniforms.coverSource == 1) * min(1.0, uniforms.aspectRatio);
 	let sourceUv = uv * vec2f(1.0, uniforms.sourceAspectRatio) / sourceScale;
 	return textureSample(sourceTexture, sourceSampler, convertTexCoords(sourceUv));
 }
@@ -282,7 +282,8 @@ fn fs(fragData: FragmentIn) -> FragmentOut {
 	blurRadius = clamp(blurRadius, 0.0, 1.0);
 
 	let sourceColor = select(vec4f(0.0), getSourceColor((aspectUv)), uniforms.hasSource == 1);
-	let sourceColorWarped = select(vec4f(0.0), getSourceColor((aspectUv + ((warpedUv + turbulence) * 0.125))), uniforms.hasSource == 1);
+	let sourceWarpOffset = ((warpedUv - uv) + vec2f(turbulence)) * 0.125;
+	let sourceColorWarped = select(vec4f(0.0), getSourceColor(aspectUv + sourceWarpOffset), uniforms.hasSource == 1);
 
 	var noiseA = snoiseFractal(vec3f((warpedUv + 1.0 + turbulence) * noiseScale, time * 0.5));
 	var noiseB = snoiseFractal(vec3f((warpedUv + 2.0 + turbulence) * noiseScale, time * 0.4));
