@@ -169,21 +169,32 @@ fn rand(seed: vec2f) -> f32 {
 	return fract(sin(dot(seed, vec2f(12.9898, 78.233))) * 43758.5453);
 }
 
-// テクスチャ座標(0~1、+Yが下)に変換
-fn convertTexCoords(uv: vec2f) -> vec2f {
-	return vec2f(uv.x, -uv.y) * 0.5 + vec2f(0.5);
+fn getScreenNdcToAspectScale(aspectRatio: f32) -> vec2f {
+	return vec2f(min(1.0, aspectRatio), min(1.0, 1.0 / aspectRatio));
 }
 
-fn convertTexCoordsClamp(uv: vec2f) -> vec2f {
-	return clamp(convertTexCoords(uv), vec2f(0.0), vec2f(1.0));
+fn screenNdcUvToAspectUv(screenNdcUv: vec2f, aspectRatio: f32) -> vec2f {
+	return screenNdcUv * getScreenNdcToAspectScale(aspectRatio);
 }
 
-fn scaleUvToCoverGivenAspectRatio(uv: vec2f, aspectRatio: f32) -> vec2f {
-	return uv / vec2f(1.0, aspectRatio) * select(1.0, aspectRatio, 1.0 > aspectRatio);
+fn screenNdcVectorToAspectVector(screenNdcVector: vec2f, aspectRatio: f32) -> vec2f {
+	return screenNdcVector * getScreenNdcToAspectScale(aspectRatio);
 }
 
-fn unscaleUvToCoverGivenAspectRatio(uv: vec2f, aspectRatio: f32) -> vec2f {
-	return uv * vec2f(1.0, aspectRatio) / select(1.0, aspectRatio, 1.0 > aspectRatio);
+fn aspectUvToScreenNdcUv(aspectUv: vec2f, aspectRatio: f32) -> vec2f {
+	return aspectUv / getScreenNdcToAspectScale(aspectRatio);
+}
+
+fn aspectVectorToScreenNdcVector(aspectVector: vec2f, aspectRatio: f32) -> vec2f {
+	return aspectVector / getScreenNdcToAspectScale(aspectRatio);
+}
+
+fn screenNdcUvToTextureUv(screenNdcUv: vec2f) -> vec2f {
+	return vec2f(screenNdcUv.x, -screenNdcUv.y) * 0.5 + vec2f(0.5);
+}
+
+fn sourceNdcUvToTextureUv(sourceNdcUv: vec2f) -> vec2f {
+	return vec2f(sourceNdcUv.x, -sourceNdcUv.y) * 0.5 + vec2f(0.5);
 }
 
 fn hslToRgb(hsl: vec3f) -> vec3f {
@@ -233,17 +244,51 @@ struct Uniforms {
 @group(0) @binding(3) var sourceTexture: texture_2d<f32>;
 @group(0) @binding(4) var pointerTrailTexture: texture_2d<f32>;
 
-fn getSourceColor(uv: vec2f) -> vec4f {
-	let sourceScale = select(
-		select(1.0, uniforms.sourceAspectRatio / uniforms.aspectRatio, uniforms.sourceAspectRatio < uniforms.aspectRatio),
-		select(1.0, uniforms.sourceAspectRatio / uniforms.aspectRatio, uniforms.sourceAspectRatio > uniforms.aspectRatio),
-		uniforms.coverSource == 1);
-	let sourceUv = uv * vec2f(1.0, uniforms.sourceAspectRatio) / sourceScale;
-	return textureSample(sourceTexture, sourceSampler, convertTexCoords(sourceUv));
+fn getScreenNdcToSourceNdcScale(
+	screenAspectRatio: f32,
+	sourceAspectRatio: f32,
+	coverSource: bool,
+) -> vec2f {
+	let fitWidth = vec2f(screenAspectRatio / sourceAspectRatio, 1.0);
+	let fitHeight = vec2f(1.0, sourceAspectRatio / screenAspectRatio);
+	let containScale = select(fitHeight, fitWidth, sourceAspectRatio < screenAspectRatio);
+	let coverScale = select(fitHeight, fitWidth, sourceAspectRatio > screenAspectRatio);
+	return select(containScale, coverScale, coverSource);
+}
+
+fn screenNdcUvToSourceNdcUv(screenNdcUv: vec2f) -> vec2f {
+	return screenNdcUv * getScreenNdcToSourceNdcScale(
+		uniforms.aspectRatio,
+		uniforms.sourceAspectRatio,
+		uniforms.coverSource == 1,
+	);
+}
+
+fn screenNdcVectorToSourceNdcVector(screenNdcVector: vec2f) -> vec2f {
+	return screenNdcVector * getScreenNdcToSourceNdcScale(
+		uniforms.aspectRatio,
+		uniforms.sourceAspectRatio,
+		uniforms.coverSource == 1,
+	);
+}
+
+fn getSourceColor(screenNdcUv: vec2f) -> vec4f {
+	let sourceNdcUv = screenNdcUvToSourceNdcUv(screenNdcUv);
+	return textureSample(sourceTexture, sourceSampler, sourceNdcUvToTextureUv(sourceNdcUv));
+}
+
+fn getWarpedSourceAspectUv(
+	sourceBaseAspectUv: vec2f,
+	proceduralBaseAspectUv: vec2f,
+	warpedProceduralAspectUv: vec2f,
+	turbulence: f32,
+) -> vec2f {
+	let warpedAspectVector = warpedProceduralAspectUv - proceduralBaseAspectUv;
+	return sourceBaseAspectUv + ((warpedAspectVector + vec2f(turbulence)) * 0.125);
 }
 
 struct FragmentIn {
-	@location(0) uv: vec2f,
+	@location(0) screenNdcUv: vec2f,
 };
 
 struct FragmentOut {
@@ -258,35 +303,51 @@ fn makeFragmentOut(color: vec4f, blurRadius: f32) -> FragmentOut {
 @fragment
 fn fs(fragData: FragmentIn) -> FragmentOut {
 	let time = uniforms.time * 0.00005;
-	let scroll = vec2f(0.0, uniforms.time * 0.0001 * uniforms.scrollFactor);
+	let scrollAspectVector = vec2f(0.0, uniforms.time * 0.0001 * uniforms.scrollFactor);
 	let noiseScale = 0.75;
 	let turbulenceScale = 0.75 * uniforms.turbulenceScale;
 
-	let aspectUv = scaleUvToCoverGivenAspectRatio(fragData.uv, uniforms.aspectRatio);
-	var uv = aspectUv * uniforms.scale;
+	let screenNdcUv = fragData.screenNdcUv;
+	let aspectUv = screenNdcUvToAspectUv(screenNdcUv, uniforms.aspectRatio);
+	let sourceBaseAspectUv = aspectUv;
+	let proceduralBaseAspectUv = aspectUv * uniforms.scale;
+	let pointerTrailScreenNdcVector = textureSample(
+		pointerTrailTexture,
+		sourceSampler,
+		screenNdcUvToTextureUv(screenNdcUv),
+	).rg;
+	let pointerTrailAspectVector = screenNdcVectorToAspectVector(
+		pointerTrailScreenNdcVector,
+		uniforms.aspectRatio,
+	);
 
-	let pointerTrailVector = textureSample(pointerTrailTexture, sourceSampler, convertTexCoords(fragData.uv)).rg;
+	var warpedProceduralAspectUv = proceduralBaseAspectUv + (vec2f(
+		snoise(vec3f((proceduralBaseAspectUv + scrollAspectVector + 4.0), time)),
+		snoise(vec3f((proceduralBaseAspectUv + scrollAspectVector + 5.0), time))) * 2.0);
 
-	var warpedUv = uv + (vec2f(
-		snoise(vec3f((uv + scroll + 4.0), time)),
-		snoise(vec3f((uv + scroll + 5.0), time))) * 2.0);
+	warpedProceduralAspectUv -= pointerTrailAspectVector;
 
-	warpedUv -= pointerTrailVector;
+	let turbulence = snoise(vec3f((warpedProceduralAspectUv + 6.0) * turbulenceScale, time * 0.5));
 
-	let turbulence = snoise(vec3f((warpedUv + 6.0) * turbulenceScale, time * 0.5));
-
-	let power = ((warpedUv.x - uv.x) + (warpedUv.y - uv.y) + turbulence) / 3.0; // 3つの成分を混ぜるので-1 ~ +1の範囲にするために3で割る
+	let power = ((warpedProceduralAspectUv.x - proceduralBaseAspectUv.x) + (warpedProceduralAspectUv.y - proceduralBaseAspectUv.y) + turbulence) / 3.0; // 3つの成分を混ぜるので-1 ~ +1の範囲にするために3で割る
 	var blurRadius = clamp((power + uniforms.blurExtend) * uniforms.blurStrength, 0.0, 1.0);
-	let pointerForce = (abs(pointerTrailVector.x) + abs(pointerTrailVector.y)) / 4.0;
+	let pointerForce = (abs(pointerTrailScreenNdcVector.x) + abs(pointerTrailScreenNdcVector.y)) / 4.0;
 	blurRadius += max(pointerForce - 0.3, 0.0) * uniforms.blurStrength * 0.7;
 	blurRadius = clamp(blurRadius, 0.0, 1.0);
 
-	let sourceColor = select(vec4f(0.0), getSourceColor((aspectUv)), uniforms.hasSource == 1);
-	let sourceColorWarped = select(vec4f(0.0), getSourceColor((aspectUv + ((warpedUv + turbulence) * 0.125))), uniforms.hasSource == 1);
+	let sourceColor = select(vec4f(0.0), getSourceColor(screenNdcUv), uniforms.hasSource == 1);
+	let warpedSourceAspectUv = getWarpedSourceAspectUv(
+		sourceBaseAspectUv,
+		proceduralBaseAspectUv,
+		warpedProceduralAspectUv,
+		turbulence,
+	);
+	let warpedSourceScreenNdcUv = aspectUvToScreenNdcUv(warpedSourceAspectUv, uniforms.aspectRatio);
+	let sourceColorWarped = select(vec4f(0.0), getSourceColor(warpedSourceScreenNdcUv), uniforms.hasSource == 1);
 
-	var noiseA = snoiseFractal(vec3f((warpedUv + 1.0 + turbulence) * noiseScale, time * 0.5));
-	var noiseB = snoiseFractal(vec3f((warpedUv + 2.0 + turbulence) * noiseScale, time * 0.4));
-	var noiseC = snoiseFractal(vec3f((warpedUv + 3.0 + turbulence) * noiseScale, time * 0.3));
+	var noiseA = snoiseFractal(vec3f((warpedProceduralAspectUv + 1.0 + turbulence) * noiseScale, time * 0.5));
+	var noiseB = snoiseFractal(vec3f((warpedProceduralAspectUv + 2.0 + turbulence) * noiseScale, time * 0.4));
+	var noiseC = snoiseFractal(vec3f((warpedProceduralAspectUv + 3.0 + turbulence) * noiseScale, time * 0.3));
 
 	if (uniforms.pallette == 0) {
 		var c = select(vec3f(1.0, 1.0, 1.0), vec3f(sourceColorWarped.r, sourceColorWarped.g, sourceColorWarped.b), uniforms.hasSource == 1);
@@ -355,7 +416,7 @@ fn fs(fragData: FragmentIn) -> FragmentOut {
 		c = mix(c, blendLightenVec3f(c, mix(vec3f(0.3, 0.3, 0.0), vec3f(0.0, 0.5, 0.0), remap(noiseB % (1.0 - noiseB), 0.0, (1.0 - noiseB), 0.0, 1.0))), noiseB * 2.0 * uniforms.channelBFactor);
 		c = mix(c, blendLightenVec3f(c, mix(vec3f(0.8, 0.8, 0.0), vec3f(0.8, 0.4, 0.0), remap(noiseC % (1.0 - noiseC), 0.0, (1.0 - noiseC), 0.0, 1.0))), noiseC * 6.0 * uniforms.channelCFactor);
 
-		c = mix(c, normalize(c), snoise(vec3f((uv + 4.0), time)));
+		c = mix(c, normalize(c), snoise(vec3f((proceduralBaseAspectUv + 4.0), time)));
 		//c = normalize(c);
 
 		c = blendSubtractVec3f(c, vec3f(0.5));
@@ -391,7 +452,7 @@ fn fs(fragData: FragmentIn) -> FragmentOut {
 		//	c = blendNormalVec3f(c, mix(vec3f(0.0, 0.0, 1.0), vec3f(0.0, 0.0, 0.0), remap(noiseC % 0.1, 0.0, 0.1, 0.0, 1.0)));
 		//}
 
-		//let _a = snoise0to1(vec3f((uv + 4.0), time)) + (power * 0.7);
+		//let _a = snoise0to1(vec3f((proceduralBaseAspectUv + 4.0), time)) + (power * 0.7);
 		let _a = max(0.03, 0.3 + (power * 0.8));
 		let _b = 0.4 + (power * 0.8);
 		let _c = 0.5 + (power * 0.8);
@@ -431,7 +492,7 @@ fn fs(fragData: FragmentIn) -> FragmentOut {
 		//c = mix(c, blendLightenVec3f(c, mix(vec3f(0.3, 0.3, 0.0), vec3f(0.0, 0.5, 0.0), remap(noiseB % (1.0 - noiseB), 0.0, (1.0 - noiseB), 0.0, 1.0))), noiseB * 2.0 * uniforms.channelBFactor);
 		//c = mix(c, blendLightenVec3f(c, mix(vec3f(0.8, 0.8, 0.0), vec3f(0.8, 0.4, 0.0), remap(noiseC % (1.0 - noiseC), 0.0, (1.0 - noiseC), 0.0, 1.0))), noiseC * 6.0 * uniforms.channelCFactor);
 
-		//c = mix(c, normalize(c), snoise(vec3f((uv + 4.0), time)));
+		//c = mix(c, normalize(c), snoise(vec3f((proceduralBaseAspectUv + 4.0), time)));
 		//c = normalize(c);
 
 		c = blendSubtractVec3f(c, vec3f(0.5));
@@ -508,26 +569,30 @@ struct BlurUniforms {
 
 const goldenAngle = 2.399963229728653; // radians
 
-fn getBlurRadius(_uv: vec2f) -> f32 {
-	return textureSampleLevel(blurRadiusTexture, targetSampler, convertTexCoords(_uv), 0.0).r;
+fn getBlurRadius(screenNdcUv: vec2f) -> f32 {
+	return textureSampleLevel(blurRadiusTexture, targetSampler, screenNdcUvToTextureUv(screenNdcUv), 0.0).r;
 }
 
 @fragment
 fn fsBlur(fragData: FragmentIn) -> @location(0) vec4f {
-	let centerUv = convertTexCoords(fragData.uv);
+	let screenNdcUv = fragData.screenNdcUv;
+	let centerTextureUv = screenNdcUvToTextureUv(screenNdcUv);
 
-	let r = getBlurRadius(fragData.uv);
+	let r = getBlurRadius(screenNdcUv);
 	if (r <= 0.0) {
-		return textureSampleLevel(targetTexture, targetSampler, centerUv, 0.0);
+		return textureSampleLevel(targetTexture, targetSampler, centerTextureUv, 0.0);
 	}
 
 	if (blurUniforms.monteCarlo == 1) {
 		let sampleCount = blurUniforms.quality;
 		var result = vec4f(0.0);
 		for (var i = 0; i < sampleCount; i++) {
-			let x = remap(rand(vec2f(fragData.uv.x + f32(i), fragData.uv.y + f32(i))), 0.0, 1.0, -1.0, 1.0);
-			let y = remap(rand(vec2f(fragData.uv.y + f32(i), fragData.uv.x + f32(i))), 0.0, 1.0, -1.0, 1.0);
-			result += textureSampleLevel(targetTexture, targetSampler, convertTexCoordsClamp(vec2f(fragData.uv.x + (x * r), fragData.uv.y + (y * r))), 0.0);
+			let x = remap(rand(vec2f(screenNdcUv.x + f32(i), screenNdcUv.y + f32(i))), 0.0, 1.0, -1.0, 1.0);
+			let y = remap(rand(vec2f(screenNdcUv.y + f32(i), screenNdcUv.x + f32(i))), 0.0, 1.0, -1.0, 1.0);
+			let aspectVector = vec2f(x, y) * r;
+			let sampleScreenNdcUv = screenNdcUv + aspectVectorToScreenNdcVector(aspectVector, blurCommonUniforms.aspectRatio);
+			let sampleTextureUv = clamp(screenNdcUvToTextureUv(sampleScreenNdcUv), vec2f(0.0), vec2f(1.0));
+			result += textureSampleLevel(targetTexture, targetSampler, sampleTextureUv, 0.0);
 		}
 
 		return result / f32(sampleCount);
@@ -536,21 +601,21 @@ fn fsBlur(fragData: FragmentIn) -> @location(0) vec4f {
 		var totalSamples = 0.0;
 		//let sampleCount = 256;
 		let sampleCount = blurUniforms.quality;
-		let jitter = rand(fragData.uv / vec2f(1.0, blurCommonUniforms.aspectRatio)) * 4.0;
+		let aspectUv = screenNdcUvToAspectUv(screenNdcUv, blurCommonUniforms.aspectRatio);
+		let jitter = rand(aspectUv) * 4.0;
 
 		for (var i = 0; i < sampleCount; i++) {
 			let radius = sqrt((f32(i) + 0.5) / f32(sampleCount));
 			let theta = (f32(i) + jitter) * goldenAngle;
-			let direction = vec2f(cos(theta), sin(theta));
-			let offset = direction * (r * radius);
+			let aspectDirectionVector = vec2f(cos(theta), sin(theta));
+			let aspectVector = aspectDirectionVector * (r * radius);
 			let weight = exp(-radius * radius * 4.0);
-			var sampleUv = fragData.uv + (offset * vec2f(1.0, blurCommonUniforms.aspectRatio));
+			var sampleScreenNdcUv = screenNdcUv + aspectVectorToScreenNdcVector(aspectVector, blurCommonUniforms.aspectRatio);
 			if (blurUniforms.isIos == 1) { // iOSではなぜか範囲外のサンプリングが異様に重いのでクランプ
-				sampleUv.x = clamp(sampleUv.x, -1.0, 1.0);
-				sampleUv.y = clamp(sampleUv.y, -1.0, 1.0);
+				sampleScreenNdcUv.x = clamp(sampleScreenNdcUv.x, -1.0, 1.0);
+				sampleScreenNdcUv.y = clamp(sampleScreenNdcUv.y, -1.0, 1.0);
 			}
-			result += textureSampleLevel(targetTexture, targetSampler, convertTexCoords(sampleUv), 0.0) * weight;
-			//result += vec3f(snoiseFractal(vec3f((uv + offset + 1.0) * 0.75, time * 0.5))) * weight;
+			result += textureSampleLevel(targetTexture, targetSampler, screenNdcUvToTextureUv(sampleScreenNdcUv), 0.0) * weight;
 			totalSamples += weight;
 		}
 
@@ -560,13 +625,14 @@ fn fsBlur(fragData: FragmentIn) -> @location(0) vec4f {
 	/*
 	var result = vec4f(0.0);
 	let sampleCount = 64;
+	let textureUv = screenNdcUvToTextureUv(fragData.screenNdcUv);
 	for (var i = 0; i < sampleCount; i++) {
-		var q = vec2(cos(degrees(f32(i / sampleCount) * 360.0)), sin(degrees(f32(i / sampleCount) * 360.0))) * (rand(vec2(f32(i), uv.x + uv.y)) + r);
-		var uv2 = uv + (q * r);
-		result += textureSample(targetTexture, targetSampler, uv2) / 2.0;
-		q = vec2(cos(degrees(f32(i / sampleCount) * 360.)), sin(degrees(f32(i / sampleCount) * 360.))) * (rand(vec2(f32(i) + 2., uv.x + uv.y + 24.)) + r);
-		uv2 = uv + (q * r);
-		result += textureSample(targetTexture, targetSampler, uv2) / 2.0;
+		var textureUvOffset = vec2(cos(degrees(f32(i / sampleCount) * 360.0)), sin(degrees(f32(i / sampleCount) * 360.0))) * (rand(vec2(f32(i), textureUv.x + textureUv.y)) + r);
+		var sampleTextureUv = textureUv + (textureUvOffset * r);
+		result += textureSample(targetTexture, targetSampler, sampleTextureUv) / 2.0;
+		textureUvOffset = vec2(cos(degrees(f32(i / sampleCount) * 360.)), sin(degrees(f32(i / sampleCount) * 360.))) * (rand(vec2(f32(i) + 2., textureUv.x + textureUv.y + 24.)) + r);
+		sampleTextureUv = textureUv + (textureUvOffset * r);
+		result += textureSample(targetTexture, targetSampler, sampleTextureUv) / 2.0;
 	}
 
 	return result / f32(sampleCount);
@@ -575,28 +641,37 @@ fn fsBlur(fragData: FragmentIn) -> @location(0) vec4f {
 
 @fragment
 fn fsBlurLight(fragData: FragmentIn) -> @location(0) vec4f {
-	let r = getBlurRadius(fragData.uv);
+	let screenNdcUv = fragData.screenNdcUv;
+	let r = getBlurRadius(screenNdcUv);
 
 	let sampleCount = blurUniforms.quality;
-	var result = textureSample(targetTexture, targetSampler, convertTexCoords(fragData.uv));
+	var result = textureSample(targetTexture, targetSampler, screenNdcUvToTextureUv(screenNdcUv));
 	var totalWeight = 1.0;
 
 	if (blurUniforms.isHorizontal == 1) {
 		for (var i = 1; i <= sampleCount; i++) {
 			let v = (cos((f32(i) / f32(sampleCount + 1)) * PI) + 1.0) * 0.5;
-			let jitter = rand(fragData.uv + f32(i)) * 0.25;
+			let jitter = rand(screenNdcUv + f32(i)) * 0.25;
 			let offset = (f32(i) / f32(sampleCount)) + jitter;
-			result += textureSample(targetTexture, targetSampler, convertTexCoordsClamp(vec2(fragData.uv.x + (offset * r), fragData.uv.y + (jitter * r)))) * v;
-			result += textureSample(targetTexture, targetSampler, convertTexCoordsClamp(vec2(fragData.uv.x - (offset * r), fragData.uv.y + (jitter * r)))) * v;
+			var aspectVector = vec2f(offset, jitter) * r;
+			var sampleScreenNdcUv = screenNdcUv + aspectVectorToScreenNdcVector(aspectVector, blurCommonUniforms.aspectRatio);
+			result += textureSample(targetTexture, targetSampler, clamp(screenNdcUvToTextureUv(sampleScreenNdcUv), vec2f(0.0), vec2f(1.0))) * v;
+			aspectVector = vec2f(-offset, jitter) * r;
+			sampleScreenNdcUv = screenNdcUv + aspectVectorToScreenNdcVector(aspectVector, blurCommonUniforms.aspectRatio);
+			result += textureSample(targetTexture, targetSampler, clamp(screenNdcUvToTextureUv(sampleScreenNdcUv), vec2f(0.0), vec2f(1.0))) * v;
 			totalWeight += v * 2.0;
 		}
 	} else {
 		for (var i = 1; i <= sampleCount; i++) {
 			let v = (cos((f32(i) / f32(sampleCount + 1)) * PI) + 1.0) * 0.5;
-			let jitter = rand(fragData.uv + f32(i)) * 0.25;
+			let jitter = rand(screenNdcUv + f32(i)) * 0.25;
 			let offset = (f32(i) / f32(sampleCount)) + jitter;
-			result += textureSample(targetTexture, targetSampler, convertTexCoordsClamp(vec2(fragData.uv.x + (jitter * r), fragData.uv.y + (offset * r)))) * v;
-			result += textureSample(targetTexture, targetSampler, convertTexCoordsClamp(vec2(fragData.uv.x + (jitter * r), fragData.uv.y - (offset * r)))) * v;
+			var aspectVector = vec2f(jitter, offset) * r;
+			var sampleScreenNdcUv = screenNdcUv + aspectVectorToScreenNdcVector(aspectVector, blurCommonUniforms.aspectRatio);
+			result += textureSample(targetTexture, targetSampler, clamp(screenNdcUvToTextureUv(sampleScreenNdcUv), vec2f(0.0), vec2f(1.0))) * v;
+			aspectVector = vec2f(jitter, -offset) * r;
+			sampleScreenNdcUv = screenNdcUv + aspectVectorToScreenNdcVector(aspectVector, blurCommonUniforms.aspectRatio);
+			result += textureSample(targetTexture, targetSampler, clamp(screenNdcUvToTextureUv(sampleScreenNdcUv), vec2f(0.0), vec2f(1.0))) * v;
 			totalWeight += v * 2.0;
 		}
 	}
@@ -615,29 +690,30 @@ struct PointerTrailUniforms {
 @group(2) @binding(2) var pointerTrailSampler: sampler;
 @group(2) @binding(3) var pointerTrailBeforeTexture: texture_2d<f32>;
 
-fn getPointerForceVector(uv: vec2f) -> vec2f {
+fn getPointerForceScreenNdcVector(aspectUv: vec2f) -> vec2f {
 	if (pointerTrailUniforms.pointerPosition.x <= -999.0 && pointerTrailUniforms.pointerPosition.y <= -999.0) {
 		return vec2f(0.0);
 	}
 
-	var v = vec2f(0.0);
+	var pointerForceScreenNdcVector = vec2f(0.0);
 	let radius = 0.3;
 
-	let pos = scaleUvToCoverGivenAspectRatio(pointerTrailUniforms.pointerPosition, pointerTrailUniforms.aspectRatio);
-	let d = distance(uv, pos);
+	let pointerAspectUv = screenNdcUvToAspectUv(pointerTrailUniforms.pointerPosition, pointerTrailUniforms.aspectRatio);
+	let d = distance(aspectUv, pointerAspectUv);
 	if (d < radius) {
 		let gradate = 1.0 - (d / radius);
-		v = (gradate * gradate) * (pointerTrailUniforms.pointerVector * 32.0);
+		pointerForceScreenNdcVector = (gradate * gradate) * (pointerTrailUniforms.pointerVector * 32.0);
 	}
 
-	return v;
+	return pointerForceScreenNdcVector;
 }
 
 @fragment
 fn fsPointerTrail(fragData: FragmentIn) -> @location(0) vec4f {
-	var uv = scaleUvToCoverGivenAspectRatio(fragData.uv, pointerTrailUniforms.aspectRatio);
-	var before = textureSample(pointerTrailBeforeTexture, pointerTrailSampler, convertTexCoords(fragData.uv)).rg;
-	before *= exp2(-pointerTrailUniforms.timeDelta / 300.0);
-	let v = getPointerForceVector(uv) * 0.3;
-	return vec4f(clamp(before + v, vec2f(-1.0), vec2f(1.0)), 0.0, 1.0);
+	let screenNdcUv = fragData.screenNdcUv;
+	let aspectUv = screenNdcUvToAspectUv(screenNdcUv, pointerTrailUniforms.aspectRatio);
+	var previousScreenNdcVector = textureSample(pointerTrailBeforeTexture, pointerTrailSampler, screenNdcUvToTextureUv(screenNdcUv)).rg;
+	previousScreenNdcVector *= exp2(-pointerTrailUniforms.timeDelta / 300.0);
+	let pointerForceScreenNdcVector = getPointerForceScreenNdcVector(aspectUv) * 0.3;
+	return vec4f(clamp(previousScreenNdcVector + pointerForceScreenNdcVector, vec2f(-1.0), vec2f(1.0)), 0.0, 1.0);
 }

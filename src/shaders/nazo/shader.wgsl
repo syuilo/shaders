@@ -12,12 +12,28 @@ struct Uniforms {
 
 @group(0) @binding(1) var<uniform> uniforms: Uniforms;
 
-fn getPixelatedUv(uv: vec2f, cellSize: vec2f) -> vec2f {
-	return (cellSize * floor(uv / cellSize)) + (cellSize / 2.0);
+fn getPixelatedAspectUv(aspectUv: vec2f, aspectCellSize: vec2f) -> vec2f {
+	return (aspectCellSize * floor(aspectUv / aspectCellSize)) + (aspectCellSize / 2.0);
 }
 
-fn scaleUvToCoverGivenAspectRatio(uv: vec2f, aspectRatio: f32) -> vec2f {
-	return uv / vec2f(1.0, aspectRatio) * select(1.0, aspectRatio, 1.0 > aspectRatio);
+fn getScreenNdcToAspectScale(aspectRatio: f32) -> vec2f {
+	return vec2f(min(1.0, aspectRatio), min(1.0, 1.0 / aspectRatio));
+}
+
+fn screenNdcUvToAspectUv(screenNdcUv: vec2f, aspectRatio: f32) -> vec2f {
+	return screenNdcUv * getScreenNdcToAspectScale(aspectRatio);
+}
+
+fn screenNdcVectorToAspectVector(screenNdcVector: vec2f, aspectRatio: f32) -> vec2f {
+	return screenNdcVector * getScreenNdcToAspectScale(aspectRatio);
+}
+
+fn aspectUvToScreenNdcUv(aspectUv: vec2f, aspectRatio: f32) -> vec2f {
+	return aspectUv / getScreenNdcToAspectScale(aspectRatio);
+}
+
+fn aspectVectorToScreenNdcVector(aspectVector: vec2f, aspectRatio: f32) -> vec2f {
+	return aspectVector / getScreenNdcToAspectScale(aspectRatio);
 }
 
 fn linearRisePulse(
@@ -29,11 +45,11 @@ fn linearRisePulse(
 	return clamp((_phase - riseStart) / riseLength, 0.0, 1.0);
 }
 
-fn getV(uv: vec2f) -> f32 {
+fn getV(aspectUv: vec2f) -> f32 {
 	let divisions = uniforms.divisions;
 
-	let lengthField = ((uv.x * 0.5) + (uv.y * 0.5) * divisions) / (divisions * divisions);
-	let phaseField = ((uv.x * 4.0) + (uv.y * 4.0) * divisions) / (divisions * divisions);
+	let lengthField = ((aspectUv.x * 0.5) + (aspectUv.y * 0.5) * divisions) / (divisions * divisions);
+	let phaseField = ((aspectUv.x * 4.0) + (aspectUv.y * 4.0) * divisions) / (divisions * divisions);
 
 	let phase = fract(
 		uniforms.time * 0.001
@@ -49,24 +65,23 @@ fn getV(uv: vec2f) -> f32 {
 }
 
 struct FragmentIn {
-	@location(0) uv: vec2f,
+	@location(0) screenNdcUv: vec2f,
 };
 
 @fragment
 fn fs(fragData: FragmentIn) -> @location(0) vec4f {
-	let uv = scaleUvToCoverGivenAspectRatio(fragData.uv, uniforms.aspectRatio);
-	//let uv = fragData.uv;
-	let cellSize = vec2f(1.0 / (uniforms.divisions * 0.5));
-	let modUv = modVec2f(uv, cellSize);
-	let cellUv = getPixelatedUv(uv, cellSize);
+	let aspectUv = screenNdcUvToAspectUv(fragData.screenNdcUv, uniforms.aspectRatio);
+	let aspectCellSize = vec2f(1.0 / (uniforms.divisions * 0.5));
+	let cellLocalUv = modVec2f(aspectUv, aspectCellSize);
+	let aspectCellUv = getPixelatedAspectUv(aspectUv, aspectCellSize);
 
-	let v = getV(cellUv + 1.0);
+	let v = getV(aspectCellUv + 1.0);
 
 	var color = vec3f(0.0, 0.0, 0.0);
-	let dist = distance(modUv, cellSize * 0.5);
+	let dist = distance(cellLocalUv, aspectCellSize * 0.5);
 	let radius = v;
-	if (dist < radius * (cellSize.x * 0.5)) { color = vec3f(1.0, 1.0, 1.0); }
+	if (dist < radius * (aspectCellSize.x * 0.5)) { color = vec3f(1.0, 1.0, 1.0); }
 
 	return vec4f(color, 1.0);
-	//return vec4f(uv + 1.0, 0.0, 1.0);
+	//return vec4f(aspectUv + 1.0, 0.0, 1.0);
 }

@@ -24,12 +24,28 @@ fn premultiplyAlpha(color: vec4f) -> vec4f {
 	return vec4f(color.rgb * color.a, color.a);
 }
 
-fn getPixelatedUv(uv: vec2f, cellSize: vec2f) -> vec2f {
-	return (cellSize * floor(uv / cellSize)) + (cellSize / 2.0);
+fn getPixelatedAspectUv(aspectUv: vec2f, aspectCellSize: vec2f) -> vec2f {
+	return (aspectCellSize * floor(aspectUv / aspectCellSize)) + (aspectCellSize / 2.0);
 }
 
-fn scaleUvToCoverGivenAspectRatio(uv: vec2f, aspectRatio: f32) -> vec2f {
-	return uv / vec2f(1.0, aspectRatio) * select(1.0, aspectRatio, 1.0 > aspectRatio);
+fn getScreenNdcToAspectScale(aspectRatio: f32) -> vec2f {
+	return vec2f(min(1.0, aspectRatio), min(1.0, 1.0 / aspectRatio));
+}
+
+fn screenNdcUvToAspectUv(screenNdcUv: vec2f, aspectRatio: f32) -> vec2f {
+	return screenNdcUv * getScreenNdcToAspectScale(aspectRatio);
+}
+
+fn screenNdcVectorToAspectVector(screenNdcVector: vec2f, aspectRatio: f32) -> vec2f {
+	return screenNdcVector * getScreenNdcToAspectScale(aspectRatio);
+}
+
+fn aspectUvToScreenNdcUv(aspectUv: vec2f, aspectRatio: f32) -> vec2f {
+	return aspectUv / getScreenNdcToAspectScale(aspectRatio);
+}
+
+fn aspectVectorToScreenNdcVector(aspectVector: vec2f, aspectRatio: f32) -> vec2f {
+	return aspectVector / getScreenNdcToAspectScale(aspectRatio);
 }
 
 fn hashU32(value: u32) -> u32 {
@@ -48,12 +64,12 @@ fn rand(seed: vec2f) -> f32 {
 	return f32(hash >> 8u) * (1.0 / 16777216.0);
 }
 
-fn rotate(uv: vec2f, angle: f32) -> vec2f {
+fn rotateAspectUv(aspectUv: vec2f, angle: f32) -> vec2f {
 	let cosAngle = cos(angle);
 	let sinAngle = sin(angle);
 	return vec2f(
-		uv.x * cosAngle - uv.y * sinAngle,
-		uv.x * sinAngle + uv.y * cosAngle
+		aspectUv.x * cosAngle - aspectUv.y * sinAngle,
+		aspectUv.x * sinAngle + aspectUv.y * cosAngle
 	);
 }
 
@@ -66,61 +82,61 @@ fn linearRisePulse(
 	return clamp((_phase - riseStart) / riseLength, 0.0, 1.0);
 }
 
-fn getV(uv: vec2f) -> f32 {
+fn getV(aspectUv: vec2f) -> f32 {
 	let dutyCycleFactor = uniforms.dutyCycle;
-	let dutyCycle = max(rand(uv), 0.1) * dutyCycleFactor;
+	let dutyCycle = max(rand(aspectUv), 0.1) * dutyCycleFactor;
 	let phase = fract(uniforms.time * 0.00015 * dutyCycle);
 	return linearRisePulse(phase, dutyCycle);
 }
 
-fn drawLayer(_color: vec4f, uv: vec2f, rotation: f32, offset: vec2f, seed: f32) -> vec4f {
+fn drawLayer(_color: vec4f, aspectUv: vec2f, rotation: f32, aspectOffsetVector: vec2f, seed: f32) -> vec4f {
 	var color = _color;
-	let cellSize = vec2f(1.0 / (uniforms.divisions * 0.5));
+	let aspectCellSize = vec2f(1.0 / (uniforms.divisions * 0.5));
 	let innerDelay = 0.25;
 	let innerFactor = 1.05;
-	let innerPosOffset = vec2f(0.07, -0.07);
+	let innerPosOffsetVector = vec2f(0.07, -0.07);
 	let transparencyDelay = 0.75;
 
-	let _uv = rotate(uv, rotation);
-	let modUv = modVec2f(_uv + (cellSize * offset), cellSize);
-	let cellUv = getPixelatedUv(_uv + (cellSize * offset), cellSize);
-	let v = getV(cellUv + seed);
+	let rotatedAspectUv = rotateAspectUv(aspectUv, rotation);
+	let cellLocalUv = modVec2f(rotatedAspectUv + (aspectCellSize * aspectOffsetVector), aspectCellSize);
+	let aspectCellUv = getPixelatedAspectUv(rotatedAspectUv + (aspectCellSize * aspectOffsetVector), aspectCellSize);
+	let v = getV(aspectCellUv + seed);
 	let transparency = max(0.0, v - transparencyDelay) / (1.0 - transparencyDelay);
 
-	let innerPosOffsetRotation = (rand(cellUv) * TWO_PI) + (uniforms.time * 0.0001);
-	let innerPosOffsetRotated = vec2f(innerPosOffset.x * cos(innerPosOffsetRotation) - innerPosOffset.y * sin(innerPosOffsetRotation), innerPosOffset.x * sin(innerPosOffsetRotation) + innerPosOffset.y * cos(innerPosOffsetRotation));
-	let innerDist = distance(modUv, (cellSize * 0.5) + (innerPosOffsetRotated * (cellSize * 0.5)));
+	let innerPosOffsetRotation = (rand(aspectCellUv) * TWO_PI) + (uniforms.time * 0.0001);
+	let innerPosOffsetVectorRotated = vec2f(innerPosOffsetVector.x * cos(innerPosOffsetRotation) - innerPosOffsetVector.y * sin(innerPosOffsetRotation), innerPosOffsetVector.x * sin(innerPosOffsetRotation) + innerPosOffsetVector.y * cos(innerPosOffsetRotation));
+	let innerDist = distance(cellLocalUv, (aspectCellSize * 0.5) + (innerPosOffsetVectorRotated * (aspectCellSize * 0.5)));
 	let radiusInner = (((v - innerDelay) / (1.0 - innerDelay)) * innerFactor) + uniforms.outlineWidth;
 
-	let mainDist = distance(modUv, cellSize * 0.5);
+	let mainDist = distance(cellLocalUv, aspectCellSize * 0.5);
 	let radiusMain = v - uniforms.outlineWidth;
-	if (mainDist < radiusMain * (cellSize.x * 0.5) && innerDist > radiusInner * (cellSize.x * 0.5)) { color = vec4f(uniforms.color, min(1.0, color.a + (1.0 - transparency))); }
+	if (mainDist < radiusMain * (aspectCellSize.x * 0.5) && innerDist > radiusInner * (aspectCellSize.x * 0.5)) { color = vec4f(uniforms.color, min(1.0, color.a + (1.0 - transparency))); }
 
-	let mainOutline = mainDist < (radiusMain + uniforms.outlineWidth) * (cellSize.x * 0.5) && mainDist > (radiusMain - uniforms.outlineWidth) * (cellSize.x * 0.5);
-	let isInnerInside = innerDist < radiusInner * (cellSize.x * 0.5);
+	let mainOutline = mainDist < (radiusMain + uniforms.outlineWidth) * (aspectCellSize.x * 0.5) && mainDist > (radiusMain - uniforms.outlineWidth) * (aspectCellSize.x * 0.5);
+	let isInnerInside = innerDist < radiusInner * (aspectCellSize.x * 0.5);
 	if (mainOutline && !isInnerInside) { color = vec4f(uniforms.outlineColor, max(0.0, color.a - 0.5)); }
 
-	let innerOutline = innerDist < (radiusInner + uniforms.outlineWidth) * (cellSize.x * 0.5) && innerDist > (radiusInner - uniforms.outlineWidth) * (cellSize.x * 0.5);
-	let isMainInside = mainDist < radiusMain * (cellSize.x * 0.5);
+	let innerOutline = innerDist < (radiusInner + uniforms.outlineWidth) * (aspectCellSize.x * 0.5) && innerDist > (radiusInner - uniforms.outlineWidth) * (aspectCellSize.x * 0.5);
+	let isMainInside = mainDist < radiusMain * (aspectCellSize.x * 0.5);
 	if (innerOutline && isMainInside) { color = vec4f(uniforms.outlineColor, max(0.0, color.a - 0.5)); }
 
 	return color;
 }
 
 struct FragmentIn {
-	@location(0) uv: vec2f,
+	@location(0) screenNdcUv: vec2f,
 };
 
 @fragment
 fn fs(fragData: FragmentIn) -> @location(0) vec4f {
-	let uv = scaleUvToCoverGivenAspectRatio(fragData.uv, uniforms.aspectRatio);
+	let aspectUv = screenNdcUvToAspectUv(fragData.screenNdcUv, uniforms.aspectRatio);
 
 	var color = vec4f(0.0, 0.0, 0.0, 0.0);
 
 	// 複数のレイヤー(格子)をずらして重ねることで格子感を薄める
-	color = drawLayer(color, uv, radians(0.0), vec2f(0.0, 0.0), 1.0);
-	color = drawLayer(color, uv, radians(22.5), vec2f(0.25, 0.25), 3.0);
-	color = drawLayer(color, uv, radians(45.0), vec2f(0.5, 0.5), 5.0);
+	color = drawLayer(color, aspectUv, radians(0.0), vec2f(0.0, 0.0), 1.0);
+	color = drawLayer(color, aspectUv, radians(22.5), vec2f(0.25, 0.25), 3.0);
+	color = drawLayer(color, aspectUv, radians(45.0), vec2f(0.5, 0.5), 5.0);
 
 	return premultiplyAlpha(color);
 }

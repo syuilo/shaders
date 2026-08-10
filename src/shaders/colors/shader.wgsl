@@ -157,8 +157,28 @@ struct Uniforms {
 
 @group(0) @binding(1) var<uniform> uniforms: Uniforms;
 
+fn getScreenNdcToAspectScale(aspectRatio: f32) -> vec2f {
+	return vec2f(min(1.0, aspectRatio), min(1.0, 1.0 / aspectRatio));
+}
+
+fn screenNdcUvToAspectUv(screenNdcUv: vec2f, aspectRatio: f32) -> vec2f {
+	return screenNdcUv * getScreenNdcToAspectScale(aspectRatio);
+}
+
+fn screenNdcVectorToAspectVector(screenNdcVector: vec2f, aspectRatio: f32) -> vec2f {
+	return screenNdcVector * getScreenNdcToAspectScale(aspectRatio);
+}
+
+fn aspectUvToScreenNdcUv(aspectUv: vec2f, aspectRatio: f32) -> vec2f {
+	return aspectUv / getScreenNdcToAspectScale(aspectRatio);
+}
+
+fn aspectVectorToScreenNdcVector(aspectVector: vec2f, aspectRatio: f32) -> vec2f {
+	return aspectVector / getScreenNdcToAspectScale(aspectRatio);
+}
+
 struct FragmentIn {
-	@location(0) uv: vec2f,
+	@location(0) screenNdcUv: vec2f,
 };
 
 @fragment
@@ -166,12 +186,12 @@ fn fs(fragData: FragmentIn) -> @location(0) vec4f {
 	let time = uniforms.time * 0.0001;
 	let seed = 1000.0;
 
-	var uv = fragData.uv / vec2f(1.0, uniforms.aspectRatio) * select(1.0, uniforms.aspectRatio, 1.0 > uniforms.aspectRatio);
-	uv *= uniforms.scale;
+	var aspectUv = screenNdcUvToAspectUv(fragData.screenNdcUv, uniforms.aspectRatio);
+	aspectUv *= uniforms.scale;
 
-	let noiseR = snoise(vec3f(uv + seed + 1.0, time));
-	let noiseG = snoise(vec3f(uv + seed + 2.0, time));
-	let noiseB = snoise(vec3f(uv + seed + 3.0, time));
+	let noiseR = snoise(vec3f(aspectUv + seed + 1.0, time));
+	let noiseG = snoise(vec3f(aspectUv + seed + 2.0, time));
+	let noiseB = snoise(vec3f(aspectUv + seed + 3.0, time));
 
 	var c = vec3f(0.0);
 	c = mix(c, vec3f(1.0, 0.0, 0.0), noiseR);

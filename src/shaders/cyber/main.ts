@@ -3,6 +3,7 @@ import { metadata } from './meta.ts';
 import { createTextureFromImages, createTextureFromSource, makeShaderDataDefinitions, makeStructuredView } from 'webgpu-utils';
 import { definePlayground } from '@/utils.ts';
 import { isVideoFrameAvailable } from '@/video.ts';
+import { createCyberMainBindGroupEntries } from './bind-group-entries.ts';
 
 export const playground = definePlayground({
 	...metadata,
@@ -248,13 +249,14 @@ export const playground = definePlayground({
 
 		const bindGroups = pointerTrailBufferViews.map(pointerTrailBufferView => wgpu.device.createBindGroup({
 			layout: pipeline.getBindGroupLayout(0),
-			entries: [
-				{ binding: 1, resource: { buffer: uniformBuffer }},
-				{ binding: 2, resource: wgpu.sampler },
-				{ binding: 3, resource: symbolTexturesView },
-				{ binding: 4, resource: sourceTextureView },
-				{ binding: 5, resource: pointerTrailBufferView },
-			],
+			entries: createCyberMainBindGroupEntries({
+				uniformBuffer,
+				sampler: wgpu.sampler,
+				symbolTexturesView,
+				sourceTextureView,
+				pointerTrailBufferView,
+				hasSource: params.source != null,
+			}),
 		}));
 
 		/*

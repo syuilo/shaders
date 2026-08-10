@@ -1,6 +1,6 @@
 struct VertexOut {
 	@builtin(position) position: vec4f,
-	@location(0) uv: vec2f,
+	@location(0) screenNdcUv: vec2f,
 };
 
 const vertices = array(
@@ -17,9 +17,9 @@ const vertices = array(
 
 @vertex
 fn vs(@builtin(vertex_index) vertexIndex: u32) -> VertexOut {
-	let pos = vertices[vertexIndex];
+	let screenNdcUv = vertices[vertexIndex];
 	var output: VertexOut;
-	output.position = vec4f(pos, 0.0, 1.0);
-	output.uv = pos.xy;
+	output.position = vec4f(screenNdcUv, 0.0, 1.0);
+	output.screenNdcUv = screenNdcUv;
 	return output;
 }

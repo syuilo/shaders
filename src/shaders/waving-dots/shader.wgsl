@@ -104,12 +104,28 @@ fn remap(value: f32, inMin: f32, inMax: f32, outMin: f32, outMax: f32) -> f32 {
 	return (value - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
 }
 
-fn getPixelatedUv(uv: vec2f, cellSize: vec2f) -> vec2f {
-	return (cellSize * floor(uv / cellSize)) + (cellSize / 2.0);
+fn getPixelatedAspectUv(aspectUv: vec2f, aspectCellSize: vec2f) -> vec2f {
+	return (aspectCellSize * floor(aspectUv / aspectCellSize)) + (aspectCellSize / 2.0);
 }
 
-fn scaleUvToCoverGivenAspectRatio(uv: vec2f, aspectRatio: f32) -> vec2f {
-	return uv / vec2f(1.0, aspectRatio) * select(1.0, aspectRatio, 1.0 > aspectRatio);
+fn getScreenNdcToAspectScale(aspectRatio: f32) -> vec2f {
+	return vec2f(min(1.0, aspectRatio), min(1.0, 1.0 / aspectRatio));
+}
+
+fn screenNdcUvToAspectUv(screenNdcUv: vec2f, aspectRatio: f32) -> vec2f {
+	return screenNdcUv * getScreenNdcToAspectScale(aspectRatio);
+}
+
+fn screenNdcVectorToAspectVector(screenNdcVector: vec2f, aspectRatio: f32) -> vec2f {
+	return screenNdcVector * getScreenNdcToAspectScale(aspectRatio);
+}
+
+fn aspectUvToScreenNdcUv(aspectUv: vec2f, aspectRatio: f32) -> vec2f {
+	return aspectUv / getScreenNdcToAspectScale(aspectRatio);
+}
+
+fn aspectVectorToScreenNdcVector(aspectVector: vec2f, aspectRatio: f32) -> vec2f {
+	return aspectVector / getScreenNdcToAspectScale(aspectRatio);
 }
 
 fn asymmetricPulse(
@@ -137,13 +153,13 @@ fn asymmetricPulse(
 	return min(attack, decay);
 }
 
-fn getV(uv: vec2f) -> f32 {
-	let phaseField = snoise0to1(vec3f(uv * 4.0, uniforms.time * 0.0001));
+fn getV(aspectUv: vec2f) -> f32 {
+	let phaseField = snoise0to1(vec3f(aspectUv * 4.0, uniforms.time * 0.0001));
 
 	// 一方向へ進む成分
-	//let direction = normalize(vec2(1.0, 0.35));
-	let direction = normalize(uv);
-	let wavePosition = dot(uv, direction) * uniforms.waveScale;
+	//let aspectDirectionVector = normalize(vec2(1.0, 0.35));
+	let aspectDirectionVector = normalize(aspectUv);
+	let wavePosition = dot(aspectUv, aspectDirectionVector) * uniforms.waveScale;
 
 	let phase = fract(
 		uniforms.time * 0.0001
@@ -161,22 +177,22 @@ fn getV(uv: vec2f) -> f32 {
 }
 
 struct FragmentIn {
-	@location(0) uv: vec2f,
+	@location(0) screenNdcUv: vec2f,
 };
 
 @fragment
 fn fs(fragData: FragmentIn) -> @location(0) vec4f {
-	let uv = scaleUvToCoverGivenAspectRatio(fragData.uv, uniforms.aspectRatio);
-	var cellSize = vec2f(1.0 / (uniforms.divisions * 0.5));
-	var modUv = modVec2f(uv, cellSize);
-	let cellUv = getPixelatedUv(uv, cellSize);
+	let aspectUv = screenNdcUvToAspectUv(fragData.screenNdcUv, uniforms.aspectRatio);
+	let aspectCellSize = vec2f(1.0 / (uniforms.divisions * 0.5));
+	let cellLocalUv = modVec2f(aspectUv, aspectCellSize);
+	let aspectCellUv = getPixelatedAspectUv(aspectUv, aspectCellSize);
 
-	let v = getV(cellUv);
+	let v = getV(aspectCellUv);
 
 	var color = vec3f(0.0, 0.0, 0.0);
-	let dist = distance(modUv, cellSize * 0.5);
+	let dist = distance(cellLocalUv, aspectCellSize * 0.5);
 	let radius = v;
-	if (dist < radius * (cellSize.x * 0.5)) { color = vec3f(1.0, 1.0, 1.0); }
+	if (dist < radius * (aspectCellSize.x * 0.5)) { color = vec3f(1.0, 1.0, 1.0); }
 
 	return vec4f(color, 1.0);
 }

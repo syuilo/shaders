@@ -149,11 +149,6 @@ fn premultiplyAlpha(color: vec4f) -> vec4f {
 	return vec4f(color.rgb * color.a, color.a);
 }
 
-// テクスチャ座標(0~1、+Yが下)に変換
-fn convertTexCoords(uv: vec2f) -> vec2f {
-	return vec2f(uv.x, -uv.y) * 0.5 + vec2f(0.5);
-}
-
 struct Uniforms {
 	aspectRatio: f32,
 	time: f32,
@@ -191,25 +186,97 @@ fn remap(value: f32, inMin: f32, inMax: f32, outMin: f32, outMax: f32) -> f32 {
 	return (value - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
 }
 
-fn getPixelatedUv(uv: vec2f, cellSize: vec2f) -> vec2f {
-	return (cellSize * floor(uv / cellSize)) + (cellSize / 2.0);
+fn getPixelatedAspectUv(aspectUv: vec2f, aspectCellSize: vec2f) -> vec2f {
+	return (aspectCellSize * floor(aspectUv / aspectCellSize)) + (aspectCellSize / 2.0);
 }
 
-fn getSourceColor(uv: vec2f) -> vec4f {
-	let sourceScale = select(
-		select(1.0, uniforms.sourceAspectRatio / uniforms.aspectRatio, uniforms.sourceAspectRatio < uniforms.aspectRatio),
-		select(1.0, uniforms.sourceAspectRatio / uniforms.aspectRatio, uniforms.sourceAspectRatio > uniforms.aspectRatio),
-		uniforms.coverSource == 1);
-	var sourceUv = uv * vec2f(1.0, uniforms.sourceAspectRatio) / sourceScale;
+fn getScreenNdcToAspectScale(aspectRatio: f32) -> vec2f {
+	return vec2f(min(1.0, aspectRatio), min(1.0, 1.0 / aspectRatio));
+}
+
+fn screenNdcUvToAspectUv(screenNdcUv: vec2f, aspectRatio: f32) -> vec2f {
+	return screenNdcUv * getScreenNdcToAspectScale(aspectRatio);
+}
+
+fn screenNdcVectorToAspectVector(screenNdcVector: vec2f, aspectRatio: f32) -> vec2f {
+	return screenNdcVector * getScreenNdcToAspectScale(aspectRatio);
+}
+
+fn aspectUvToScreenNdcUv(aspectUv: vec2f, aspectRatio: f32) -> vec2f {
+	return aspectUv / getScreenNdcToAspectScale(aspectRatio);
+}
+
+fn aspectVectorToScreenNdcVector(aspectVector: vec2f, aspectRatio: f32) -> vec2f {
+	return aspectVector / getScreenNdcToAspectScale(aspectRatio);
+}
+
+fn screenNdcUvToTextureUv(screenNdcUv: vec2f) -> vec2f {
+	return vec2f(screenNdcUv.x, -screenNdcUv.y) * 0.5 + vec2f(0.5);
+}
+
+fn sourceNdcUvToTextureUv(sourceNdcUv: vec2f) -> vec2f {
+	return vec2f(sourceNdcUv.x, -sourceNdcUv.y) * 0.5 + vec2f(0.5);
+}
+
+fn getScreenNdcToSourceNdcScale(
+	screenAspectRatio: f32,
+	sourceAspectRatio: f32,
+	coverSource: bool,
+) -> vec2f {
+	let fitWidth = vec2f(screenAspectRatio / sourceAspectRatio, 1.0);
+	let fitHeight = vec2f(1.0, sourceAspectRatio / screenAspectRatio);
+	let containScale = select(fitHeight, fitWidth, sourceAspectRatio < screenAspectRatio);
+	let coverScale = select(fitHeight, fitWidth, sourceAspectRatio > screenAspectRatio);
+	return select(containScale, coverScale, coverSource);
+}
+
+fn screenNdcUvToSourceNdcUv(screenNdcUv: vec2f) -> vec2f {
+	return screenNdcUv * getScreenNdcToSourceNdcScale(
+		uniforms.aspectRatio,
+		uniforms.sourceAspectRatio,
+		uniforms.coverSource == 1,
+	);
+}
+
+fn screenNdcVectorToSourceNdcVector(screenNdcVector: vec2f) -> vec2f {
+	return screenNdcVector * getScreenNdcToSourceNdcScale(
+		uniforms.aspectRatio,
+		uniforms.sourceAspectRatio,
+		uniforms.coverSource == 1,
+	);
+}
+
+fn getAdaptiveCellSampleOffset(baseAspectCellSize: f32, multiplier: f32) -> vec2f {
+	return vec2f(baseAspectCellSize * ((multiplier - 1.0) * 0.5));
+}
+
+fn getSourceColor(screenNdcUv: vec2f) -> vec4f {
+	var sourceNdcUv = screenNdcUvToSourceNdcUv(screenNdcUv);
 	if (uniforms.pointerTrailWarp == 1) {
-		sourceUv -= getPointerTrailVector(uv);
+		let pointerTrailScreenNdcVector = getPointerTrailScreenNdcVector(screenNdcUv);
+		let pointerTrailSourceNdcVector = screenNdcVectorToSourceNdcVector(pointerTrailScreenNdcVector);
+		sourceNdcUv -= pointerTrailSourceNdcVector;
 	}
-	let color = textureSample(sourceTexture, mySampler, convertTexCoords(sourceUv));
+	let color = textureSample(sourceTexture, mySampler, sourceNdcUvToTextureUv(sourceNdcUv));
 	return vec4f(pow(color.rgb, vec3f(uniforms.sourceContrast)), color.a);
 }
 
-fn getPointerTrailVector(uv: vec2f) -> vec2f {
-	return textureSample(pointerTrailTexture, mySampler, convertTexCoords(unscaleUvToCoverGivenAspectRatio(uv, uniforms.aspectRatio))).rg;
+fn getPointerTrailScreenNdcVector(screenNdcUv: vec2f) -> vec2f {
+	return textureSample(pointerTrailTexture, mySampler, screenNdcUvToTextureUv(screenNdcUv)).rg;
+}
+
+fn getSymbolShiftAspectVector(
+	pointerTrailScreenNdcVector: vec2f,
+	aspectCellSize: vec2f,
+) -> vec2f {
+	return -pointerTrailScreenNdcVector * aspectCellSize;
+}
+
+fn getShiftedCellLocalAspectUv(
+	cellLocalAspectUv: vec2f,
+	symbolShiftAspectVector: vec2f,
+) -> vec2f {
+	return cellLocalAspectUv + symbolShiftAspectVector;
 }
 
 fn isSimilar(a: vec4f, b: vec4f, c: vec4f, d: vec4f, threshold: f32) -> bool {
@@ -220,73 +287,70 @@ fn isSimilar(a: vec4f, b: vec4f, c: vec4f, d: vec4f, threshold: f32) -> bool {
 	);
 }
 
-fn scaleUvToCoverGivenAspectRatio(uv: vec2f, aspectRatio: f32) -> vec2f {
-	return uv / vec2f(1.0, aspectRatio) * select(1.0, aspectRatio, 1.0 > aspectRatio);
-}
-
-fn unscaleUvToCoverGivenAspectRatio(uv: vec2f, aspectRatio: f32) -> vec2f {
-	return uv * vec2f(1.0, aspectRatio) / select(1.0, aspectRatio, 1.0 > aspectRatio);
-}
-
 struct FragmentIn {
-	@location(0) uv: vec2f,
+	@location(0) screenNdcUv: vec2f,
 };
 
 @fragment
 fn fsWithSource(fragData: FragmentIn) -> @location(0) vec4f {
 	let time = uniforms.time;
-	let scroll = vec2f(0.0, -time * 0.0001);
-	let uv = scaleUvToCoverGivenAspectRatio(fragData.uv, uniforms.aspectRatio);
-	var cellSize = vec2f(1.0 / (uniforms.divisions * 0.5));
+	let scrollAspectVector = vec2f(0.0, -time * 0.0001);
+	let aspectUv = screenNdcUvToAspectUv(fragData.screenNdcUv, uniforms.aspectRatio);
+	let baseAspectCellSize = 1.0 / (uniforms.divisions * 0.5);
+	var aspectCellSize = vec2f(baseAspectCellSize);
 	var border = uniforms.margin;
-	var modUv = modVec2f(uv, cellSize);
+	var cellLocalAspectUv = modVec2f(aspectUv, aspectCellSize);
 
-	let cellUv2 = getPixelatedUv(uv, cellSize * 2.0);
-	let a2 = cellUv2 + vec2f(-(cellUv2.x / 2.0 / 2.0), -(cellUv2.y / 2.0 / 2.0));
-	let b2 = cellUv2 + vec2f((cellUv2.x / 2.0 / 2.0), -(cellUv2.y / 2.0 / 2.0));
-	let c2 = cellUv2 + vec2f(-(cellUv2.x / 2.0 / 2.0), (cellUv2.y / 2.0 / 2.0));
-	let d2 = cellUv2 + vec2f((cellUv2.x / 2.0 / 2.0), (cellUv2.y / 2.0 / 2.0));
-	let sourceColorA2 = getSourceColor(a2);
-	let sourceColorB2 = getSourceColor(b2);
-	let sourceColorC2 = getSourceColor(c2);
-	let sourceColorD2 = getSourceColor(d2);
+	let aspectCellUv2 = getPixelatedAspectUv(aspectUv, aspectCellSize * 2.0);
+	let sampleAspectVector2 = getAdaptiveCellSampleOffset(baseAspectCellSize, 2.0);
+	let sampleAspectUvA2 = aspectCellUv2 + vec2f(-sampleAspectVector2.x, -sampleAspectVector2.y);
+	let sampleAspectUvB2 = aspectCellUv2 + vec2f(sampleAspectVector2.x, -sampleAspectVector2.y);
+	let sampleAspectUvC2 = aspectCellUv2 + vec2f(-sampleAspectVector2.x, sampleAspectVector2.y);
+	let sampleAspectUvD2 = aspectCellUv2 + vec2f(sampleAspectVector2.x, sampleAspectVector2.y);
+	let sourceColorA2 = getSourceColor(aspectUvToScreenNdcUv(sampleAspectUvA2, uniforms.aspectRatio));
+	let sourceColorB2 = getSourceColor(aspectUvToScreenNdcUv(sampleAspectUvB2, uniforms.aspectRatio));
+	let sourceColorC2 = getSourceColor(aspectUvToScreenNdcUv(sampleAspectUvC2, uniforms.aspectRatio));
+	let sourceColorD2 = getSourceColor(aspectUvToScreenNdcUv(sampleAspectUvD2, uniforms.aspectRatio));
 	let similar2 = isSimilar(sourceColorA2, sourceColorB2, sourceColorC2, sourceColorD2, 0.1 * uniforms.similarityThresholdFactor);
 
-	let cellUv4 = getPixelatedUv(uv, cellSize * 4.0);
-	let a4 = cellUv4 + vec2f(-(cellUv4.x / 4.0 / 2.0), -(cellUv4.y / 4.0 / 2.0));
-	let b4 = cellUv4 + vec2f((cellUv4.x / 4.0 / 2.0), -(cellUv4.y / 4.0 / 2.0));
-	let c4 = cellUv4 + vec2f(-(cellUv4.x / 4.0 / 2.0), (cellUv4.y / 4.0 / 2.0));
-	let d4 = cellUv4 + vec2f((cellUv4.x / 4.0 / 2.0), (cellUv4.y / 4.0 / 2.0));
-	let sourceColorA4 = getSourceColor(a4);
-	let sourceColorB4 = getSourceColor(b4);
-	let sourceColorC4 = getSourceColor(c4);
-	let sourceColorD4 = getSourceColor(d4);
+	let aspectCellUv4 = getPixelatedAspectUv(aspectUv, aspectCellSize * 4.0);
+	let sampleAspectVector4 = getAdaptiveCellSampleOffset(baseAspectCellSize, 4.0);
+	let sampleAspectUvA4 = aspectCellUv4 + vec2f(-sampleAspectVector4.x, -sampleAspectVector4.y);
+	let sampleAspectUvB4 = aspectCellUv4 + vec2f(sampleAspectVector4.x, -sampleAspectVector4.y);
+	let sampleAspectUvC4 = aspectCellUv4 + vec2f(-sampleAspectVector4.x, sampleAspectVector4.y);
+	let sampleAspectUvD4 = aspectCellUv4 + vec2f(sampleAspectVector4.x, sampleAspectVector4.y);
+	let sourceColorA4 = getSourceColor(aspectUvToScreenNdcUv(sampleAspectUvA4, uniforms.aspectRatio));
+	let sourceColorB4 = getSourceColor(aspectUvToScreenNdcUv(sampleAspectUvB4, uniforms.aspectRatio));
+	let sourceColorC4 = getSourceColor(aspectUvToScreenNdcUv(sampleAspectUvC4, uniforms.aspectRatio));
+	let sourceColorD4 = getSourceColor(aspectUvToScreenNdcUv(sampleAspectUvD4, uniforms.aspectRatio));
 	let similar4 = isSimilar(sourceColorA4, sourceColorB4, sourceColorC4, sourceColorD4, 0.025 * uniforms.similarityThresholdFactor);
 
 	if (similar4) {
-		modUv = modVec2f(uv, cellSize * 4.0);
-		cellSize = cellSize * 4.0;
+		cellLocalAspectUv = modVec2f(aspectUv, aspectCellSize * 4.0);
+		aspectCellSize = aspectCellSize * 4.0;
 		border /= 4.0;
 	} else if (similar2) {
-		modUv = modVec2f(uv, cellSize * 2.0);
-		cellSize = cellSize * 2.0;
+		cellLocalAspectUv = modVec2f(aspectUv, aspectCellSize * 2.0);
+		aspectCellSize = aspectCellSize * 2.0;
 		border /= 2.0;
 	}
 
-	let cellUv = getPixelatedUv(uv, cellSize);
+	let aspectCellUv = getPixelatedAspectUv(aspectUv, aspectCellSize);
 
-	let sourceColor = getSourceColor(cellUv);
+	let sourceColor = getSourceColor(aspectUvToScreenNdcUv(aspectCellUv, uniforms.aspectRatio));
 	let sourceColorLuminance = (sourceColor.r + sourceColor.g + sourceColor.b) / 3.0;
 
 	var texSelector = remap(sourceColorLuminance, uniforms.shadowClipThreshold, uniforms.highlightClipThreshold, 0.0, 1.0); // クリップする範囲の分だけ範囲を圧縮する
 	texSelector = remap(texSelector, 0.0, 1.0, uniforms.symbolTexturesRangeMin, uniforms.symbolTexturesRangeMax);
 
 	let scale = min(1.0, 1.0 - border);
-	let shift = select(vec2f(0.0), vec2f(0.0) - getPointerTrailVector(cellUv) * cellSize, uniforms.pointerTrailShift == 1);
-	let margin = (1.0 - (0.5 + (scale * 0.5))) * cellSize;
-	let transformedCoords = ((modUv + shift) - margin) / (cellSize - (margin * 2.0));
-	var out_color = textureSample(symbolTextures, mySampler, vec2f(transformedCoords.x, 1.0 - transformedCoords.y), u32(texSelector * f32(uniforms.symbolTexturesCount)));
-	if (transformedCoords.x < 0.0 || transformedCoords.x > 1.0 || transformedCoords.y < 0.0 || transformedCoords.y > 1.0) {
+	let pointerTrailScreenNdcVector = getPointerTrailScreenNdcVector(aspectUvToScreenNdcUv(aspectCellUv, uniforms.aspectRatio));
+	let symbolShiftAspectVector = select(vec2f(0.0), getSymbolShiftAspectVector(pointerTrailScreenNdcVector, aspectCellSize), uniforms.pointerTrailShift == 1);
+	let shiftedCellLocalAspectUv = getShiftedCellLocalAspectUv(cellLocalAspectUv, symbolShiftAspectVector);
+	let symbolMarginAspectVector = (1.0 - (0.5 + (scale * 0.5))) * aspectCellSize;
+	let symbolTextureUv = (shiftedCellLocalAspectUv - symbolMarginAspectVector) / (aspectCellSize - (symbolMarginAspectVector * 2.0));
+	var out_color = textureSample(symbolTextures, mySampler, vec2f(symbolTextureUv.x, 1.0 - symbolTextureUv.y), u32(texSelector * f32(uniforms.symbolTexturesCount)));
+	if (symbolTextureUv.x < 0.0 || symbolTextureUv.x > 1.0 || symbolTextureUv.y < 0.0 || symbolTextureUv.y > 1.0) {
 		out_color = vec4f(0.0); // 範囲外の参照は無として扱う
 	}
 
@@ -299,7 +363,7 @@ fn fsWithSource(fragData: FragmentIn) -> @location(0) vec4f {
 		if (sourceColorLuminance < uniforms.shadowClipThreshold * 0.3) {
 			return premultiplyAlpha(vec4f(uniforms.bgColor, 1.0));
 		} else if (sourceColorLuminance < uniforms.shadowClipThreshold * 0.7) {
-			if (distance(modUv / cellSize, vec2(0.5, 0.5)) < 0.05) {
+			if (distance(shiftedCellLocalAspectUv / aspectCellSize, vec2(0.5, 0.5)) < 0.05) {
 				return premultiplyAlpha(vec4f(mix(uniforms.bgColor, uniforms.colorA, 0.25), 1.0));
 			} else {
 				return premultiplyAlpha(vec4f(uniforms.bgColor, 1.0));
@@ -314,10 +378,10 @@ fn fsWithSource(fragData: FragmentIn) -> @location(0) vec4f {
 	}
 
 	let isIn = (
-		(modUv.x / cellSize.x) > (1.0 - scale) / 2.0 &&
-		(modUv.x / cellSize.x) < 0.5 + (scale / 2.0) &&
-		(modUv.y / cellSize.y) > (1.0 - scale) / 2.0 &&
-		(modUv.y / cellSize.y) < 0.5 + (scale / 2.0)
+		(cellLocalAspectUv.x / aspectCellSize.x) > (1.0 - scale) / 2.0 &&
+		(cellLocalAspectUv.x / aspectCellSize.x) < 0.5 + (scale / 2.0) &&
+		(cellLocalAspectUv.y / aspectCellSize.y) > (1.0 - scale) / 2.0 &&
+		(cellLocalAspectUv.y / aspectCellSize.y) < 0.5 + (scale / 2.0)
 	);
 
 	if (!isIn) {
@@ -349,56 +413,57 @@ fn fsWithSource(fragData: FragmentIn) -> @location(0) vec4f {
 @fragment
 fn fsWithoutSource(fragData: FragmentIn) -> @location(0) vec4f {
 	let time = uniforms.time;
-	let scroll = vec2f(0.0, -time * 0.0001);
-	let uv = scaleUvToCoverGivenAspectRatio(fragData.uv, uniforms.aspectRatio);
-	var cellSize = vec2f(1.0 / (uniforms.divisions * 0.5));
+	let scrollAspectVector = vec2f(0.0, -time * 0.0001);
+	let aspectUv = screenNdcUvToAspectUv(fragData.screenNdcUv, uniforms.aspectRatio);
+	var aspectCellSize = vec2f(1.0 / (uniforms.divisions * 0.5));
 	var border = uniforms.margin;
-	var modUv = modVec2f(uv, cellSize);
+	var cellLocalAspectUv = modVec2f(aspectUv, aspectCellSize);
 
-	let cellUv2 = getPixelatedUv(uv, cellSize * 2.0);
-	let cellUv4 = getPixelatedUv(uv, cellSize * 4.0);
+	let aspectCellUv2 = getPixelatedAspectUv(aspectUv, aspectCellSize * 2.0);
+	let aspectCellUv4 = getPixelatedAspectUv(aspectUv, aspectCellSize * 4.0);
 
-	let cellMultiplier2Noise = snoise0to1(vec3f(cellUv2.x * 3.0, cellUv2.y * 3.0, time * 0.000025));
-	let cellMultiplier4Noise = snoise0to1(vec3f(cellUv4.x * 3.0, cellUv4.y * 3.0, time * 0.000025));
+	let cellMultiplier2Noise = snoise0to1(vec3f(aspectCellUv2.x * 3.0, aspectCellUv2.y * 3.0, time * 0.000025));
+	let cellMultiplier4Noise = snoise0to1(vec3f(aspectCellUv4.x * 3.0, aspectCellUv4.y * 3.0, time * 0.000025));
 	if (cellMultiplier4Noise > 0.9) {
-		modUv = modVec2f(uv, cellSize * 4.0);
-		cellSize = cellSize * 4.0;
+		cellLocalAspectUv = modVec2f(aspectUv, aspectCellSize * 4.0);
+		aspectCellSize = aspectCellSize * 4.0;
 		border /= 4.0;
 	} else if (cellMultiplier2Noise > 0.75) {
-		modUv = modVec2f(uv, cellSize * 2.0);
-		cellSize = cellSize * 2.0;
+		cellLocalAspectUv = modVec2f(aspectUv, aspectCellSize * 2.0);
+		aspectCellSize = aspectCellSize * 2.0;
 		border /= 2.0;
 	}
 
-	var cellUv = getPixelatedUv(uv, cellSize);
+	var aspectCellUv = getPixelatedAspectUv(aspectUv, aspectCellSize);
 
 	if (uniforms.pointerTrailWarp == 1) {
-		cellUv -= getPointerTrailVector(cellUv);
+		let pointerTrailScreenNdcVector = getPointerTrailScreenNdcVector(aspectUvToScreenNdcUv(aspectCellUv, uniforms.aspectRatio));
+		aspectCellUv -= screenNdcVectorToAspectVector(pointerTrailScreenNdcVector, uniforms.aspectRatio);
 	}
 
-	let sourceColor = getSourceColor(cellUv); // なぜか無いと死ぬ
-
-	let visibilityNoiseA = snoise0to1(vec3f(cellUv + scroll, time * 0.00000625));
-	let visibilityNoiseB = snoise0to1(vec3f(cellUv * 8.0, time * 0.00000625));
+	let visibilityNoiseA = snoise0to1(vec3f(aspectCellUv + scrollAspectVector, time * 0.00000625));
+	let visibilityNoiseB = snoise0to1(vec3f(aspectCellUv * 8.0, time * 0.00000625));
 	let threshold = 0.65;
 	let visibility = select(0.0, 1.0, mix(visibilityNoiseA, visibilityNoiseB, 0.5) > threshold);
 
-	var texSelector = snoise0to1(vec3f((cellUv * 3.0) + scroll, time * 0.00001));
+	var texSelector = snoise0to1(vec3f((aspectCellUv * 3.0) + scrollAspectVector, time * 0.00001));
 	texSelector = remap(texSelector, 0.0, 1.0, uniforms.symbolTexturesRangeMin, uniforms.symbolTexturesRangeMax);
 
-	let scaleNoise = snoise0to1(vec3f(cellUv * 0.7, time * 0.0000125));
+	let scaleNoise = snoise0to1(vec3f(aspectCellUv * 0.7, time * 0.0000125));
 	var scale = select(0.4, 1.0, scaleNoise > 0.25);
 	scale = min(scale, 1.0 - border);
 
-	let shift = select(vec2f(0.0), vec2f(0.0) - getPointerTrailVector(cellUv) * cellSize, uniforms.pointerTrailShift == 1);
-	let margin = (1.0 - (0.5 + (scale * 0.5))) * cellSize;
-	let transformedCoords = ((modUv + shift) - margin) / (cellSize - (margin * 2.0));
-	var out_color = textureSample(symbolTextures, mySampler, vec2f(transformedCoords.x, 1.0 - transformedCoords.y), u32(texSelector * f32(uniforms.symbolTexturesCount)));
-	if (transformedCoords.x < 0.0 || transformedCoords.x > 1.0 || transformedCoords.y < 0.0 || transformedCoords.y > 1.0) {
+	let pointerTrailScreenNdcVector = getPointerTrailScreenNdcVector(aspectUvToScreenNdcUv(aspectCellUv, uniforms.aspectRatio));
+	let symbolShiftAspectVector = select(vec2f(0.0), getSymbolShiftAspectVector(pointerTrailScreenNdcVector, aspectCellSize), uniforms.pointerTrailShift == 1);
+	let shiftedCellLocalAspectUv = getShiftedCellLocalAspectUv(cellLocalAspectUv, symbolShiftAspectVector);
+	let symbolMarginAspectVector = (1.0 - (0.5 + (scale * 0.5))) * aspectCellSize;
+	let symbolTextureUv = (shiftedCellLocalAspectUv - symbolMarginAspectVector) / (aspectCellSize - (symbolMarginAspectVector * 2.0));
+	var out_color = textureSample(symbolTextures, mySampler, vec2f(symbolTextureUv.x, 1.0 - symbolTextureUv.y), u32(texSelector * f32(uniforms.symbolTexturesCount)));
+	if (symbolTextureUv.x < 0.0 || symbolTextureUv.x > 1.0 || symbolTextureUv.y < 0.0 || symbolTextureUv.y > 1.0) {
 		out_color = vec4f(0.0); // 範囲外の参照は無として扱う
 	}
 
-	let colorNoise = snoise0to1(vec3f((cellUv * 8.0) + scroll, time * 0.000025));
+	let colorNoise = snoise0to1(vec3f((aspectCellUv * 8.0) + scrollAspectVector, time * 0.000025));
 
 	// background dots and blocks
 	if (visibility == 0.0 && uniforms.enableClippedAreaFill == 1) {
@@ -406,17 +471,17 @@ fn fsWithoutSource(fragData: FragmentIn) -> @location(0) vec4f {
 		if (n > 0.75) {
 			return premultiplyAlpha(vec4f(mix(uniforms.bgColor, uniforms.colorA, 0.05), 1.0));
 		} else if (n > 0.5) {
-			if (distance(modUv / cellSize, vec2(0.5, 0.5)) < 0.05) {
+			if (distance(shiftedCellLocalAspectUv / aspectCellSize, vec2(0.5, 0.5)) < 0.05) {
 				return premultiplyAlpha(vec4f(mix(uniforms.bgColor, uniforms.colorA, 0.25), 1.0));
 			}
 		}
 	}
 
 	let isIn = (
-		(modUv.x / cellSize.x) > (1.0 - scale) / 2.0 &&
-		(modUv.x / cellSize.x) < 0.5 + (scale / 2.0) &&
-		(modUv.y / cellSize.y) > (1.0 - scale) / 2.0 &&
-		(modUv.y / cellSize.y) < 0.5 + (scale / 2.0)
+		(cellLocalAspectUv.x / aspectCellSize.x) > (1.0 - scale) / 2.0 &&
+		(cellLocalAspectUv.x / aspectCellSize.x) < 0.5 + (scale / 2.0) &&
+		(cellLocalAspectUv.y / aspectCellSize.y) > (1.0 - scale) / 2.0 &&
+		(cellLocalAspectUv.y / aspectCellSize.y) < 0.5 + (scale / 2.0)
 	);
 
 	if (!isIn) {
@@ -458,29 +523,29 @@ struct PointerTrailUniforms {
 @group(1) @binding(2) var pointerTrailSampler: sampler;
 @group(1) @binding(3) var pointerTrailBeforeTexture: texture_2d<f32>;
 
-fn getPointerForceVector(uv: vec2f) -> vec2f {
+fn getPointerForceScreenNdcVector(aspectUv: vec2f) -> vec2f {
 	if (pointerTrailUniforms.pointerPosition.x <= -999.0 && pointerTrailUniforms.pointerPosition.y <= -999.0) {
 		return vec2f(0.0);
 	}
 
-	var v = vec2f(0.0);
+	var pointerForceScreenNdcVector = vec2f(0.0);
 	let radius = 0.3;
 
-	let pos = scaleUvToCoverGivenAspectRatio(pointerTrailUniforms.pointerPosition, pointerTrailUniforms.aspectRatio);
-	let d = distance(uv, pos);
+	let pointerAspectUv = screenNdcUvToAspectUv(pointerTrailUniforms.pointerPosition, pointerTrailUniforms.aspectRatio);
+	let d = distance(aspectUv, pointerAspectUv);
 	if (d < radius) {
 		let gradate = 1.0 - (d / radius);
-		v = (gradate * gradate) * (pointerTrailUniforms.pointerVector * 32.0);
+		pointerForceScreenNdcVector = (gradate * gradate) * (pointerTrailUniforms.pointerVector * 32.0);
 	}
 
-	return v;
+	return pointerForceScreenNdcVector;
 }
 
 @fragment
 fn fsPointerTrail(fragData: FragmentIn) -> @location(0) vec4f {
-	var uv = scaleUvToCoverGivenAspectRatio(fragData.uv, pointerTrailUniforms.aspectRatio);
-	var before = textureSample(pointerTrailBeforeTexture, pointerTrailSampler, convertTexCoords(fragData.uv)).rg;
-	before *= exp2(-pointerTrailUniforms.timeDelta / 300.0);
-	let v = getPointerForceVector(uv) * 0.3;
-	return vec4f(clamp(before + v, vec2f(-1.0), vec2f(1.0)), 0.0, 1.0);
+	let aspectUv = screenNdcUvToAspectUv(fragData.screenNdcUv, pointerTrailUniforms.aspectRatio);
+	var beforeScreenNdcVector = textureSample(pointerTrailBeforeTexture, pointerTrailSampler, screenNdcUvToTextureUv(fragData.screenNdcUv)).rg;
+	beforeScreenNdcVector *= exp2(-pointerTrailUniforms.timeDelta / 300.0);
+	let pointerForceScreenNdcVector = getPointerForceScreenNdcVector(aspectUv) * 0.3;
+	return vec4f(clamp(beforeScreenNdcVector + pointerForceScreenNdcVector, vec2f(-1.0), vec2f(1.0)), 0.0, 1.0);
 }

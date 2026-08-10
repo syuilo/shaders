@@ -3,6 +3,7 @@ import { metadata } from './meta.ts';
 import { createTextureFromSource, makeShaderDataDefinitions, makeStructuredView } from 'webgpu-utils';
 import { definePlayground, isIos, remap } from '@/utils.ts';
 import { isVideoFrameAvailable } from '@/video.ts';
+import { createLiquidPaintBlurLightBindGroupEntries } from './bind-group-entries.ts';
 
 export const playground = definePlayground({
 	...metadata,
@@ -254,22 +255,24 @@ export const playground = definePlayground({
 
 		const blurHorizontalBindGroup = wgpu.device.createBindGroup({
 			layout: blurLqPipeline.getBindGroupLayout(1),
-			entries: [
-				{ binding: 2, resource: { buffer: blurHorizontalUniformBuffer }},
-				{ binding: 3, resource: wgpu.sampler },
-				{ binding: 4, resource: bufferView },
-				{ binding: 5, resource: blurRadiusTextureView },
-			],
+			entries: createLiquidPaintBlurLightBindGroupEntries({
+				commonUniformBuffer: uniformBuffer,
+				blurUniformBuffer: blurHorizontalUniformBuffer,
+				sampler: wgpu.sampler,
+				targetTextureView: bufferView,
+				blurRadiusTextureView,
+			}),
 		});
 
 		const blurVerticalBindGroup = wgpu.device.createBindGroup({
 			layout: blurLqPipeline.getBindGroupLayout(1),
-			entries: [
-				{ binding: 2, resource: { buffer: blurVerticalUniformBuffer }},
-				{ binding: 3, resource: wgpu.sampler },
-				{ binding: 4, resource: buffer2View },
-				{ binding: 5, resource: blurRadiusTextureView },
-			],
+			entries: createLiquidPaintBlurLightBindGroupEntries({
+				commonUniformBuffer: uniformBuffer,
+				blurUniformBuffer: blurVerticalUniformBuffer,
+				sampler: wgpu.sampler,
+				targetTextureView: buffer2View,
+				blurRadiusTextureView,
+			}),
 		});
 
 		const blurBindGroup = wgpu.device.createBindGroup({
