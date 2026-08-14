@@ -3,6 +3,7 @@ import { metadata } from './meta.ts';
 import { createTextureFromSource, makeShaderDataDefinitions, makeStructuredView } from 'webgpu-utils';
 import { definePlayground, isIos, remap } from '@/utils.ts';
 import { isVideoFrameAvailable } from '@/video.ts';
+import { getBlurSampleCount, getMipLevelCount, shouldGenerateBlurMipmaps } from './blur-settings.ts';
 
 export const playground = definePlayground({
 	...metadata,
@@ -35,6 +36,8 @@ export const playground = definePlayground({
 		blurExtend: { type: 'range', min: -1, max: 1, step: 0.01, label: 'Blur Extend' },
 		blurQuality: { type: 'range', min: 0, max: 1, step: 0.01, label: 'Blur Quality' },
 		blurMethod: { type: 'enum', label: 'Blur Method', enum: [{
+			value: 'standardMip', label: 'Standard Mip'
+		}, {
 			value: 'standard', label: 'Standard'
 		}, {
 			value: 'monteCarlo', label: 'Monte Carlo'
@@ -56,7 +59,7 @@ export const playground = definePlayground({
 		blurStrength: 1.0,
 		blurExtend: 0.0,
 		blurQuality: 0.25,
-		blurMethod: isIos ? 'twoPass' : 'standard',
+		blurMethod: 'standardMip',
 		scrollFactor: 0.0,
 		test: false,
 	}),
@@ -179,12 +182,43 @@ export const playground = definePlayground({
 			],
 		}));
 
+		const mipLevelCount = getMipLevelCount(width, height);
 		const buffer = wgpu.device.createTexture({
 			size: { width, height },
+			mipLevelCount,
 			format: navigator.gpu.getPreferredCanvasFormat(),
 			usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
 		});
 		const bufferView = buffer.createView();
+		const bufferMipViews = Array.from({ length: mipLevelCount }, (_, mipLevel) => buffer.createView({
+			baseMipLevel: mipLevel,
+			mipLevelCount: 1,
+		}));
+
+		const downsamplePipeline = wgpu.device.createRenderPipeline({
+			vertex: {
+				module: wgpu.defaultVertexShaderModule,
+			},
+			fragment: {
+				module: shaderModule,
+				entryPoint: 'fsDownsample',
+				targets: [{
+					format: navigator.gpu.getPreferredCanvasFormat(),
+				}],
+			},
+			primitive: {
+				topology: 'triangle-list',
+			},
+			layout: 'auto',
+		});
+
+		const downsampleBindGroups = bufferMipViews.slice(0, -1).map(bufferMipView => wgpu.device.createBindGroup({
+			layout: downsamplePipeline.getBindGroupLayout(3),
+			entries: [
+				{ binding: 1, resource: wgpu.sampler },
+				{ binding: 2, resource: bufferMipView },
+			],
+		}));
 
 		const blurRadiusTexture = wgpu.device.createTexture({
 			size: { width, height },
@@ -207,6 +241,23 @@ export const playground = definePlayground({
 			fragment: {
 				module: shaderModule,
 				entryPoint: 'fsBlur',
+				targets: [{
+					format: navigator.gpu.getPreferredCanvasFormat(),
+				}],
+			},
+			primitive: {
+				topology: 'triangle-list',
+			},
+			layout: 'auto',
+		});
+
+		const blurMipPipeline = wgpu.device.createRenderPipeline({
+			vertex: {
+				module: wgpu.defaultVertexShaderModule,
+			},
+			fragment: {
+				module: shaderModule,
+				entryPoint: 'fsBlurMip',
 				targets: [{
 					format: navigator.gpu.getPreferredCanvasFormat(),
 				}],
@@ -274,6 +325,17 @@ export const playground = definePlayground({
 
 		const blurBindGroup = wgpu.device.createBindGroup({
 			layout: blurPipeline.getBindGroupLayout(1),
+			entries: [
+				{ binding: 1, resource: { buffer: uniformBuffer }},
+				{ binding: 2, resource: { buffer: blurUniformBuffer }},
+				{ binding: 3, resource: wgpu.sampler },
+				{ binding: 4, resource: bufferView },
+				{ binding: 5, resource: blurRadiusTextureView },
+			],
+		});
+
+		const blurMipBindGroup = wgpu.device.createBindGroup({
+			layout: blurMipPipeline.getBindGroupLayout(1),
 			entries: [
 				{ binding: 1, resource: { buffer: uniformBuffer }},
 				{ binding: 2, resource: { buffer: blurUniformBuffer }},
@@ -363,7 +425,7 @@ export const playground = definePlayground({
 
 					const passEncoder = ctx.createPassEncoder(ctx.commandEncoder, {
 						colorAttachments: [{
-							view: bufferView,
+							view: bufferMipViews[0],
 							clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
 							loadOp: 'clear',
 							storeOp: 'store',
@@ -378,6 +440,23 @@ export const playground = definePlayground({
 					passEncoder.setBindGroup(0, bindGroups[currentPointerTrailBufferIndex]);
 					passEncoder.draw(6);
 					passEncoder.end();
+				}
+
+				if (shouldGenerateBlurMipmaps(params.blurStrength, params.blurMethod)) {
+					for (let mipLevel = 1; mipLevel < mipLevelCount; mipLevel++) {
+						const passEncoder = ctx.createPassEncoder(ctx.commandEncoder, {
+							colorAttachments: [{
+								view: bufferMipViews[mipLevel],
+								clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+								loadOp: 'clear',
+								storeOp: 'store',
+							}],
+						});
+						passEncoder.setPipeline(downsamplePipeline);
+						passEncoder.setBindGroup(3, downsampleBindGroups[mipLevel - 1]);
+						passEncoder.draw(6);
+						passEncoder.end();
+					}
 				}
 
 				if (params.blurMethod === 'twoPass') {
@@ -424,10 +503,32 @@ export const playground = definePlayground({
 						passEncoder.draw(6);
 						passEncoder.end();
 					}
+				} else if (params.blurMethod === 'standardMip') {
+					{ // blur pass
+						blurUniformValues.set({
+							quality: getBlurSampleCount(params.blurQuality, params.blurMethod),
+							isIos: isIos ? 1.0 : 0.0,
+							monteCarlo: 0.0,
+						});
+						wgpu.device.queue.writeBuffer(blurUniformBuffer, 0, blurUniformValues.arrayBuffer);
+
+						const passEncoder = ctx.createPassEncoder(ctx.commandEncoder, {
+							colorAttachments: [{
+								view: wgpu.context.getCurrentTexture().createView(),
+								clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+								loadOp: 'clear',
+								storeOp: 'store',
+							}],
+						});
+						passEncoder.setPipeline(blurMipPipeline);
+						passEncoder.setBindGroup(1, blurMipBindGroup);
+						passEncoder.draw(6);
+						passEncoder.end();
+					}
 				} else {
 					{ // blur pass
 						blurUniformValues.set({
-							quality: Math.round(remap(params.blurQuality, 0, 1, 1, 512)),
+							quality: getBlurSampleCount(params.blurQuality, params.blurMethod),
 							isIos: isIos ? 1.0 : 0.0,
 							monteCarlo: params.blurMethod === 'monteCarlo' ? 1.0 : 0.0,
 						});

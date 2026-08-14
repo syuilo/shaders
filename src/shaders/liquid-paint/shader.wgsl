@@ -493,6 +493,25 @@ fn fs(fragData: FragmentIn) -> FragmentOut {
 	}
 }
 
+@group(3) @binding(1) var downsampleSampler: sampler;
+@group(3) @binding(2) var downsampleTexture: texture_2d<f32>;
+
+@fragment
+fn fsDownsample(fragData: FragmentIn) -> @location(0) vec4f {
+	let uv = convertTexCoords(fragData.uv);
+	let sourceDimensions = textureDimensions(downsampleTexture, 0);
+	let texelSize = 1.0 / vec2f(f32(sourceDimensions.x), f32(sourceDimensions.y));
+	let minUv = vec2f(0.0);
+	let maxUv = vec2f(1.0);
+
+	let a = textureSampleLevel(downsampleTexture, downsampleSampler, clamp(uv + texelSize * vec2f(-0.5, -0.5), minUv, maxUv), 0.0);
+	let b = textureSampleLevel(downsampleTexture, downsampleSampler, clamp(uv + texelSize * vec2f( 0.5, -0.5), minUv, maxUv), 0.0);
+	let c = textureSampleLevel(downsampleTexture, downsampleSampler, clamp(uv + texelSize * vec2f(-0.5,  0.5), minUv, maxUv), 0.0);
+	let d = textureSampleLevel(downsampleTexture, downsampleSampler, clamp(uv + texelSize * vec2f( 0.5,  0.5), minUv, maxUv), 0.0);
+
+	return (a + b + c + d) * 0.25;
+}
+
 struct BlurUniforms {
 	quality: i32,
 	isIos: u32,
@@ -508,9 +527,48 @@ struct BlurUniforms {
 @group(1) @binding(5) var blurRadiusTexture: texture_2d<f32>;
 
 const goldenAngle = 2.399963229728653; // radians
+const blurLodBias = 0.0;
 
 fn getBlurRadius(_uv: vec2f) -> f32 {
 	return textureSampleLevel(blurRadiusTexture, targetSampler, convertTexCoords(_uv), 0.0).r;
+}
+
+@fragment
+fn fsBlurMip(fragData: FragmentIn) -> @location(0) vec4f {
+	let centerUv = convertTexCoords(fragData.uv);
+
+	let r = getBlurRadius(fragData.uv);
+	if (r <= 0.0) {
+		return textureSampleLevel(targetTexture, targetSampler, centerUv, 0.0);
+	}
+
+	let sampleCount = max(blurUniforms.quality, 1);
+	let targetDimensions = textureDimensions(targetTexture, 0);
+	let radiusPx = r * 0.5 * f32(targetDimensions.x);
+	let sampleFootprintPx = radiusPx / sqrt(f32(sampleCount));
+	let maxLod = f32(textureNumLevels(targetTexture) - 1u);
+	let sampleLod = clamp(log2(max(sampleFootprintPx, 1.0)) + blurLodBias, 0.0, maxLod);
+
+	var result = vec4f(0.0);
+	var totalWeight = 0.0;
+	let jitter = rand(fragData.uv / vec2f(1.0, blurCommonUniforms.aspectRatio)) * 4.0;
+
+	for (var i = 0; i < sampleCount; i++) {
+		let radius = sqrt((f32(i) + 0.5) / f32(sampleCount));
+		let theta = (f32(i) + jitter) * goldenAngle;
+		let direction = vec2f(cos(theta), sin(theta));
+		let offset = direction * (r * radius);
+		let weight = exp(-radius * radius * 4.0);
+		var sampleUv = fragData.uv + (offset * vec2f(1.0, blurCommonUniforms.aspectRatio));
+		if (blurUniforms.isIos == 1) { // iOSではなぜか範囲外のサンプリングが異様に重いのでクランプ
+			sampleUv.x = clamp(sampleUv.x, -1.0, 1.0);
+			sampleUv.y = clamp(sampleUv.y, -1.0, 1.0);
+		}
+		result += textureSampleLevel(targetTexture, targetSampler, convertTexCoords(sampleUv), sampleLod) * weight;
+		totalWeight += weight;
+	}
+
+	return result / totalWeight;
 }
 
 @fragment
