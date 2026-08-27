@@ -165,6 +165,7 @@ struct Uniforms {
 	useOriginalColor: u32,
 	sourceAspectRatio: f32,
 	sourceContrast: f32,
+	sourceBlend: f32,
 	highlightClipThreshold: f32,
 	shadowClipThreshold: f32,
 	enableClippedAreaFill: u32,
@@ -229,6 +230,15 @@ fn unscaleUvToCoverGivenAspectRatio(uv: vec2f, aspectRatio: f32) -> vec2f {
 	return uv * vec2f(1.0, aspectRatio) / select(1.0, aspectRatio, 1.0 > aspectRatio);
 }
 
+fn blendSource(sourceColor: vec4f, outColor: vec4f) -> vec4f {
+	return vec4f(
+		mix(outColor.r, sourceColor.r, uniforms.sourceBlend),
+		mix(outColor.g, sourceColor.g, uniforms.sourceBlend),
+		mix(outColor.b, sourceColor.b, uniforms.sourceBlend),
+		outColor.a
+	);
+}
+
 struct FragmentIn {
 	@location(0) uv: vec2f,
 };
@@ -241,6 +251,7 @@ fn fsWithSource(fragData: FragmentIn) -> @location(0) vec4f {
 	var cellSize = vec2f(1.0 / (uniforms.divisions * 0.5));
 	var border = uniforms.margin;
 	var modUv = modVec2f(uv, cellSize);
+	let sourceOriginalColor = getSourceColor(uv);
 
 	let cellUv2 = getPixelatedUv(uv, cellSize * 2.0);
 	let cellOffset2 = cellSize * 0.5;
@@ -294,25 +305,25 @@ fn fsWithSource(fragData: FragmentIn) -> @location(0) vec4f {
 	}
 
 	if (sourceColorLuminance > uniforms.highlightClipThreshold) {
-		return premultiplyAlpha(vec4f(uniforms.bgColor, 1.0));
+		return premultiplyAlpha(blendSource(sourceOriginalColor, vec4f(uniforms.bgColor, 1.0)));
 	}
 
 	// fill background dots and blocks
 	if (uniforms.enableClippedAreaFill == 1) {
 		if (sourceColorLuminance < uniforms.shadowClipThreshold * 0.3) {
-			return premultiplyAlpha(vec4f(uniforms.bgColor, 1.0));
+			return premultiplyAlpha(blendSource(sourceOriginalColor, vec4f(uniforms.bgColor, 1.0)));
 		} else if (sourceColorLuminance < uniforms.shadowClipThreshold * 0.7) {
 			if (distance(modUv / cellSize, vec2(0.5, 0.5)) < 0.05) {
-				return premultiplyAlpha(vec4f(mix(uniforms.bgColor, uniforms.colorA, 0.25), 1.0));
+				return premultiplyAlpha(blendSource(sourceOriginalColor, vec4f(mix(uniforms.bgColor, uniforms.colorA, 0.25), 1.0)));
 			} else {
-				return premultiplyAlpha(vec4f(uniforms.bgColor, 1.0));
+				return premultiplyAlpha(blendSource(sourceOriginalColor, vec4f(uniforms.bgColor, 1.0)));
 			}
 		} else if (sourceColorLuminance < uniforms.shadowClipThreshold) {
-			return premultiplyAlpha(vec4f(mix(uniforms.bgColor, uniforms.colorA, 0.05), 1.0));
+			return premultiplyAlpha(blendSource(sourceOriginalColor, vec4f(mix(uniforms.bgColor, uniforms.colorA, 0.05), 1.0)));
 		}
 	} else {
 		if (sourceColorLuminance < uniforms.shadowClipThreshold) {
-			return premultiplyAlpha(vec4f(uniforms.bgColor, 1.0));
+			return premultiplyAlpha(blendSource(sourceOriginalColor, vec4f(uniforms.bgColor, 1.0)));
 		}
 	}
 
@@ -324,7 +335,7 @@ fn fsWithSource(fragData: FragmentIn) -> @location(0) vec4f {
 	);
 
 	if (!isIn) {
-		return premultiplyAlpha(vec4f(vec3f(uniforms.bgColor), 1.0));
+		return premultiplyAlpha(blendSource(sourceOriginalColor, vec4f(vec3f(uniforms.bgColor), 1.0)));
 	}
 
 	if (uniforms.useOriginalColor == 0) {
@@ -346,7 +357,7 @@ fn fsWithSource(fragData: FragmentIn) -> @location(0) vec4f {
 	out_color.b = mix(uniforms.bgColor.b, out_color.b, out_color.a);
 	out_color.a = 1.0;
 
-	return premultiplyAlpha(out_color);
+	return premultiplyAlpha(blendSource(sourceOriginalColor, out_color));
 }
 
 @fragment
