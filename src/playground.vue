@@ -84,14 +84,16 @@
 		<b>Hide menu button:</b>
 		<input type="checkbox" v-model="hideMenuButton" />
 	</label>
+	<button type="button" @click="copyUrl">Copy URL</button>
+
+	<hr>
+
 	<label>
 		<b>Show debug menu:</b>
 		<input type="checkbox" v-model="showDebugMenu" />
 	</label>
 
 	<template v-if="showDebugMenu">
-		<hr>
-
 		<label>
 			<b>Enable stats:</b>
 			<input type="checkbox" v-model="enableStats" />
@@ -105,6 +107,7 @@
 			<input type="checkbox" v-model="benchmarkMode" />
 		</label>
 	</template>
+
 </div>
 </template>
 
@@ -150,6 +153,43 @@ const pixelRatio = ref(tryParseJson(urlParams.get('_pixelRatio'), null));
 const fps = ref(tryParseJson(urlParams.get('_fps'), null));
 const bgColor = ref(tryParseJson(urlParams.get('_bgColor'), playgroundDef?.backgroundColor ?? '#000000'));
 const animatedBg = ref(tryParseJson(urlParams.get('_animatedBg'), false));
+
+async function copyUrl() {
+	const nextUrlParams = new URLSearchParams(window.location.search);
+	nextUrlParams.delete(props.name);
+
+	for (const [key, schema] of Object.entries(playgroundDef.params)) {
+		if (schema.type === 'media') {
+			nextUrlParams.delete(key);
+			continue;
+		}
+
+		nextUrlParams.set(key, JSON.stringify(params[key]));
+	}
+
+	for (const [key, value] of [
+		['_hideMenuButton', hideMenuButton.value],
+		['_timeFactor', timeFactor.value],
+		['_timeSpecified', timeSpecified.value],
+		['_pixelRatio', pixelRatio.value],
+		['_fps', fps.value],
+		['_bgColor', bgColor.value],
+		['_animatedBg', animatedBg.value],
+	] as const) {
+		nextUrlParams.set(key, JSON.stringify(value));
+	}
+
+	const serializedParams = nextUrlParams.toString();
+	const query = serializedParams === '' ? props.name : `${props.name}&${serializedParams}`;
+	const url = new URL(window.location.href);
+	url.search = query;
+
+	try {
+		await navigator.clipboard.writeText(url.toString());
+	} catch {
+		window.alert('Failed to copy URL');
+	}
+}
 
 async function init() {
 	console.log(`Initializing ${props.name}...`);
