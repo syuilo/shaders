@@ -149,8 +149,8 @@ const showDebugMenu = ref(false);
 const hideMenuButton = ref(tryParseJson(urlParams.get('_hideMenuButton'), false));
 const timeFactor = ref(tryParseJson(urlParams.get('_timeFactor'), 1.0));
 const timeSpecified = ref(tryParseJson(urlParams.get('_timeSpecified'), null));
-const pixelRatio = ref(tryParseJson(urlParams.get('_pixelRatio'), null));
-const fps = ref(tryParseJson(urlParams.get('_fps'), null));
+const pixelRatio = ref(tryParseJson(urlParams.get('_pixelRatio'), 1));
+const fps = ref(tryParseJson(urlParams.get('_fps'), 60));
 const bgColor = ref(tryParseJson(urlParams.get('_bgColor'), playgroundDef?.backgroundColor ?? '#000000'));
 const animatedBg = ref(tryParseJson(urlParams.get('_animatedBg'), false));
 
